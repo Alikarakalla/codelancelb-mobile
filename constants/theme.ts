@@ -5,25 +5,31 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
+const tintColorLight = '#1152d4'; // Keep primary blue for some actions, or switch to black if requested
 const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
+    text: '#18181B', // Zinc-900
     background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    tint: '#000', // Sadek uses black primary
+    icon: '#18181B',
+    tabIconDefault: '#94a3b8',
+    tabIconSelected: '#000',
+    primary: '#1152d4',
+    red: '#DC3545',
+    gray: '#6B7280',
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
+    background: '#000',
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    primary: '#1152d4',
+    red: '#DC3545',
+    gray: '#6B7280',
   },
 };
 
