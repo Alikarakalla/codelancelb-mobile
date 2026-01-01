@@ -58,6 +58,13 @@ function DrawerWrappedTabs() {
             tabBarIcon: ({ color }) => <MaterialIcons name="person" size={28} color={color} />,
           }}
         />
+        <Tabs.Screen
+          name="cart"
+          options={{
+            href: null,
+            headerShown: false,
+          }}
+        />
       </Tabs>
     </SideDrawer>
   );

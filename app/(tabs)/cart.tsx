@@ -8,11 +8,13 @@ import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { CartFooter } from '@/components/cart/CartFooter';
 
+import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCart } from '@/hooks/use-cart-context';
 
 export default function CartScreen() {
     const insets = useSafeAreaInsets();
     const { items, removeFromCart, updateQuantity, cartTotal } = useCart();
+    const { openDrawer } = useDrawer();
 
     const totals = {
         subtotal: cartTotal,
@@ -24,11 +26,11 @@ export default function CartScreen() {
 
     return (
         <View style={styles.container}>
-            <LuxeHeader showBackButton={true} title="Shopping Cart" />
+            <LuxeHeader showBackButton={false} title="LUXE" onOpenMenu={openDrawer} />
 
             <ScrollView
                 contentContainerStyle={{
-                    paddingTop: 60 + insets.top, // Header
+                    paddingTop: 80 + insets.top, // Header + extra spacing
                     paddingBottom: 180, // Footer + cushion
                     paddingHorizontal: 16
                 }}

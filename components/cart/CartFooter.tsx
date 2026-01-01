@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingTop: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
@@ -63,7 +63,8 @@ const styles = StyleSheet.create({
         letterSpacing: -0.5,
     },
     checkoutBtn: {
-        height: 56,
+        height: 'auto',
+        padding: 8,
         backgroundColor: '#1152d4',
         borderRadius: 12,
         flexDirection: 'row',
