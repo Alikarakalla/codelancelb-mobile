@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Drawer } from 'react-native-drawer-layout';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.85, 320);
@@ -26,6 +27,9 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const router = useRouter();
+
+    const [isLoggedIn] = React.useState(false);
 
     const renderDrawerContent = useCallback(() => {
         const NavItem = ({ icon, label, badge, active = false }: any) => (
@@ -69,15 +73,29 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                 {/* Profile Section */}
                 <View style={styles.profileSection}>
                     <View style={styles.avatarContainer}>
-                        <View style={[styles.avatar, { backgroundColor: '#1152d4' }]}>
-                            <Text style={styles.avatarText}>JD</Text>
+                        <View style={[styles.avatar, { backgroundColor: isLoggedIn ? '#1152d4' : (isDark ? '#374151' : '#e2e8f0') }]}>
+                            {isLoggedIn ? (
+                                <Text style={styles.avatarText}>JD</Text>
+                            ) : (
+                                <MaterialIcons name="person" size={32} color={isDark ? '#9ca3af' : '#64748b'} />
+                            )}
                         </View>
-                        <View style={styles.onlineBadge} />
+                        {isLoggedIn && <View style={styles.onlineBadge} />}
                     </View>
                     <View style={styles.profileInfo}>
-                        <Text style={[styles.userName, { color: isDark ? '#fff' : '#0f172a' }]}>Jane Doe</Text>
-                        <Pressable style={styles.viewProfile}>
-                            <Text style={styles.viewProfileText}>View Profile</Text>
+                        <Text style={[styles.userName, { color: isDark ? '#fff' : '#0f172a' }]}>
+                            {isLoggedIn ? 'Jane Doe' : 'Welcome!'}
+                        </Text>
+                        <Pressable
+                            style={styles.viewProfile}
+                            onPress={() => {
+                                onClose();
+                                router.push(isLoggedIn ? '/profile' : '/login');
+                            }}
+                        >
+                            <Text style={styles.viewProfileText}>
+                                {isLoggedIn ? 'View Profile' : 'Log In / Sign Up'}
+                            </Text>
                             <MaterialIcons name="arrow-forward" size={14} color="#1152d4" />
                         </Pressable>
                     </View>
@@ -98,15 +116,17 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                 </ScrollView>
 
                 {/* Footer */}
-                <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
-                    <Pressable style={styles.signOutButton}>
-                        <MaterialIcons name="logout" size={22} color="#64748b" />
-                        <Text style={styles.signOutText}>Sign Out</Text>
-                    </Pressable>
-                </View>
+                {isLoggedIn && (
+                    <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+                        <Pressable style={styles.signOutButton}>
+                            <MaterialIcons name="logout" size={22} color="#64748b" />
+                            <Text style={styles.signOutText}>Sign Out</Text>
+                        </Pressable>
+                    </View>
+                )}
             </View>
         );
-    }, [isDark, insets, onClose]);
+    }, [isDark, insets, onClose, isLoggedIn]);
 
     return (
         <Drawer

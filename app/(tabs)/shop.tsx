@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LuxeHeader } from '@/components/home/LuxeHeader';
 import { ShopFilterBar, FilterChip } from '@/components/shop/ShopFilterBar';
-import { ProductGridItem } from '@/components/product/ProductGridItem';
+import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import { ShopFilterModal } from '@/components/shop/ShopFilterModal';
 import { MOCK_PRODUCTS } from '@/constants/mockData';
@@ -58,9 +58,9 @@ export default function ShopScreen() {
                     keyExtractor={(item) => item.id.toString()}
                     numColumns={2}
                     renderItem={({ item }) => (
-                        <ProductGridItem
+                        <ShopProductCard
                             product={item}
-                            onPress={() => handleProductPress(item)}
+                            style={{ width: '48%' }}
                             onQuickView={() => setQuickViewProduct(item)}
                         />
                     )}

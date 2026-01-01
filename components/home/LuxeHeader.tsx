@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useCart } from '@/hooks/use-cart-context';
 
 interface LuxeHeaderProps {
     showBackButton?: boolean;
@@ -18,6 +19,7 @@ export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu 
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const router = useRouter();
+    const { cartCount } = useCart();
     const isDark = colorScheme === 'dark';
     const textColor = isDark ? '#fff' : '#18181B';
     const bgColor = isDark ? '#000' : '#fff';
@@ -51,11 +53,13 @@ export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu 
                     <Pressable style={styles.iconButton}>
                         <Feather name="search" size={20} color={textColor} />
                     </Pressable>
-                    <Pressable style={styles.iconButton}>
+                    <Pressable style={styles.iconButton} onPress={() => router.push('/cart')}>
                         <Feather name="shopping-bag" size={20} color={textColor} />
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>2</Text>
-                        </View>
+                        {cartCount > 0 && (
+                            <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
+                                <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
+                            </View>
+                        )}
                     </Pressable>
                 </View>
             </View>

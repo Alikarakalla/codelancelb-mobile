@@ -8,14 +8,25 @@ const IMAGE_ASPECT_RATIO = 1; // Square 1:1
 
 interface ProductImageGalleryProps {
     images: string[];
+    selectedImage?: string | null;
 }
 
-export function ProductImageGallery({ images }: ProductImageGalleryProps) {
+export function ProductImageGallery({ images, selectedImage }: ProductImageGalleryProps) {
     const [visible, setVisible] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
 
     const formattedImages = images.map(img => ({ uri: img }));
+
+    // Scroll to selected image when it updates
+    React.useEffect(() => {
+        if (selectedImage) {
+            const index = images.findIndex(img => img === selectedImage);
+            if (index !== -1 && index !== activeIndex) {
+                scrollToIndex(index);
+            }
+        }
+    }, [selectedImage, images]);
 
     // Handle scroll for pagination
     const onViewRef = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -26,8 +37,10 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
     const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
     const scrollToIndex = (index: number) => {
-        flatListRef.current?.scrollToIndex({ index, animated: true });
-        setActiveIndex(index);
+        if (index >= 0 && index < images.length) {
+            flatListRef.current?.scrollToIndex({ index, animated: true });
+            setActiveIndex(index);
+        }
     };
 
     if (!images || images.length === 0) return null;
@@ -45,6 +58,17 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
                     onViewableItemsChanged={onViewRef.current}
                     viewabilityConfig={viewConfigRef.current}
                     keyExtractor={(_, index) => index.toString()}
+                    getItemLayout={(_, index) => ({
+                        length: width,
+                        offset: width * index,
+                        index,
+                    })}
+                    onScrollToIndexFailed={(info) => {
+                        const wait = new Promise(resolve => setTimeout(resolve, 500));
+                        wait.then(() => {
+                            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                        });
+                    }}
                     renderItem={({ item }) => (
                         <View style={styles.slide}>
                             <Image

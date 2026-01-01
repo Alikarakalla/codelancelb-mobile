@@ -5,22 +5,44 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 
-export function AddToCartFooter() {
+interface AddToCartFooterProps {
+    onAddToCart: () => void;
+    onToggleWishlist?: () => void;
+    isWishlisted?: boolean;
+    disabled?: boolean;
+    price?: number;
+}
+
+export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, disabled, price }: AddToCartFooterProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
     return (
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) + 90 }]}>
-            <Pressable style={({ pressed }) => [styles.favButton, pressed && styles.pressed]}>
-                <Ionicons name="heart-outline" size={24} color="#94A3B8" />
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <Pressable
+                onPress={onToggleWishlist}
+                style={({ pressed }) => [styles.favButton, pressed && styles.pressed]}
+            >
+                <Ionicons
+                    name={isWishlisted ? "heart" : "heart-outline"}
+                    size={24}
+                    color={isWishlisted ? "#ef4444" : "#94A3B8"}
+                />
             </Pressable>
 
             <Pressable
-                onPress={() => router.push('/cart')}
-                style={({ pressed }) => [styles.cartButton, pressed && styles.pressedOpacity]}
+                onPress={onAddToCart}
+                disabled={disabled}
+                style={({ pressed }) => [
+                    styles.cartButton,
+                    pressed && !disabled && styles.pressedOpacity,
+                    disabled && styles.disabledButton
+                ]}
             >
-                <Ionicons name="cart" size={20} color="#fff" />
-                <Text style={styles.cartText}>Add to Cart</Text>
+                <Ionicons name="cart" size={20} color={disabled ? "#94A3B8" : "#fff"} />
+                <Text style={[styles.cartText, disabled && styles.disabledText]}>
+                    {disabled ? 'Out of Stock' : (price ? `Add • $${price.toFixed(2)}` : 'Add to Cart')}
+                </Text>
             </Pressable>
         </View>
     );
@@ -82,5 +104,13 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         color: '#fff',
+    },
+    disabledButton: {
+        backgroundColor: '#F1F5F9',
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+    disabledText: {
+        color: '#94A3B8',
     },
 });

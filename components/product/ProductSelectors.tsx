@@ -6,9 +6,10 @@ import { ProductOption, ProductVariant } from '@/types/schema';
 interface ProductSelectorsProps {
     options?: ProductOption[];
     variants?: ProductVariant[];
+    onVariantChange?: (variant: ProductVariant | null) => void;
 }
 
-export function ProductSelectors({ options = [], variants = [] }: ProductSelectorsProps) {
+export function ProductSelectors({ options = [], variants = [], onVariantChange }: ProductSelectorsProps) {
     // Find specific options
     const colorOption = options.find(o => o.name === 'Color');
     const sizeOption = options.find(o => o.name === 'Size');
@@ -18,8 +19,6 @@ export function ProductSelectors({ options = [], variants = [] }: ProductSelecto
     const allSizes = sizeOption?.values || [];
 
     // Initialize state
-    // Default to the first color/size that is available?
-    // Let's just default to the first one in list for now, then effect will fix it.
     const [selectedColor, setSelectedColor] = React.useState(allColors[0] || '');
     const [selectedSize, setSelectedSize] = React.useState('');
 
@@ -48,6 +47,16 @@ export function ProductSelectors({ options = [], variants = [] }: ProductSelecto
             setSelectedSize(''); // No sizes available for this color
         }
     }, [availableSizes, selectedSize]);
+
+    // Notify parent of variant change
+    useEffect(() => {
+        if (selectedColor && selectedSize) {
+            const variant = variants.find(v => v.color === selectedColor && v.size === selectedSize) || null;
+            onVariantChange?.(variant);
+        } else {
+            onVariantChange?.(null);
+        }
+    }, [selectedColor, selectedSize, variants, onVariantChange]);
 
     // Map color names to hex codes
     const getColorHex = (name: string) => {

@@ -1,0 +1,99 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Product, ProductVariant, CartItem } from '@/types/schema';
+
+// Mock initial data or empty
+const INITIAL_CART: CartItem[] = [];
+
+interface CartContextType {
+    items: CartItem[];
+    addToCart: (product: Product, variant?: ProductVariant | null, quantity?: number) => void;
+    removeFromCart: (itemId: number) => void;
+    updateQuantity: (itemId: number, quantity: number) => void;
+    clearCart: () => void;
+    cartCount: number;
+    cartTotal: number;
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+    const [items, setItems] = useState<CartItem[]>(INITIAL_CART);
+
+    // Calculate derived state
+    const cartCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const cartTotal = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+    const addToCart = (product: Product, variant?: ProductVariant | null, quantity: number = 1) => {
+        setItems(prev => {
+            // Unique key logic: ProductID + VariantSlug (if exists)
+            // Or just use variant_key if we have specific variant IDs
+            const variantKey = variant ? variant?.slug : null;
+
+            // Check if item already exists
+            const existingIndex = prev.findIndex(item =>
+                item.product_id === product.id &&
+                item.variant_key === variantKey
+            );
+
+            if (existingIndex >= 0) {
+                // Update quantity
+                const newItems = [...prev];
+                newItems[existingIndex].qty += quantity;
+                return newItems;
+            } else {
+                // Add new item
+                const newItem: CartItem = {
+                    id: Date.now(), // Mock ID
+                    product_id: product.id,
+                    variant_key: variantKey || null,
+                    options: variant ? { ...variant.option_values } : null,
+                    qty: quantity,
+                    price: variant ? (variant.price || product.price || 0) : (product.price || 0),
+                    product: product // Store full product for UI display
+                };
+                return [...prev, newItem];
+            }
+        });
+        console.log(`Added to cart: ${product.name} (Variant: ${variant?.slug || 'None'}) x${quantity}`);
+    };
+
+    const removeFromCart = (itemId: number) => {
+        setItems(prev => prev.filter(item => item.id !== itemId));
+    };
+
+    const updateQuantity = (itemId: number, quantity: number) => {
+        if (quantity <= 0) {
+            removeFromCart(itemId);
+            return;
+        }
+        setItems(prev => prev.map(item =>
+            item.id === itemId ? { ...item, qty: quantity } : item
+        ));
+    };
+
+    const clearCart = () => {
+        setItems([]);
+    };
+
+    return (
+        <CartContext.Provider value={{
+            items,
+            addToCart,
+            removeFromCart,
+            updateQuantity,
+            clearCart,
+            cartCount,
+            cartTotal
+        }}>
+            {children}
+        </CartContext.Provider>
+    );
+}
+
+export function useCart() {
+    const context = useContext(CartContext);
+    if (context === undefined) {
+        throw new Error('useCart must be used within a CartProvider');
+    }
+    return context;
+}

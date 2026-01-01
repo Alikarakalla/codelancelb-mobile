@@ -11,21 +11,17 @@ export function CartFooter({ total }: CartFooterProps) {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) + 90 }]}>
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <View style={styles.row}>
                 <View>
                     <Text style={styles.label}>Total Price</Text>
                     <Text style={styles.total}>${total.toFixed(2)}</Text>
                 </View>
-                <Pressable style={styles.detailsBtn}>
-                    <Text style={styles.detailsText}>View Details</Text>
-                    <Ionicons name="chevron-up" size={16} color="#1152d4" />
-                </Pressable>
             </View>
 
             <Pressable style={styles.checkoutBtn}>
                 <Text style={styles.checkoutText}>Proceed to Checkout</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
             </Pressable>
         </View>
     );
@@ -66,16 +62,6 @@ const styles = StyleSheet.create({
         color: '#0F172A',
         letterSpacing: -0.5,
     },
-    detailsBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    detailsText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#1152d4',
-    },
     checkoutBtn: {
         height: 56,
         backgroundColor: '#1152d4',
@@ -91,7 +77,7 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     checkoutText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '700',
         color: '#fff',
     },

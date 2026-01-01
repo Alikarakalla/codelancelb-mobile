@@ -9,6 +9,8 @@ interface CartItemProps {
     price: number;
     image: string;
     quantity: number;
+    onRemove?: () => void;
+    onUpdateQuantity?: (quantity: number) => void;
 }
 
 export function CartItem(props: CartItemProps) {
@@ -22,7 +24,7 @@ export function CartItem(props: CartItemProps) {
                         <Text style={styles.name} numberOfLines={2}>{props.name}</Text>
                         <Text style={styles.details}>{props.details}</Text>
                     </View>
-                    <Pressable style={styles.deleteBtn}>
+                    <Pressable style={styles.deleteBtn} onPress={props.onRemove}>
                         <Ionicons name="trash-outline" size={20} color="#94A3B8" />
                     </Pressable>
                 </View>
@@ -31,11 +33,17 @@ export function CartItem(props: CartItemProps) {
                     <Text style={styles.price}>${props.price.toFixed(2)}</Text>
 
                     <View style={styles.counter}>
-                        <Pressable style={styles.counterBtn}>
+                        <Pressable
+                            style={styles.counterBtn}
+                            onPress={() => props.onUpdateQuantity?.(props.quantity - 1)}
+                        >
                             <Ionicons name="remove" size={16} color="#0F172A" />
                         </Pressable>
                         <Text style={styles.countText}>{props.quantity}</Text>
-                        <Pressable style={[styles.counterBtn, styles.counterBtnAdd]}>
+                        <Pressable
+                            style={[styles.counterBtn, styles.counterBtnAdd]}
+                            onPress={() => props.onUpdateQuantity?.(props.quantity + 1)}
+                        >
                             <Ionicons name="add" size={16} color="#fff" />
                         </Pressable>
                     </View>

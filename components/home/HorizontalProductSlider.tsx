@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions } from 'react-native';
 import { Product } from '@/types/schema';
-import { ProductGridItem } from '@/components/product/ProductGridItem';
+import { ShopProductCard } from '@/components/shop/ShopProductCard';
 
 interface HorizontalProductSliderProps {
     products: Product[];
@@ -20,10 +20,9 @@ export function HorizontalProductSlider({ products, onProductPress }: Horizontal
             decelerationRate="fast"
             renderItem={({ item }) => (
                 <View style={styles.itemWrapper}>
-                    <ProductGridItem
+                    <ShopProductCard
                         product={item}
-                        width={200}
-                        onPress={() => onProductPress(item)}
+                    // style={{ width: '100%' }} // Implicitly fills wrapper
                     />
                 </View>
             )}

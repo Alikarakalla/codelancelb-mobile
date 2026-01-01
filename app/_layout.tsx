@@ -11,8 +11,10 @@ export const unstable_settings = {
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { GlobalLiquidTabBar } from '@/components/ui/GlobalLiquidTabBar';
-import { View } from 'react-native';
+import { WishlistProvider } from '@/hooks/use-wishlist-context';
+import { CartProvider } from '@/hooks/use-cart-context';
+
+/* ... */
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -20,19 +22,22 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <View style={{ flex: 1 }}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
-              <Stack.Screen name="cart" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
-            <GlobalLiquidTabBar />
-          </View>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
+                <Stack.Screen name="cart" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="signup" options={{ headerShown: false }} />
+              </Stack>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </CartProvider>
+        </WishlistProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
