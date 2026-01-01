@@ -4,21 +4,25 @@ import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions } from
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.42;
 
-const BRANDS = [
-    { id: '1', name: 'LATTAFA', color: '#000', label: 'LATTAFA', textColor: '#D4AF37', image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?q=80&w=1000&auto=format&fit=crop' },
-    { id: '2', name: 'MAYBELLINE', color: '#000', label: 'MAYBELLINE', textColor: '#FFFFFF', image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1000&auto=format&fit=crop' },
-    { id: '3', name: 'YSL', color: '#000', label: 'YVES SAINT LAURENT', textColor: '#FFFFFF', image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=1000&auto=format&fit=crop' },
-    { id: '4', name: 'BOURJOIS', color: '#000', label: 'BOURJOIS', textColor: '#FFFFFF', image: 'https://images.unsplash.com/photo-1512496011951-a99932826d04?q=80&w=1000&auto=format&fit=crop' },
-];
-
 import { SharedValue } from 'react-native-reanimated';
 import { RevealingItem } from './RevealingItem';
+import { Brand } from '@/types/schema';
+
+const MOCK_BRANDS = [
+    { id: 1, name: 'LATTAFA', name_en: 'LATTAFA', name_ar: 'لطافة', slug: 'lattafa', logo: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?q=80&w=1000&auto=format&fit=crop', is_active: true },
+    { id: 2, name: 'MAYBELLINE', name_en: 'MAYBELLINE', name_ar: 'ميبيلين', slug: 'maybelline', logo: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1000&auto=format&fit=crop', is_active: true },
+    { id: 3, name: 'YSL', name_en: 'YVES SAINT LAURENT', name_ar: 'YSL', slug: 'ysl', logo: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=1000&auto=format&fit=crop', is_active: true },
+    { id: 4, name: 'BOURJOIS', name_en: 'BOURJOIS', name_ar: 'بورجوا', slug: 'bourjois', logo: 'https://images.unsplash.com/photo-1512496011951-a99932826d04?q=80&w=1000&auto=format&fit=crop', is_active: true },
+];
 
 interface Props {
     scrollY: SharedValue<number>;
+    brands?: Brand[];
 }
 
-export function BrandSlider({ scrollY }: Props) {
+export function BrandSlider({ scrollY, brands }: Props) {
+    const displayBrands = (brands && brands.length > 0) ? brands : (MOCK_BRANDS as Brand[]);
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -33,14 +37,14 @@ export function BrandSlider({ scrollY }: Props) {
                 snapToInterval={CARD_WIDTH + 12}
                 decelerationRate="fast"
             >
-                {BRANDS.map((brand) => (
-                    <View key={brand.id} style={[styles.card, { backgroundColor: brand.color }]}>
-                        <Image source={{ uri: brand.image }} style={styles.bgImage} />
+                {displayBrands.map((brand) => (
+                    <View key={brand.id} style={styles.card}>
+                        <Image source={{ uri: brand.logo || 'https://via.placeholder.com/400x800' }} style={styles.bgImage} />
                         <View style={[StyleSheet.absoluteFill, styles.cardOverlay]} />
 
                         <View style={styles.cardContent}>
                             <View style={styles.logoContainer}>
-                                <Text style={[styles.brandName, { color: brand.textColor }]}>{brand.label}</Text>
+                                <Text style={styles.brandName}>{brand.name_en || brand.name}</Text>
                             </View>
 
                             <Pressable style={styles.exploreButton}>

@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { CountryPicker } from 'react-native-country-codes-picker';
+import { useForm, Controller } from 'react-hook-form';
+import { FormInput } from '@/components/ui/FormInput';
 
 export default function SignUpScreen() {
     const insets = useSafeAreaInsets();
@@ -14,21 +16,26 @@ export default function SignUpScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const [form, setForm] = useState({
-        email: '',
-        phone: '',
-        countryCode: 'US', // Default
-        callingCode: '1',  // Default
-        password: '',
-        confirmPassword: '',
-        referralCode: '',
-        agreeToTerms: false,
+    const { control, handleSubmit, watch, formState: { errors } } = useForm({
+        defaultValues: {
+            name: '',
+            email: '',
+            phone: '',
+            password: '',
+            confirmPassword: '',
+            referralCode: '',
+            agreeToTerms: false,
+        }
     });
 
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [countryCode, setCountryCode] = useState('US');
+    const [callingCode, setCallingCode] = useState('1');
     const [loading, setLoading] = useState(false);
     const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    const pwd = watch('password');
 
     // Auto-detect country based on IP
     React.useEffect(() => {
@@ -37,11 +44,8 @@ export default function SignUpScreen() {
                 const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
                 if (data.country_code && data.country_calling_code) {
-                    setForm(prev => ({
-                        ...prev,
-                        countryCode: data.country_code,
-                        callingCode: data.country_calling_code.replace('+', ''),
-                    }));
+                    setCountryCode(data.country_code);
+                    setCallingCode(data.country_calling_code.replace('+', ''));
                 }
             } catch (error) {
                 console.log('Error fetching location:', error);
@@ -70,17 +74,37 @@ export default function SignUpScreen() {
         }
     }), [isDark]);
 
-    const handleSignUp = async () => {
-        if (!form.agreeToTerms) {
+    const onSubmit = async (data: any) => {
+        if (!data.agreeToTerms) {
             alert('Please agree to the Terms of Service and Privacy Policy.');
             return;
         }
+
         setLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setLoading(false);
-        // Navigate or show success
-        router.push('/login');
+        try {
+            const payload = {
+                name: data.name,
+                email: data.email,
+                password: data.password,
+                phone: `+${callingCode}${data.phone}`,
+                phone_country: countryCode,
+                referral_code: data.referralCode || undefined,
+            };
+
+            console.log('Ready to register:', payload);
+            // await api.register(payload);
+
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Navigate or show success
+            router.push('/login');
+        } catch (error) {
+            console.error(error);
+            alert('An error occurred. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -106,125 +130,133 @@ export default function SignUpScreen() {
 
                 {/* Form Section */}
                 <View style={styles.form}>
-                    {/* Email */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email Address</Text>
-                        <View style={styles.inputWrapper}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="hello@example.com"
-                                placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                                value={form.email}
-                                onChangeText={(t) => setForm({ ...form, email: t })}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                            <View style={styles.inputIcon}>
-                                <MaterialIcons name="mail-outline" size={20} color="#9ca3af" />
-                            </View>
-                        </View>
-                    </View>
+                    <FormInput
+                        control={control}
+                        name="name"
+                        label="Full Name"
+                        placeholder="John Doe"
+                        icon="person-outline"
+                        rules={{ required: 'Full Name is required' }}
+                        autoCapitalize="words"
+                    />
+
+                    <FormInput
+                        control={control}
+                        name="email"
+                        label="Email Address"
+                        placeholder="hello@example.com"
+                        icon="mail-outline"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        rules={{
+                            required: 'Email is required',
+                            pattern: {
+                                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                message: 'Invalid email address'
+                            }
+                        }}
+                    />
 
                     {/* Phone - With Country Picker */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Phone Number</Text>
-                        <View style={[styles.phoneContainer, isDark && styles.phoneContainerDark]}>
+                        <View style={[
+                            styles.phoneContainer,
+                            isDark && styles.phoneContainerDark,
+                        ]}>
                             <Pressable
                                 style={styles.countryCodeBtn}
                                 onPress={() => setCountryPickerVisible(true)}
                             >
-                                <Text style={styles.countryCodeText}>{form.callingCode ? `+${form.callingCode}` : '+1'}</Text>
+                                <Text style={styles.countryCodeText}>{callingCode ? `+${callingCode}` : '+1'}</Text>
                                 <MaterialIcons name="arrow-drop-down" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
                             </Pressable>
                             <View style={[styles.verticalDivider, isDark && { backgroundColor: '#374151' }]} />
-                            <TextInput
-                                style={styles.phoneInput}
-                                placeholder="Enter phone number"
-                                placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                                value={form.phone}
-                                onChangeText={(t) => setForm({ ...form, phone: t })}
-                                keyboardType="phone-pad"
+
+                            <Controller
+                                control={control}
+                                name="phone"
+                                rules={{ required: false }}
+                                render={({ field: { onChange, onBlur, value } }) => (
+                                    <TextInput
+                                        style={styles.phoneInput}
+                                        placeholder="Enter phone number"
+                                        placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
+                                        onBlur={onBlur}
+                                        onChangeText={onChange}
+                                        value={value}
+                                        keyboardType="phone-pad"
+                                    />
+                                )}
                             />
                         </View>
                     </View>
 
-                    {/* Password */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <View style={styles.inputWrapper}>
-                            <TextInput
-                                style={[styles.input, { paddingRight: 48 }]}
-                                placeholder="••••••••"
-                                placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                                value={form.password}
-                                onChangeText={(t) => setForm({ ...form, password: t })}
-                                secureTextEntry={!showPassword}
-                            />
-                            <Pressable
-                                onPress={() => setShowPassword(!showPassword)}
-                                style={styles.eyeIcon}
-                            >
+                    <FormInput
+                        control={control}
+                        name="password"
+                        label="Password"
+                        placeholder="••••••••"
+                        secureTextEntry={!showPassword}
+                        rules={{ required: 'Password is required', minLength: { value: 6, message: 'Password must be at least 6 characters' } }}
+                        rightElement={
+                            <Pressable onPress={() => setShowPassword(!showPassword)}>
                                 <MaterialIcons
                                     name={showPassword ? "visibility" : "visibility-off"}
                                     size={20}
                                     color="#9ca3af"
                                 />
                             </Pressable>
-                        </View>
-                    </View>
+                        }
+                    />
 
-                    {/* Confirm Password */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password</Text>
-                        <View style={styles.inputWrapper}>
-                            <TextInput
-                                style={[styles.input, { paddingRight: 48 }]}
-                                placeholder="••••••••"
-                                placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                                value={form.confirmPassword}
-                                onChangeText={(t) => setForm({ ...form, confirmPassword: t })}
-                                secureTextEntry={!showConfirmPassword}
-                            />
-                            <Pressable
-                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                style={styles.eyeIcon}
-                            >
+                    <FormInput
+                        control={control}
+                        name="confirmPassword"
+                        label="Confirm Password"
+                        placeholder="••••••••"
+                        secureTextEntry={!showConfirmPassword}
+                        rules={{
+                            required: 'Please confirm your password',
+                            validate: value => value === pwd || 'Passwords do not match'
+                        }}
+                        rightElement={
+                            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
                                 <MaterialIcons
                                     name={showConfirmPassword ? "visibility" : "visibility-off"}
                                     size={20}
                                     color="#9ca3af"
                                 />
                             </Pressable>
-                        </View>
-                    </View>
+                        }
+                    />
 
-                    {/* Referral Code */}
-                    <View style={styles.inputGroup}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={styles.label}>Referral Code</Text>
-                            <Text style={styles.optionalLabel}>Optional</Text>
-                        </View>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="ENTER CODE"
-                            placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                            value={form.referralCode}
-                            onChangeText={(t) => setForm({ ...form, referralCode: t })}
-                            autoCapitalize="characters"
-                        />
-                    </View>
+                    <FormInput
+                        control={control}
+                        name="referralCode"
+                        label="Referral Code (Optional)"
+                        placeholder="ENTER CODE"
+                        autoCapitalize="characters"
+                    />
 
                     {/* Terms Check */}
                     <View style={styles.termsContainer}>
-                        <Pressable
-                            onPress={() => setForm({ ...form, agreeToTerms: !form.agreeToTerms })}
-                            style={[
-                                styles.checkbox,
-                                form.agreeToTerms && { backgroundColor: '#1152d4', borderColor: '#1152d4' }
-                            ]}
-                        >
-                            {form.agreeToTerms && <MaterialIcons name="check" size={16} color="#fff" />}
-                        </Pressable>
+                        <Controller
+                            control={control}
+                            name="agreeToTerms"
+                            rules={{ required: 'You must agree to the terms' }}
+                            render={({ field: { onChange, value } }) => (
+                                <Pressable
+                                    onPress={() => onChange(!value)}
+                                    style={[
+                                        styles.checkbox,
+                                        value && { backgroundColor: '#1152d4', borderColor: '#1152d4' }
+                                    ]}
+                                >
+                                    {value && <MaterialIcons name="check" size={16} color="#fff" />}
+                                </Pressable>
+                            )}
+                        />
                         <Text style={styles.termsText}>
                             I agree to the <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>.
                         </Text>
@@ -236,7 +268,7 @@ export default function SignUpScreen() {
                             styles.primaryButton,
                             pressed && styles.primaryButtonPressed
                         ]}
-                        onPress={handleSignUp}
+                        onPress={handleSubmit(onSubmit)}
                         disabled={loading}
                     >
                         {loading ? (
@@ -281,11 +313,8 @@ export default function SignUpScreen() {
                 show={countryPickerVisible}
                 lang={'en'}
                 pickerButtonOnPress={(item) => {
-                    setForm(prev => ({
-                        ...prev,
-                        countryCode: item.code,
-                        callingCode: item.dial_code.replace('+', ''),
-                    }));
+                    setCountryCode(item.code);
+                    setCallingCode(item.dial_code.replace('+', ''));
                     setCountryPickerVisible(false);
                 }}
                 onBackdropPress={() => setCountryPickerVisible(false)}

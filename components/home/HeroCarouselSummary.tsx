@@ -4,38 +4,46 @@ import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 52) / 2; // (Screen - padding - gap) / 2
 
+import { CarouselSlide } from '@/types/schema';
+
 interface SummaryProps {
-    slides: any[];
+    slides: CarouselSlide[];
     activeIndex: number;
 }
 
 export function HeroCarouselSummary({ slides, activeIndex }: SummaryProps) {
-    const currentSlide = slides[activeIndex];
-    const nextSlide = slides[(activeIndex + 1) % slides.length];
+    if (!slides || slides.length === 0) return null;
+
+    // Ensure activeIndex is valid
+    const safeIndex = activeIndex % slides.length;
+    const currentSlide = slides[safeIndex];
+    const nextSlide = slides[(safeIndex + 1) % slides.length];
+
+    const getImageUrl = (slide: CarouselSlide) => slide.image_mobile || slide.image_desktop || 'https://via.placeholder.com/300x200';
 
     return (
         <View style={styles.container}>
             <View style={styles.card}>
                 <Image
-                    source={{ uri: currentSlide.image }}
+                    source={{ uri: getImageUrl(currentSlide) }}
                     style={styles.image}
                 />
                 <View style={[StyleSheet.absoluteFill, styles.overlay]} />
                 <View style={styles.textContainer}>
-                    <Text style={styles.subtitle}>0{activeIndex + 1} / CURRENT</Text>
-                    <Text style={styles.title} numberOfLines={2}>{currentSlide.title}</Text>
+                    <Text style={styles.subtitle}>0{safeIndex + 1} / CURRENT</Text>
+                    <Text style={styles.title} numberOfLines={2}>{currentSlide.title_en}</Text>
                 </View>
             </View>
 
             <View style={styles.card}>
                 <Image
-                    source={{ uri: nextSlide.image }}
+                    source={{ uri: getImageUrl(nextSlide) }}
                     style={styles.image}
                 />
                 <View style={[StyleSheet.absoluteFill, styles.overlay]} />
                 <View style={styles.textContainer}>
-                    <Text style={styles.subtitle}>0{((activeIndex + 1) % slides.length) + 1} / NEXT</Text>
-                    <Text style={styles.title} numberOfLines={2}>{nextSlide.title}</Text>
+                    <Text style={styles.subtitle}>0{((safeIndex + 1) % slides.length) + 1} / NEXT</Text>
+                    <Text style={styles.title} numberOfLines={2}>{nextSlide.title_en}</Text>
                 </View>
             </View>
         </View>

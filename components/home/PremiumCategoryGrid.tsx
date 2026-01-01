@@ -2,50 +2,59 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable, Dimensions } from 'react-native';
 import { RevealingItem } from './RevealingItem';
 import { SharedValue } from 'react-native-reanimated';
+import { Category } from '@/types/schema';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 44) / 2; // (Screen - margin - gap) / 2
+// const CARD_WIDTH = (SCREEN_WIDTH - 44) / 2; // (Screen - margin - gap) / 2
 
-const CATEGORIES = [
+// Fallback Mock Data
+const MOCK_CATEGORIES: Partial<Category>[] = [
     {
-        id: 'men',
-        title: 'MEN',
-        image: 'https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?q=80&w=1000&auto=format&fit=crop',
+        id: 101,
+        name: 'MEN',
+        thumbnail: 'https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?q=80&w=1000&auto=format&fit=crop',
     },
     {
-        id: 'women',
-        title: 'WOMEN',
-        image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1000&auto=format&fit=crop',
+        id: 102,
+        name: 'WOMEN',
+        thumbnail: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1000&auto=format&fit=crop',
     },
     {
-        id: 'acc',
-        title: 'ACCESSORIES',
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
+        id: 103,
+        name: 'ACCESSORIES',
+        thumbnail: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop',
     },
     {
-        id: 'shoes',
-        title: 'COLLECTIONS',
-        image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1000&auto=format&fit=crop',
+        id: 104,
+        name: 'COLLECTIONS',
+        thumbnail: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1000&auto=format&fit=crop',
     }
 ];
 
 interface Props {
     scrollY: SharedValue<number>;
+    categories?: Category[];
 }
 
-export function PremiumCategoryGrid({ scrollY }: Props) {
+export function PremiumCategoryGrid({ scrollY, categories }: Props) {
+    // specific logic: use passed categories, or mock if empty
+    const displayCategories = (categories && categories.length > 0) ? categories : MOCK_CATEGORIES as Category[];
+
+    // Limit to 4 for the grid if needed, or allow more
+    const gridItems = displayCategories.slice(0, 4);
+
     return (
         <View style={styles.container}>
             <View style={styles.headerArea}>
                 <Text style={styles.titleText}>Shop by Category</Text>
             </View>
             <View style={styles.grid}>
-                {CATEGORIES.map((cat, index) => (
+                {gridItems.map((cat, index) => (
                     <Pressable key={cat.id} style={styles.card}>
-                        <Image source={{ uri: cat.image }} style={styles.image} />
+                        <Image source={{ uri: cat.thumbnail || 'https://via.placeholder.com/300' }} style={styles.image} />
                         <View style={styles.overlay} />
                         <View style={styles.textContainer}>
-                            <Text style={styles.title}>{cat.title}</Text>
+                            <Text style={styles.title}>{cat.name}</Text>
                         </View>
                     </Pressable>
                 ))}
@@ -77,9 +86,10 @@ const styles = StyleSheet.create({
     card: {
         width: (SCREEN_WIDTH - 52) / 2, // (Screen - padding - gap) / 2
         height: ((SCREEN_WIDTH - 52) / 2) * 1.33,
-        borderRadius: 12, // Subagent mentioned rounded corners
+        borderRadius: 12,
         overflow: 'hidden',
         position: 'relative',
+        marginBottom: 12,
     },
     image: {
         ...StyleSheet.absoluteFillObject,
@@ -99,5 +109,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '800',
         letterSpacing: 2,
+        textTransform: 'uppercase',
     }
 });

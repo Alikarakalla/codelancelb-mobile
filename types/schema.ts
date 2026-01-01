@@ -106,6 +106,23 @@ export interface Category {
     sort_order: number;
 }
 
+export interface HighlightSection {
+    id: number;
+    eyebrow_en?: string | null;
+    eyebrow_ar?: string | null;
+    title_en: string;
+    title_ar: string;
+    subtitle_en?: string | null;
+    subtitle_ar?: string | null;
+    cta_text_en?: string | null;
+    cta_text_ar?: string | null;
+    cta_url?: string | null;
+    image?: string | null;
+    image_position: 'left' | 'right';
+    is_active: boolean;
+    sort_order: number;
+}
+
 export interface Brand {
     id: number;
     name: string;
@@ -113,6 +130,30 @@ export interface Brand {
     name_ar: string;
     slug: string;
     logo?: string | null;
+    is_active: boolean;
+}
+
+export interface Banner {
+    id: number;
+    image: string;
+    image_mobile?: string | null;
+    button_text_en?: string | null;
+    button_text_ar?: string | null;
+    button_url?: string | null;
+    is_active: boolean;
+    sort_order: number;
+}
+
+export interface CMSFeature {
+    id: number;
+    store_id: number;
+    icon: string;
+    image?: string | null;
+    title_en: string;
+    title_ar: string;
+    description_en: string;
+    description_ar: string;
+    sort_order: number;
     is_active: boolean;
 }
 
@@ -128,4 +169,45 @@ export interface CartItem {
 
     // Populated fields for UI
     product?: Product;
+}
+
+export interface User {
+    id: number;
+    name: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email: string;
+    phone?: string | null;
+    avatar?: string | null;
+    referral_code?: string | null;
+    role: string;
+    is_active: boolean;
+    loyalty_points_balance: number;
+    created_at?: string;
+}
+
+export interface WishlistItem {
+    id: number;
+    user_id?: number | null;
+    session_id?: string | null;
+    product_id: number;
+    created_at?: string;
+
+    // Populated relations
+    product?: Product;
+}
+
+export interface CarouselSlide {
+    id: number;
+    title_en: string;
+    title_ar: string;
+    subtitle_en?: string | null;
+    subtitle_ar?: string | null;
+    cta_text_en?: string | null;
+    cta_text_ar?: string | null;
+    cta_url?: string | null;
+    image_desktop?: string | null;
+    image_mobile?: string | null;
+    is_active: boolean;
+    sort_order: number;
 }

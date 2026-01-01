@@ -7,18 +7,29 @@ import Animated, {
     SharedValue
 } from 'react-native-reanimated';
 
+import { Banner } from '@/types/schema';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Props {
     scrollY?: SharedValue<number>;
+    banner?: Banner;
 }
 
-export function StorefrontBanner({ scrollY }: Props) {
+export function StorefrontBanner({ scrollY, banner }: Props) {
     const [containerY, setContainerY] = React.useState(0);
 
     const onLayout = (event: LayoutChangeEvent) => {
         setContainerY(event.nativeEvent.layout.y);
     };
+
+    const displayBanner = banner || {
+        id: 0,
+        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1000&auto=format&fit=crop',
+        button_text_en: 'SHOP NOW',
+        is_active: true,
+        sort_order: 1
+    } as Banner;
 
     const shopButtonStyle = useAnimatedStyle(() => {
         if (!scrollY) return { opacity: 1 };
@@ -42,7 +53,7 @@ export function StorefrontBanner({ scrollY }: Props) {
     return (
         <View onLayout={onLayout} style={styles.container}>
             <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1000&auto=format&fit=crop' }}
+                source={{ uri: displayBanner.image_mobile || displayBanner.image }}
                 style={styles.image}
                 resizeMode="cover"
             />
@@ -50,7 +61,7 @@ export function StorefrontBanner({ scrollY }: Props) {
             <View style={styles.overlay}>
                 <Animated.View style={shopButtonStyle}>
                     <Pressable style={styles.shopButton}>
-                        <Text style={styles.shopText}>SHOP NOW</Text>
+                        <Text style={styles.shopText}>{displayBanner.button_text_en || 'SHOP NOW'}</Text>
                     </Pressable>
                 </Animated.View>
             </View>

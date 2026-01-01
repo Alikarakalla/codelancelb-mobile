@@ -6,12 +6,27 @@ import Animated, {
     Extrapolate,
     SharedValue
 } from 'react-native-reanimated';
+import { HighlightSection } from '@/types/schema';
 
 interface Props {
     progress?: SharedValue<number>;
+    section?: HighlightSection;
 }
 
-export function PromoBanner({ progress }: Props) {
+export function PromoBanner({ progress, section }: Props) {
+    // Fallback data if no section provided
+    const data = section || {
+        id: 0,
+        title_en: 'Dragon Diffusion',
+        eyebrow_en: 'Just Landed',
+        subtitle_en: 'Introducing Dragon Diffusion, a brand redefining craftsmanship with its iconic hand-woven leather bags. Each piece is made entirely by hand, using traditional braiding techniques and naturally vegetable-dyed leather for an authentic, lived-in feel.',
+        cta_text_en: 'SHOP NOW',
+        image: 'https://sadekabdelsater.com/storage/highlights/69532125375e1_1767055653.webp',
+        image_position: 'left',
+        is_active: true,
+        sort_order: 1
+    } as HighlightSection;
+
     // Stage 1: Title
     const titleStyle = useAnimatedStyle(() => {
         if (!progress) return { opacity: 1 };
@@ -23,7 +38,7 @@ export function PromoBanner({ progress }: Props) {
         };
     });
 
-    // Stage 2: Subtitle
+    // Stage 2: Subtitle (Eyebrow here)
     const subtitleStyle = useAnimatedStyle(() => {
         if (!progress) return { opacity: 1 };
         // Delayed: Starts at 20%, finishes at 50%
@@ -34,7 +49,7 @@ export function PromoBanner({ progress }: Props) {
         };
     });
 
-    // Stage 3: Description
+    // Stage 3: Description (Subtitle here)
     const descStyle = useAnimatedStyle(() => {
         if (!progress) return { opacity: 1 };
         // Further delayed: Starts at 40%, finishes at 80%
@@ -59,35 +74,29 @@ export function PromoBanner({ progress }: Props) {
     return (
         <View style={styles.container}>
             <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1598532163257-ae3c6b2524b6?q=80&w=1000&auto=format&fit=crop' }}
+                source={{ uri: data.image || 'https://via.placeholder.com/600x800' }}
                 style={styles.image}
                 resizeMode="cover"
             />
 
             <View style={styles.content}>
                 <Animated.View style={titleStyle}>
-                    <Text style={styles.title}>Dragon Diffusion</Text>
+                    <Text style={styles.title}>{data.title_en}</Text>
                 </Animated.View>
 
                 <Animated.View style={subtitleStyle}>
-                    <Text style={styles.subtitle}>Just Landed</Text>
+                    <Text style={styles.subtitle}>{data.eyebrow_en}</Text>
                 </Animated.View>
 
                 <Animated.View style={descStyle}>
                     <Text style={styles.description}>
-                        Introducing Dragon Diffusion, a brand redefining craftsmanship
-                        with its iconic hand-woven leather bags. Each piece is made
-                        entirely by hand, using traditional braiding techniques and naturally
-                        vegetable-dyed leather for an authentic, lived-in feel. Blending
-                        inspiration from global basket-weaving cultures — from Japanese
-                        bamboo artistry to South Pacific fibre work — Dragon Diffusion
-                        transforms age-old craft into modern.
+                        {data.subtitle_en}
                     </Text>
                 </Animated.View>
 
                 <Animated.View style={buttonStyle}>
                     <Pressable style={styles.shopNowButton}>
-                        <Text style={styles.shopNowText}>SHOP NOW</Text>
+                        <Text style={styles.shopNowText}>{data.cta_text_en || 'SHOP NOW'}</Text>
                         <View style={styles.underline} />
                     </Pressable>
                 </Animated.View>

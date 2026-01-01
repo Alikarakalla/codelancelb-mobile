@@ -21,35 +21,13 @@ import Animated, {
     SharedValue
 } from 'react-native-reanimated';
 
+import { CarouselSlide } from '@/types/schema';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDE_HEIGHT = SCREEN_WIDTH * 1.3;
 
-export const SLIDES = [
-    {
-        id: '1',
-        title: 'DISCOVER YOUR\nSIGNATURE SCENT',
-        subtitle: 'NEW ARRIVALS 2024',
-        image: 'https://images.unsplash.com/photo-1594125354139-3f7315ff9f3c?q=80&w=1000&auto=format&fit=crop',
-        cta: 'SHOP COLLECTION'
-    },
-    {
-        id: '2',
-        title: 'ELEGANCE IN\nEVERY DETAIL',
-        subtitle: 'LIMITED EDITION',
-        image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=1000&auto=format&fit=crop',
-        cta: 'EXPLORE NOW'
-    },
-    {
-        id: '3',
-        title: 'MODERN CLASSICS\nREIMAGINED',
-        subtitle: 'SUMMER ESSENTIALS',
-        image: 'https://images.unsplash.com/photo-1590736704728-f4730bb30770?q=80&w=1000&auto=format&fit=crop',
-        cta: 'VIEW ALL'
-    }
-];
-
 interface SlideItemProps {
-    item: typeof SLIDES[0];
+    item: CarouselSlide;
     index: number;
     scrollX: SharedValue<number>;
 }
@@ -65,10 +43,22 @@ const SlideItem = ({ item, index, scrollX }: SlideItemProps) => {
         return { opacity };
     });
 
+    // Handle image URL (mock or real)
+    // If it's a relative path from DB, preprend base URL or handle accordingly.
+    // For now assuming full URL or handling basic paths if needed. 
+    // The DB dump shows relative paths like 'carousel/desktop/...'.
+    // We might need a helper to resolve image URLs. 
+    const imageUrl = item.image_mobile || item.image_desktop || 'https://via.placeholder.com/600x800';
+    // If using local server, maybe prepend URL. let's assume absolute for now or handled by Image component if we had a base url.
+    // Since I can't easily see the base asset URL, I will use a placeholder if it doesn't look like http.
+
+    // Actually, let's just render it. If it's relative, it won't load without a base. 
+    // Assuming the user will configure base url later. 
+
     return (
         <View style={styles.slide}>
             <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
-                <Image source={{ uri: item.image }} style={styles.image} />
+                <Image source={{ uri: imageUrl }} style={styles.image} />
                 <View style={[StyleSheet.absoluteFill, styles.overlay]} />
             </Animated.View>
 
@@ -77,18 +67,18 @@ const SlideItem = ({ item, index, scrollX }: SlideItemProps) => {
                     entering={FadeInUp.delay(200).duration(1000)}
                     style={styles.subtitle}
                 >
-                    {item.subtitle}
+                    {item.subtitle_en || ''}
                 </Animated.Text>
                 <Animated.Text
                     entering={FadeInUp.delay(400).duration(1000)}
                     style={styles.title}
                 >
-                    {item.title}
+                    {item.title_en}
                 </Animated.Text>
 
                 <Animated.View entering={FadeInUp.delay(600).duration(1000)}>
                     <Pressable style={styles.button}>
-                        <Text style={styles.buttonText}>{item.cta}</Text>
+                        <Text style={styles.buttonText}>{item.cta_text_en || 'EXPLORE'}</Text>
                     </Pressable>
                 </Animated.View>
             </View>
@@ -97,10 +87,11 @@ const SlideItem = ({ item, index, scrollX }: SlideItemProps) => {
 };
 
 interface HeroSliderProps {
+    slides: CarouselSlide[];
     onIndexChange?: (index: number) => void;
 }
 
-export function HeroSlider({ onIndexChange }: HeroSliderProps) {
+export function HeroSlider({ slides, onIndexChange }: HeroSliderProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const scrollX = useSharedValue(0);
 
@@ -113,10 +104,14 @@ export function HeroSlider({ onIndexChange }: HeroSliderProps) {
         }
     }, [activeIndex, onIndexChange]);
 
+    if (!slides || slides.length === 0) {
+        return null; // Or loading state
+    }
+
     return (
         <View style={styles.container}>
             <FlatList
-                data={SLIDES}
+                data={slides}
                 renderItem={({ item, index }) => (
                     <SlideItem item={item} index={index} scrollX={scrollX} />
                 )}
@@ -125,18 +120,18 @@ export function HeroSlider({ onIndexChange }: HeroSliderProps) {
                 showsHorizontalScrollIndicator={false}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.id.toString()}
             />
 
             <View style={styles.navContainer}>
                 <View style={styles.progressRow}>
                     <Text style={styles.navIndex}>0{activeIndex + 1}</Text>
                     <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${((activeIndex + 1) / SLIDES.length) * 100}%` }]} />
+                        <View style={[styles.progressFill, { width: `${((activeIndex + 1) / slides.length) * 100}%` }]} />
                     </View>
-                    <Text style={styles.navTotal}>0{SLIDES.length}</Text>
+                    <Text style={styles.navTotal}>0{slides.length}</Text>
                 </View>
-                <Text style={styles.nextText}>NEXT: {SLIDES[(activeIndex + 1) % SLIDES.length].subtitle}</Text>
+                <Text style={styles.nextText}>NEXT: {slides[(activeIndex + 1) % slides.length]?.subtitle_en || 'FEATURED'}</Text>
             </View>
         </View>
     );

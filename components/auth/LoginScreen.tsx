@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { useForm } from 'react-hook-form';
+import { FormInput } from '@/components/ui/FormInput';
+// import { api } from '@/services/apiClient'; // Uncomment when ready
 
 export default function LoginScreen() {
     const insets = useSafeAreaInsets();
@@ -15,19 +17,34 @@ export default function LoginScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const [form, setForm] = useState({
-        email: '',
-        password: '',
+    const { control, handleSubmit, formState: { errors } } = useForm({
+        defaultValues: {
+            email: '',
+            password: '',
+        }
     });
+
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const handleLogin = async () => {
+    const onSubmit = async (data: any) => {
         setLoading(true);
-        // Simulate login
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setLoading(false);
-        router.back(); // Or navigate to home
+        try {
+            console.log('Login payload:', data);
+            // await api.login(data); // Implement actual login call
+
+            // Simulate login
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // TODO: Store token and user data
+
+            router.back(); // Or navigate to home
+        } catch (error) {
+            console.error(error);
+            alert('Login failed. Please check your credentials.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -42,53 +59,51 @@ export default function LoginScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.card}>
-
+                    {/* Header inside card */}
+                    <View style={styles.header}>
+                        <View style={styles.iconBox}>
+                            <MaterialIcons name="lock-outline" size={32} color="#1152d4" />
+                        </View>
+                        <Text style={styles.title}>Welcome Back</Text>
+                        <Text style={styles.subtitle}>Sign in to continue to your account</Text>
+                    </View>
 
                     {/* Form */}
                     <View style={styles.form}>
-                        {/* Email */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email Address</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your email"
-                                    placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                                    value={form.email}
-                                    onChangeText={(t) => setForm({ ...form, email: t })}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                                <View style={styles.inputIcon}>
-                                    <MaterialIcons name="mail" size={20} color="#9ca3af" />
-                                </View>
-                            </View>
-                        </View>
+                        <FormInput
+                            control={control}
+                            name="email"
+                            label="Email Address"
+                            placeholder="Enter your email"
+                            icon="mail-outline"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            rules={{
+                                required: 'Email is required',
+                                pattern: {
+                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                    message: 'Invalid email address'
+                                }
+                            }}
+                        />
 
-                        {/* Password */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={[styles.input, { paddingRight: 48 }]}
-                                    placeholder="Enter your password"
-                                    placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
-                                    value={form.password}
-                                    onChangeText={(t) => setForm({ ...form, password: t })}
-                                    secureTextEntry={!showPassword}
-                                />
-                                <Pressable
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={styles.eyeIcon}
-                                >
+                        <FormInput
+                            control={control}
+                            name="password"
+                            label="Password"
+                            placeholder="Enter your password"
+                            secureTextEntry={!showPassword}
+                            rules={{ required: 'Password is required' }}
+                            rightElement={
+                                <Pressable onPress={() => setShowPassword(!showPassword)}>
                                     <MaterialIcons
                                         name={showPassword ? "visibility" : "visibility-off"}
                                         size={20}
                                         color="#9ca3af"
                                     />
                                 </Pressable>
-                            </View>
-                        </View>
+                            }
+                        />
 
                         {/* Forgot Password */}
                         <View style={styles.forgotRow}>
@@ -103,7 +118,7 @@ export default function LoginScreen() {
                                 styles.loginButton,
                                 pressed && styles.loginButtonPressed
                             ]}
-                            onPress={handleLogin}
+                            onPress={handleSubmit(onSubmit)}
                             disabled={loading}
                         >
                             {loading ? (
@@ -201,42 +216,6 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     form: {
         padding: 24,
         gap: 20,
-    },
-    inputGroup: {
-        gap: 8,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: isDark ? '#fff' : '#111318',
-    },
-    inputWrapper: {
-        position: 'relative',
-    },
-    input: {
-        height: 56,
-        backgroundColor: isDark ? '#101622' : '#ffffff',
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        borderRadius: 12,
-        paddingLeft: 16,
-        paddingRight: 16, // adjusted dynamically for password
-        fontSize: 16,
-        color: isDark ? '#fff' : '#111318',
-    },
-    inputIcon: {
-        position: 'absolute',
-        right: 16,
-        top: 18,
-    },
-    eyeIcon: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        height: 56,
-        width: 56,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     forgotRow: {
         alignItems: 'flex-end',

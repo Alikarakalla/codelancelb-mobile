@@ -1,42 +1,77 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { CMSFeature } from '@/types/schema';
+import { Image as ExpoImage } from 'expo-image';
 
-const FEATURES = [
+const MOCK_FEATURES: CMSFeature[] = [
     {
+        id: 1,
+        store_id: 1,
         icon: 'bus-outline',
-        title: 'SAME DAY DELIVERY',
-        desc: 'Available In Lebanon On Weekdays.',
+        title_en: 'SAME DAY DELIVERY',
+        title_ar: 'توصيل في نفس اليوم',
+        description_en: 'Available In Lebanon On Weekdays.',
+        description_ar: 'متوفر في لبنان خلال أيام الأسبوع.',
+        sort_order: 1,
+        is_active: true
     },
     {
+        id: 2,
+        store_id: 1,
         icon: 'gift-outline',
-        title: 'FREE SHIPPING',
-        desc: 'For Orders Above $100.',
+        title_en: 'FREE SHIPPING',
+        title_ar: 'شحن مجاني',
+        description_en: 'For Orders Above $100.',
+        description_ar: 'للطلبات التي تزيد عن 100 دولار.',
+        sort_order: 2,
+        is_active: true
     },
     {
+        id: 3,
+        store_id: 1,
         icon: 'location-outline',
-        title: 'CLICK & COLLECT',
-        desc: 'Choose Pickup From The Stores.',
+        title_en: 'CLICK & COLLECT',
+        title_ar: 'اختر واستلم',
+        description_en: 'Choose Pickup From The Stores.',
+        description_ar: 'اختر الاستلام من المتاجر.',
+        sort_order: 3,
+        is_active: true
     },
     {
+        id: 4,
+        store_id: 1,
         icon: 'refresh-outline',
-        title: '7 DAYS RETURN',
-        desc: 'Available In Stores Within 7 Days.',
+        title_en: '7 DAYS RETURN',
+        title_ar: '7 أيام للإرجاع',
+        description_en: 'Available In Stores Within 7 Days.',
+        description_ar: 'متوفر في المتاجر خلال 7 أيام.',
+        sort_order: 4,
+        is_active: true
     }
 ];
 
-export function FeaturesSection() {
+interface Props {
+    features?: CMSFeature[];
+}
+
+export function FeaturesSection({ features }: Props) {
+    const displayFeatures = (features && features.length > 0) ? features : MOCK_FEATURES;
+
     return (
         <View style={styles.container}>
-            {FEATURES.map((item, index) => (
-                <View key={index} style={styles.item}>
+            {displayFeatures.map((item) => (
+                <View key={item.id} style={styles.item}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name={item.icon as any} size={28} color="#18181B" />
+                        {item.image ? (
+                            <ExpoImage source={{ uri: item.image }} style={{ width: 28, height: 28 }} contentFit="contain" />
+                        ) : (
+                            <Ionicons name={(item.icon || 'star-outline') as any} size={28} color="#18181B" />
+                        )}
                     </View>
                     <View style={styles.textContainer}>
-                        <Text style={styles.title}>{item.title}</Text>
-                        <Text style={styles.desc}>{item.desc}</Text>
+                        <Text style={styles.title}>{item.title_en}</Text>
+                        <Text style={styles.desc}>{item.description_en}</Text>
                     </View>
                 </View>
             ))}
