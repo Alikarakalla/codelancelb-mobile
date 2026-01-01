@@ -11,6 +11,8 @@ export const unstable_settings = {
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { GlobalLiquidTabBar } from '@/components/ui/GlobalLiquidTabBar';
+import { View } from 'react-native';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -19,13 +21,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
-            <Stack.Screen name="cart" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
+          <View style={{ flex: 1 }}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
+              <Stack.Screen name="cart" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            <GlobalLiquidTabBar />
+          </View>
           <StatusBar style="auto" />
         </ThemeProvider>
       </BottomSheetModalProvider>

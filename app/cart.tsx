@@ -28,7 +28,7 @@ export default function CartScreen() {
             <ScrollView
                 contentContainerStyle={{
                     paddingTop: 60 + insets.top, // Header
-                    paddingBottom: 160, // Footer + cushion
+                    paddingBottom: 260, // Footer + cushion + tab bar
                     paddingHorizontal: 16
                 }}
                 showsVerticalScrollIndicator={false}

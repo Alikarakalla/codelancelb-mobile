@@ -9,10 +9,12 @@ import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModa
 import { ShopFilterModal } from '@/components/shop/ShopFilterModal';
 import { MOCK_PRODUCTS } from '@/constants/mockData';
 import { Product } from '@/types/schema';
+import { useDrawer } from '@/hooks/use-drawer-context';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ShopScreen() {
     const insets = useSafeAreaInsets();
+    const { openDrawer } = useDrawer();
     const [filterVisible, setFilterVisible] = React.useState(false);
     const [activeFilters, setActiveFilters] = React.useState<FilterChip[]>([
         { id: '1', label: 'Jeans & Denim', type: 'category' },
@@ -24,9 +26,6 @@ export default function ShopScreen() {
 
     const handleApplyFilters = (filters: any) => {
         console.log('Applied filters:', filters);
-        // In a real app, this would be an API call:
-        // const filtered = await apiClient.getProducts(filters);
-        // setProducts(filtered);
         setFilterVisible(false);
     };
 
@@ -36,17 +35,17 @@ export default function ShopScreen() {
 
     const handleProductPress = (product: Product) => {
         console.log('Product pressed:', product.name);
-        // router.push(`/product/${product.slug}`);
     };
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <LuxeHeader showBackButton={false} title="Shop All" />
+            <LuxeHeader
+                showBackButton={false}
+                title="LUXE"
+                onOpenMenu={openDrawer}
+            />
 
-            {/* Content Area */}
             <View style={{ flex: 1, paddingTop: 60 + insets.top }}>
-                {/* Filter Bar */}
                 <ShopFilterBar
                     activeFilters={activeFilters}
                     onFilterPress={() => setFilterVisible(true)}
@@ -54,7 +53,6 @@ export default function ShopScreen() {
                     onRemoveFilter={handleRemoveFilter}
                 />
 
-                {/* Main List */}
                 <FlatList
                     data={products}
                     keyExtractor={(item) => item.id.toString()}
@@ -77,7 +75,6 @@ export default function ShopScreen() {
                 />
             </View>
 
-            {/* Quick View Modal */}
             <ProductQuickViewModal
                 visible={!!quickViewProduct}
                 product={quickViewProduct}
@@ -86,7 +83,6 @@ export default function ShopScreen() {
                 onViewDetails={(product) => handleProductPress(product)}
             />
 
-            {/* Filter Modal */}
             <ShopFilterModal
                 visible={filterVisible}
                 onClose={() => setFilterVisible(false)}
@@ -99,7 +95,7 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F6F6F8', // background-light
+        backgroundColor: '#F6F6F8',
     },
     listHeader: {
         paddingVertical: 12,

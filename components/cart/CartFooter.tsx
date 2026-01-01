@@ -11,7 +11,7 @@ export function CartFooter({ total }: CartFooterProps) {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) + 90 }]}>
             <View style={styles.row}>
                 <View>
                     <Text style={styles.label}>Total Price</Text>

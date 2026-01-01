@@ -11,9 +11,10 @@ import { useRouter } from 'expo-router';
 interface LuxeHeaderProps {
     showBackButton?: boolean;
     title?: string;
+    onOpenMenu?: () => void;
 }
 
-export function LuxeHeader({ showBackButton = false, title = 'SADEK' }: LuxeHeaderProps) {
+export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu }: LuxeHeaderProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const router = useRouter();
@@ -31,7 +32,7 @@ export function LuxeHeader({ showBackButton = false, title = 'SADEK' }: LuxeHead
                             <Feather name="arrow-left" size={22} color={textColor} />
                         </Pressable>
                     ) : (
-                        <Pressable style={styles.iconButton}>
+                        <Pressable onPress={onOpenMenu} style={styles.iconButton}>
                             <Feather name="menu" size={24} color={textColor} />
                         </Pressable>
                     )}
@@ -39,7 +40,7 @@ export function LuxeHeader({ showBackButton = false, title = 'SADEK' }: LuxeHead
 
                 {/* Center Section: Logo */}
                 <View style={styles.centerSection}>
-                    <Text style={[styles.title, { color: textColor }]}>S A D E K</Text>
+                    <Text style={[styles.title, { color: textColor }]}>{title}</Text>
                 </View>
 
                 {/* Right Section */}

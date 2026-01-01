@@ -23,6 +23,7 @@ import Animated, {
   useAnimatedScrollHandler
 } from 'react-native-reanimated';
 import { RevealingSection } from '@/components/home/RevealingSection';
+import { useDrawer } from '@/hooks/use-drawer-context';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const { openDrawer } = useDrawer();
 
   const featuredProducts = MOCK_PRODUCTS.filter(p => p.is_featured);
   const latestProducts = [...MOCK_PRODUCTS].reverse().slice(0, 4);
@@ -49,7 +51,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <LuxeHeader title="Codelancelb" />
+      <LuxeHeader
+        title="LUXE"
+        onOpenMenu={openDrawer}
+      />
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -117,8 +122,6 @@ export default function HomeScreen() {
           </View>
         </RevealingSection>
       </Animated.ScrollView>
-
-
 
       {/* Quick View Sync */}
       <ProductQuickViewModal

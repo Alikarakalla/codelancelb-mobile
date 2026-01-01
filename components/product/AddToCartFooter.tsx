@@ -10,7 +10,7 @@ export function AddToCartFooter() {
     const router = useRouter();
 
     return (
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) + 90 }]}>
             <Pressable style={({ pressed }) => [styles.favButton, pressed && styles.pressed]}>
                 <Ionicons name="heart-outline" size={24} color="#94A3B8" />
             </Pressable>

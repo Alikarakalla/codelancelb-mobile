@@ -27,7 +27,7 @@ export default function ProductDetailsScreen() {
             <ScrollView
                 contentContainerStyle={{
                     paddingTop: 60 + insets.top, // Space for header
-                    paddingBottom: 100 // Space for footer
+                    paddingBottom: 220 // Space for footer + tab bar
                 }}
                 showsVerticalScrollIndicator={false}
             >
