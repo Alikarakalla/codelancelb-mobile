@@ -112,10 +112,17 @@ export default function SignUpScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <GlobalHeader title="LUXE" />
+            <GlobalHeader
+                title="REGISTER"
+                showBack
+                alwaysShowTitle
+                showWishlist={false}
+                showShare={false}
+                showCart={false}
+            />
 
             <ScrollView
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20, paddingTop: 60 + insets.top }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Headline Section */}
@@ -246,7 +253,7 @@ export default function SignUpScreen() {
                                     onPress={() => onChange(!value)}
                                     style={[
                                         styles.checkbox,
-                                        value && { backgroundColor: '#1152d4', borderColor: '#1152d4' }
+                                        value && { backgroundColor: '#000', borderColor: '#000' }
                                     ]}
                                 >
                                     {value && <MaterialIcons name="check" size={16} color="#fff" />}
@@ -468,16 +475,16 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     },
     linkText: {
         fontWeight: '700',
-        color: '#1152d4',
+        color: '#000',
     },
     primaryButton: {
         height: 56,
-        backgroundColor: '#1152d4',
+        backgroundColor: '#000',
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 8,
-        shadowColor: '#1152d4',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,

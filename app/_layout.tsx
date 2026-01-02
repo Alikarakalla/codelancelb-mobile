@@ -48,6 +48,10 @@ export default function RootLayout() {
                         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
                         <Stack.Screen name="product/[id]" options={{ headerShown: false, animation: 'fade' }} />
                         <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
+                        <Stack.Screen name="cart" options={{ headerShown: false }} />
+                        <Stack.Screen name="checkout" options={{ headerShown: false }} />
+                        <Stack.Screen name="login" options={{ headerShown: false }} />
+                        <Stack.Screen name="signup" options={{ headerShown: false }} />
                       </Stack>
                     </ThemeProvider>
                   </DrawerWrappedRoot>

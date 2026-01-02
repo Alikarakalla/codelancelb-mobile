@@ -14,3 +14,12 @@ export const ShoppingBag01Icon = [
     ["path", { d: "M3.32352 13.0113C3.6739 10.009 4.18586 7.75784 4.66063 6.15851C5.04994 4.84711 5.24459 4.19141 6.04283 3.5957C6.84107 3 7.65697 3 9.28876 3H14.7113C16.3431 3 17.159 3 17.9572 3.5957C18.7554 4.19141 18.9501 4.84711 19.3394 6.15851C19.8142 7.75784 20.3261 10.009 20.6765 13.0113C21.0895 16.5497 21.2959 18.3189 20.1027 19.6594C18.9095 21 16.9758 21 13.1084 21H10.8916C7.02422 21 5.09052 21 3.89731 19.6594C2.70411 18.3189 2.91058 16.5497 3.32352 13.0113Z", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "1.5", key: "0" }],
     ["path", { d: "M9 7C9 8.65685 10.3431 10 12 10C13.6569 10 15 8.65685 15 7", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "1.5", key: "1" }]
 ];
+
+export const Search01Icon = [
+    ["circle", { cx: "9.5", cy: "9.5", r: "9.5", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "1.5", key: "0" }],
+    ["path", { d: "M18.5 18.5L22 22", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "1.5", key: "1" }]
+];
+
+export const SearchCustomIcon = [
+    ["path", { d: "M22.553,21.156l-5.712-5.722a9.495,9.495,0,1,0-1.411,1.411l5.712,5.722a1,1,0,1,0,1.411-1.411ZM9.477,16.962A7.482,7.482,0,1,1,16.959,9.48,7.49,7.49,0,0,1,9.477,16.962Z", fill: "currentColor", key: "0" }]
+];

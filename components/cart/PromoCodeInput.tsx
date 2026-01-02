@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
     applyText: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#1152d4',
+        color: '#000',
     },
 });

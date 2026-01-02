@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
         shadowRadius: 1,
     },
     counterBtnAdd: {
-        backgroundColor: '#1152d4', // primary
+        backgroundColor: '#000', // primary (black)
     },
     countText: {
         width: 32,

@@ -51,7 +51,14 @@ export default function LoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <GlobalHeader title="LUXE" />
+            <GlobalHeader
+                title="LOGIN"
+                showBack
+                alwaysShowTitle
+                showWishlist={false}
+                showShare={false}
+                showCart={false}
+            />
 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: 60 + insets.top }]}
@@ -61,7 +68,7 @@ export default function LoginScreen() {
                     {/* Header inside card */}
                     <View style={styles.header}>
                         <View style={styles.iconBox}>
-                            <MaterialIcons name="lock-outline" size={32} color="#1152d4" />
+                            <MaterialIcons name="lock-outline" size={32} color="#000" />
                         </View>
                         <Text style={styles.title}>Welcome Back</Text>
                         <Text style={styles.subtitle}>Sign in to continue to your account</Text>
@@ -195,7 +202,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 16,
-        backgroundColor: 'rgba(17, 82, 212, 0.1)',
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
@@ -222,17 +229,17 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     forgotText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1152d4',
+        color: '#000',
     },
     loginButton: {
         height: 56,
-        backgroundColor: '#1152d4',
+        backgroundColor: '#000',
         borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        shadowColor: '#1152d4',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -311,6 +318,6 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     signUpText: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#1152d4',
+        color: '#000',
     },
 });

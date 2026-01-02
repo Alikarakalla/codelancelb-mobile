@@ -55,13 +55,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <MaterialIcons name="person" size={28} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="cart"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
+
       <Tabs.Screen
         name="explore"
         options={{
@@ -69,27 +63,8 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-      <Tabs.Screen
-        name="login"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="signup"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="checkout"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
+
+
     </Tabs>
   );
 }

@@ -100,7 +100,14 @@ export default function CheckoutScreen() {
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
-            <GlobalHeader title="Checkout" />
+            <GlobalHeader
+                title="CHECKOUT"
+                showBack
+                alwaysShowTitle
+                showWishlist={false}
+                showShare={false}
+                showCart={false}
+            />
 
             <ScrollView
                 contentContainerStyle={[
@@ -425,7 +432,7 @@ export default function CheckoutScreen() {
                     onPress={() => alert('Order Placed!')}
                     style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
                 >
-                    <Text style={styles.payButtonText}>Pay Now</Text>
+                    <Text style={styles.payButtonText}>Place Order</Text>
                     <Text style={styles.payButtonTotal}>· ${total.toFixed(2)}</Text>
                 </Pressable>
                 <View style={styles.secureFooter}>
@@ -889,14 +896,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#F8FAFC',
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 8,
         alignSelf: 'flex-start',
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#BFDBFE',
+        borderColor: '#E2E8F0',
     },
     couponText: {
         fontSize: 14,

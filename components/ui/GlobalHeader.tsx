@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
-import { Share08Icon, FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
+import { Share08Icon, FavouriteIcon, ShoppingBag01Icon, SearchCustomIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 
 interface GlobalHeaderProps {
@@ -18,6 +19,7 @@ interface GlobalHeaderProps {
     showCart?: boolean;
     isWishlisted?: boolean;
     onWishlistPress?: () => void;
+    alwaysShowTitle?: boolean;
 }
 
 export function GlobalHeader({
@@ -27,7 +29,8 @@ export function GlobalHeader({
     showWishlist,
     showCart,
     isWishlisted,
-    onWishlistPress
+    onWishlistPress,
+    alwaysShowTitle
 }: GlobalHeaderProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
@@ -60,10 +63,18 @@ export function GlobalHeader({
                     )}
                 </View>
 
-                {/* Center Section - Hidden in detail mode as per request */}
+                {/* Center Section - Hidden in detail mode unless forced */}
                 <View style={styles.centerSection}>
-                    {!isDetailMode && (
-                        <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                    {(!isDetailMode || alwaysShowTitle) && (
+                        title === 'LUXE' ? (
+                            <Image
+                                source={require('@/assets/images/logo.png')}
+                                style={{ width: 60, height: 28 }}
+                                contentFit="contain"
+                            />
+                        ) : (
+                            <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                        )
                     )}
                 </View>
 
@@ -89,14 +100,9 @@ export function GlobalHeader({
                     )}
 
                     {!isDetailMode && (
-                        <>
-                            <Pressable style={styles.langButton}>
-                                <Text style={[styles.langText, { color: textColor }]}>EN</Text>
-                            </Pressable>
-                            <Pressable style={styles.iconButton}>
-                                <Feather name="search" size={20} color={textColor} />
-                            </Pressable>
-                        </>
+                        <Pressable style={styles.iconButton}>
+                            <HugeiconsIcon icon={SearchCustomIcon} size={20} color={textColor} />
+                        </Pressable>
                     )}
 
                     {(showCart || !isDetailMode) && (
@@ -147,12 +153,12 @@ const styles = StyleSheet.create({
         height: 56,
     },
     title: {
-        fontSize: 18,
-        fontWeight: '800',
+        fontSize: 16,
+        fontWeight: '600',
         letterSpacing: 2,
         textAlign: 'center',
         textTransform: 'uppercase',
-        fontFamily: Platform.select({ ios: 'Avenir Next', android: 'Roboto' }),
+        fontFamily: Platform.select({ ios: 'Inter', android: 'Roboto' }),
     },
     leftSection: {
         flex: 1,

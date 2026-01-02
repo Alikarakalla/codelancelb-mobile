@@ -28,7 +28,14 @@ export default function CartScreen() {
 
     return (
         <View style={styles.container}>
-            <GlobalHeader title="LUXE" />
+            <GlobalHeader
+                title="CART"
+                showBack
+                showWishlist={false}
+                showShare={false}
+                showCart={false}
+                alwaysShowTitle
+            />
 
             <ScrollView
                 contentContainerStyle={{

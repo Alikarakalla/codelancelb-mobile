@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
     totalValue: {
         fontSize: 20,
         fontWeight: '900', // heavy
-        color: '#1152d4',
+        color: '#000',
     },
 });

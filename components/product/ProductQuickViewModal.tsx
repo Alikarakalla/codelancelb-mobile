@@ -8,7 +8,8 @@ import {
     Image,
     Dimensions,
     ScrollView,
-    Platform
+    Platform,
+    Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -17,6 +18,8 @@ import { ShoppingBag01Icon } from '@/components/ui/icons';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { Product, ProductVariant } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ProductInfo } from '@/components/product/ProductInfo';
+import { ProductSelectors } from '@/components/product/ProductSelectors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -35,62 +38,58 @@ export const ProductQuickViewModal = ({
     onAddToCart,
     onViewDetails
 }: ProductQuickViewModalProps) => {
-    const [selectedSize, setSelectedSize] = useState<string | null>(null);
-    const [selectedColor, setSelectedColor] = useState<string | null>(null);
     const [quantity, setQuantity] = useState(1);
+    const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
     const { triggerCartAnimation } = useCartAnimation();
     const cartButtonRef = React.useRef<View>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+    // Reset quantity when product changes
+    React.useEffect(() => {
+        if (product) {
+            setQuantity(1);
+            // Default variant logic is handled by ProductSelectors on mount, 
+            // but we can initialize it here if needed for immediate render state before callback
+            if (product.variants?.length) {
+                const defaultVariant = product.variants.find(v => v.is_default) || product.variants[0];
+                setSelectedVariant(defaultVariant);
+            } else {
+                setSelectedVariant(null);
+            }
+        }
+    }, [product]);
+
     if (!product) return null;
 
-    const hasDiscount = product.discount_amount && product.discount_amount > 0;
-    const finalPrice = hasDiscount
-        ? (product.discount_type === 'percent'
-            ? product.price! * (1 - product.discount_amount! / 100)
-            : product.price! - product.discount_amount!)
-        : product.price;
-
-    // Extract unique sizes and colors from variants
-    const sizes = useMemo(() => {
-        const s = new Set<string>();
-        product.variants?.forEach(v => v.size && s.add(v.size));
-        return Array.from(s);
-    }, [product]);
-
-    const colors = useMemo(() => {
-        const c = new Set<string>();
-        product.variants?.forEach(v => v.color && c.add(v.color));
-        return Array.from(c);
-    }, [product]);
-
     const handleAddToCart = () => {
+        if (product.has_variants && !selectedVariant) {
+            // Should theoretically be handled by valid default, but good safety
+            return;
+        }
+
+        const addAction = () => {
+            onAddToCart({
+                product,
+                quantity,
+                variant: selectedVariant || undefined
+            });
+            onClose();
+        };
+
         if (cartButtonRef.current) {
             requestAnimationFrame(() => {
                 cartButtonRef.current?.measure((x, y, w, h, px, py) => {
                     triggerCartAnimation(
                         { x: px + w / 2, y: py + h / 2 },
-                        () => {
-                            onAddToCart({
-                                product,
-                                quantity,
-                                variant: product.variants?.find(v => v.size === selectedSize && v.color === selectedColor)
-                            });
-                            onClose();
-                        }
+                        addAction
                     );
                 });
             });
         } else {
-            onAddToCart({
-                product,
-                quantity,
-                variant: product.variants?.find(v => v.size === selectedSize && v.color === selectedColor)
-            });
-            onClose();
+            addAction();
         }
-    }
+    };
 
     return (
         <Modal
@@ -113,86 +112,34 @@ export const ProductQuickViewModal = ({
                     {/* Product Image */}
                     <View style={styles.imageWrapper}>
                         <Image
-                            source={{ uri: product.main_image || 'https://via.placeholder.com/400x300' }}
+                            source={{ uri: selectedVariant?.image_path || product.main_image || 'https://via.placeholder.com/400x300' }}
                             style={styles.image}
                             resizeMode="cover"
                         />
                     </View>
 
                     <ScrollView style={styles.content} bounces={false} showsVerticalScrollIndicator={false}>
-                        {/* Title & Price */}
-                        <View style={styles.header}>
-                            <View style={{ flex: 1 }}>
-                                {product.brand && (
-                                    <Text style={[styles.brandName, isDark && { color: '#94A3B8' }]}>{product.brand.name}</Text>
-                                )}
-                                <Text style={[styles.productName, isDark && { color: '#fff' }]}>{product.name_en || product.name}</Text>
-                            </View>
-                            <View style={styles.priceContainer}>
-                                <Text style={[styles.price, isDark && { color: '#1152d4' }]}>${finalPrice?.toFixed(2)}</Text>
-                                {hasDiscount && (
-                                    <View style={styles.discountBadge}>
-                                        <Text style={styles.discountText}>
-                                            -{product.discount_type === 'percent' ? `${product.discount_amount}%` : `$${product.discount_amount}`}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
+                        {/* Title & Price using ProductInfo */}
+                        <View style={{ marginHorizontal: -20, marginTop: -20 }}>
+                            <ProductInfo
+                                brand={product.brand?.name}
+                                title={product.name_en || product.name || ''}
+                                price={selectedVariant?.price ?? product.price ?? 0}
+                                originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
+                                rating={4.8}
+                                reviewCount={product.reviews?.length || 0}
+                            />
                         </View>
 
-                        {/* Color Selector */}
-                        {colors.length > 0 && (
-                            <View style={styles.section}>
-                                <Text style={[styles.sectionTitle, isDark && { color: '#e5e5e5' }]}>Available Colors</Text>
-                                <View style={styles.colorRow}>
-                                    {colors.map(color => (
-                                        <Pressable
-                                            key={color}
-                                            onPress={() => setSelectedColor(color)}
-                                            style={[
-                                                styles.colorDot,
-                                                { backgroundColor: color.toLowerCase() },
-                                                selectedColor === color && styles.colorDotSelected,
-                                                isDark && { borderColor: '#333' }
-                                            ]}
-                                        >
-                                            {selectedColor === color && (
-                                                <MaterialIcons name="check" size={16} color={color.toLowerCase() === 'white' ? '#000' : '#fff'} />
-                                            )}
-                                        </Pressable>
-                                    ))}
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Size Selector */}
-                        {sizes.length > 0 && (
-                            <View style={styles.section}>
-                                <View style={styles.sectionHeader}>
-                                    <Text style={[styles.sectionTitle, isDark && { color: '#e5e5e5' }]}>Select Size</Text>
-                                    <Pressable><Text style={styles.sizeChartText}>Size Chart</Text></Pressable>
-                                </View>
-                                <View style={styles.sizeGrid}>
-                                    {sizes.map(size => (
-                                        <Pressable
-                                            key={size}
-                                            onPress={() => setSelectedSize(size)}
-                                            style={[
-                                                styles.sizeBox,
-                                                selectedSize === size && styles.sizeBoxSelected,
-                                                isDark && { borderColor: '#333' }
-                                            ]}
-                                        >
-                                            <Text style={[
-                                                styles.sizeText,
-                                                isDark && { color: '#94A3B8' },
-                                                selectedSize === size && styles.sizeTextSelected
-                                            ]}>{size}</Text>
-                                        </Pressable>
-                                    ))}
-                                </View>
-                            </View>
-                        )}
+                        {/* Selectors */}
+                        <View style={{ marginHorizontal: -20, marginTop: 10 }}>
+                            <ProductSelectors
+                                key={product.id}
+                                options={product.options}
+                                variants={product.variants}
+                                onVariantChange={setSelectedVariant}
+                            />
+                        </View>
 
                         {/* Quantity Selector */}
                         <View style={styles.section}>
@@ -296,108 +243,14 @@ const styles = StyleSheet.create({
     content: {
         padding: 20,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 20,
-    },
-    brandName: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#94a3b8',
-        textTransform: 'uppercase',
-        marginBottom: 4,
-    },
-    productName: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
-        lineHeight: 22,
-    },
-    priceContainer: {
-        alignItems: 'flex-end',
-    },
-    price: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1152d4',
-    },
-    discountBadge: {
-        marginTop: 4,
-        backgroundColor: '#fee2e2',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    discountText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#ef4444',
-    },
     section: {
         marginBottom: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
     },
     sectionTitle: {
         fontSize: 13,
         fontWeight: '700',
         color: '#334155',
         marginBottom: 8,
-    },
-    colorRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    colorDot: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    colorDotSelected: {
-        borderWidth: 2,
-        borderColor: '#1152d4',
-        transform: [{ scale: 1.1 }],
-    },
-    sizeChartText: {
-        fontSize: 11,
-        color: '#1152d4',
-        fontWeight: '600',
-    },
-    sizeGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    sizeBox: {
-        width: (360 - 80) / 5,
-        height: 36,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    sizeBoxSelected: {
-        backgroundColor: '#1152d4',
-        borderColor: '#1152d4',
-    },
-    sizeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748b',
-    },
-    sizeTextSelected: {
-        color: '#fff',
     },
     quantityContainer: {
         flexDirection: 'row',
