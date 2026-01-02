@@ -1,17 +1,15 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { WishlistProvider } from '@/hooks/use-wishlist-context';
 import { CartProvider } from '@/hooks/use-cart-context';
 import { WishlistAnimationProvider } from '@/components/wishlist/WishlistAnimationProvider';
 import { CartAnimationProvider } from '@/components/cart/CartAnimationProvider';
-import { SideDrawer } from '@/components/ui/SideDrawer';
 import { DrawerProvider, useDrawer } from '@/hooks/use-drawer-context';
+import { SideDrawer } from '@/components/ui/SideDrawer';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import 'react-native-reanimated';
 
 function DrawerWrappedRoot({ children }: { children: React.ReactNode }) {
   const { isOpen, closeDrawer } = useDrawer();
@@ -35,32 +33,12 @@ export default function RootLayout() {
                 <DrawerProvider>
                   <DrawerWrappedRoot>
                     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                      <NativeTabs backBehavior="history">
-                        <NativeTabs.Trigger name="index">
-                          <Label>Home</Label>
-                          <Icon sf="house.fill" />
-                        </NativeTabs.Trigger>
-
-                        <NativeTabs.Trigger name="shop">
-                          <Label>Shop</Label>
-                          <Icon sf="bag.fill" />
-                        </NativeTabs.Trigger>
-
-                        <NativeTabs.Trigger name="wishlist">
-                          <Label>Wishlist</Label>
-                          <Icon sf="heart.fill" />
-                        </NativeTabs.Trigger>
-
-                        <NativeTabs.Trigger name="profile">
-                          <Label>Profile</Label>
-                          <Icon sf="person.fill" />
-                        </NativeTabs.Trigger>
-
-                        <NativeTabs.Trigger name="search" role="search">
-                          <Label>Search</Label>
-                          <Icon sf="magnifyingglass" />
-                        </NativeTabs.Trigger>
-                      </NativeTabs>
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="product" options={{ presentation: 'card', headerShown: false }} />
+                        <Stack.Screen name="cart" options={{ presentation: 'card', headerShown: false }} />
+                        <Stack.Screen name="checkout" options={{ presentation: 'card', headerShown: false }} />
+                      </Stack>
                     </ThemeProvider>
                   </DrawerWrappedRoot>
                 </DrawerProvider>
