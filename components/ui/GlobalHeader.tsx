@@ -10,6 +10,8 @@ import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { Share08Icon, FavouriteIcon, ShoppingBag01Icon, SearchCustomIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
+import { SearchBottomSheet } from '@/components/search/SearchBottomSheet';
+import { BlurView } from 'expo-blur';
 
 interface GlobalHeaderProps {
     title?: string;
@@ -39,97 +41,105 @@ export function GlobalHeader({
     const { openDrawer } = useDrawer();
     const { setCartTargetPoint } = useCartAnimation();
     const cartIconRef = React.useRef<View>(null);
+    const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     const isDark = colorScheme === 'dark';
     const textColor = isDark ? '#fff' : '#18181B';
-    const bgColor = isDark ? '#000' : '#fff';
 
     // If back button is enabled, we assume a "Product/Detail" header style
     const isDetailMode = showBack;
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgColor }]}>
-            <View style={styles.content}>
-                {/* Left Section */}
-                <View style={styles.leftSection}>
-                    {showBack ? (
-                        <Pressable onPress={() => router.back()} style={styles.iconButton}>
-                            <Feather name="chevron-left" size={28} color={textColor} />
-                        </Pressable>
-                    ) : (
-                        <Pressable onPress={openDrawer} style={styles.iconButton}>
-                            <Feather name="menu" size={24} color={textColor} />
-                        </Pressable>
-                    )}
-                </View>
-
-                {/* Center Section - Hidden in detail mode unless forced */}
-                <View style={styles.centerSection}>
-                    {(!isDetailMode || alwaysShowTitle) && (
-                        title === 'LUXE' ? (
-                            <Image
-                                source={require('@/assets/images/logo.png')}
-                                style={{ width: 60, height: 28 }}
-                                contentFit="contain"
-                            />
+        <>
+            <BlurView
+                intensity={80}
+                tint={isDark ? 'dark' : 'light'}
+                style={[styles.container, { paddingTop: insets.top }]}
+            >
+                <View style={styles.content}>
+                    {/* Left Section */}
+                    <View style={styles.leftSection}>
+                        {showBack ? (
+                            <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                                <Feather name="chevron-left" size={28} color={textColor} />
+                            </Pressable>
                         ) : (
-                            <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-                        )
-                    )}
-                </View>
+                            <Pressable onPress={openDrawer} style={styles.iconButton}>
+                                <Feather name="menu" size={24} color={textColor} />
+                            </Pressable>
+                        )}
+                    </View>
 
-                {/* Right Section */}
-                <View style={styles.rightSection}>
-                    {showWishlist && (
-                        <Pressable
-                            style={styles.iconButton}
-                            onPress={onWishlistPress ? onWishlistPress : () => router.push('/wishlist')}
-                        >
-                            <HugeiconsIcon
-                                icon={FavouriteIcon}
-                                size={24}
-                                color={textColor}
-                            />
-                        </Pressable>
-                    )}
+                    {/* Center Section - Hidden in detail mode unless forced */}
+                    <View style={styles.centerSection}>
+                        {(!isDetailMode || alwaysShowTitle) && (
+                            title === 'LUXE' ? (
+                                <Image
+                                    source={require('@/assets/images/logo.png')}
+                                    style={{ width: 60, height: 28 }}
+                                    contentFit="contain"
+                                />
+                            ) : (
+                                <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                            )
+                        )}
+                    </View>
 
-                    {showShare && (
-                        <Pressable style={styles.iconButton}>
-                            <HugeiconsIcon icon={Share08Icon} size={24} color={textColor} />
-                        </Pressable>
-                    )}
+                    {/* Right Section */}
+                    <View style={styles.rightSection}>
+                        {showWishlist && (
+                            <Pressable
+                                style={styles.iconButton}
+                                onPress={onWishlistPress ? onWishlistPress : () => router.push('/wishlist')}
+                            >
+                                <HugeiconsIcon
+                                    icon={FavouriteIcon}
+                                    size={24}
+                                    color={textColor}
+                                />
+                            </Pressable>
+                        )}
 
-                    {!isDetailMode && (
-                        <Pressable style={styles.iconButton}>
-                            <HugeiconsIcon icon={SearchCustomIcon} size={20} color={textColor} />
-                        </Pressable>
-                    )}
+                        {showShare && (
+                            <Pressable style={styles.iconButton}>
+                                <HugeiconsIcon icon={Share08Icon} size={24} color={textColor} />
+                            </Pressable>
+                        )}
 
-                    {(showCart || !isDetailMode) && (
-                        <Pressable
-                            style={styles.iconButton}
-                            onPress={() => router.push('/cart')}
-                            ref={cartIconRef}
-                            onLayout={() => {
-                                cartIconRef.current?.measure((x, y, width, height, px, py) => {
-                                    setCartTargetPoint({
-                                        x: px + width / 2,
-                                        y: py + height / 2
+                        {!isDetailMode && (
+                            <Pressable style={styles.iconButton} onPress={() => setIsSearchOpen(true)}>
+                                <HugeiconsIcon icon={SearchCustomIcon} size={20} color={textColor} />
+                            </Pressable>
+                        )}
+
+                        {(showCart || !isDetailMode) && (
+                            <Pressable
+                                style={styles.iconButton}
+                                onPress={() => router.push('/cart')}
+                                ref={cartIconRef}
+                                onLayout={() => {
+                                    cartIconRef.current?.measure((x, y, width, height, px, py) => {
+                                        setCartTargetPoint({
+                                            x: px + width / 2,
+                                            y: py + height / 2
+                                        });
                                     });
-                                });
-                            }}
-                        >
-                            <HugeiconsIcon icon={ShoppingBag01Icon} size={24} color={textColor} />
-                            {cartCount > 0 && (
-                                <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
-                                    <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
-                                </View>
-                            )}
-                        </Pressable>
-                    )}
+                                }}
+                            >
+                                <HugeiconsIcon icon={ShoppingBag01Icon} size={24} color={textColor} />
+                                {cartCount > 0 && (
+                                    <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
+                                        <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
+                                    </View>
+                                )}
+                            </Pressable>
+                        )}
+                    </View>
                 </View>
-            </View>
-        </View>
+            </BlurView>
+
+            <SearchBottomSheet isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+        </>
     );
 }
 
@@ -140,8 +150,9 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 100,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(0,0,0,0.1)',
+        overflow: 'hidden',
     },
     content: {
         flexDirection: 'row',
@@ -176,15 +187,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-end',
         gap: 4,
-    },
-    langButton: {
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        marginRight: 4,
-    },
-    langText: {
-        fontSize: 12,
-        fontWeight: '700',
     },
     iconButton: {
         width: 36,
