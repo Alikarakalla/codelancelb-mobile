@@ -2,6 +2,7 @@ import { View, StyleSheet, ScrollView, Alert, ActivityIndicator, Text } from 're
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useMemo } from 'react';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useDrawer } from '@/hooks/use-drawer-context';
@@ -21,6 +22,8 @@ import { useCart } from '@/hooks/use-cart-context';
 export default function ProductDetailsScreen() {
     const { id } = useLocalSearchParams();
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const { openDrawer } = useDrawer();
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
@@ -106,24 +109,24 @@ export default function ProductDetailsScreen() {
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={[styles.loadingContainer, isDark && { backgroundColor: '#000' }]}>
                 <GlobalHeader title="LUXE" />
-                <ActivityIndicator size="large" color="#000" />
+                <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
             </View>
         );
     }
 
     if (error || !product) {
         return (
-            <View style={styles.errorContainer}>
+            <View style={[styles.errorContainer, isDark && { backgroundColor: '#000' }]}>
                 <GlobalHeader title="LUXE" />
-                <Text style={styles.errorText}>{error || 'Product not found'}</Text>
+                <Text style={[styles.errorText, isDark && { color: '#94A3B8' }]}>{error || 'Product not found'}</Text>
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <GlobalHeader title="LUXE" />
 
             <ScrollView

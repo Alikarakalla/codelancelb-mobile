@@ -67,13 +67,36 @@ export const api = {
     },
 
     async getRelatedProducts(productId: number | string): Promise<Product[]> {
-        const res = await fetch(`${BASE_URL}/products/${productId}/related`);
-        return handleResponse<Product[]>(res);
+        try {
+            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
+            const res = await fetch(`${BASE_URL}/products/${productId}/related`);
+            return await handleResponse<Product[]>(res);
+        } catch (err) {
+            if (!IS_PLACEHOLDER) console.error(`Error fetching related products for ${productId}:`, err);
+            if (IS_DEV) {
+                // Return some mock related products (excluding the current one)
+                return MOCK_PRODUCTS.filter(p => p.id !== Number(productId)).slice(0, 4);
+            }
+            throw err;
+        }
     },
 
     async getProductReviews(productId: number | string): Promise<ProductReview[]> {
-        const res = await fetch(`${BASE_URL}/products/${productId}/reviews`);
-        return handleResponse<ProductReview[]>(res);
+        try {
+            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
+            const res = await fetch(`${BASE_URL}/products/${productId}/reviews`);
+            return await handleResponse<ProductReview[]>(res);
+        } catch (err) {
+            if (!IS_PLACEHOLDER) console.error(`Error fetching reviews for ${productId}:`, err);
+            if (IS_DEV) {
+                // Return dummy reviews if API fails
+                return [
+                    { id: 1, product_id: Number(productId), user_id: 101, rating: 5, review: 'Absolutely love this! The quality is outstanding.', created_at: '2 days ago', user: { name: 'Sarah J.' } as any },
+                    { id: 2, product_id: Number(productId), user_id: 102, rating: 4, review: 'Great value for money. Fits perfectly.', created_at: '1 week ago', user: { name: 'Mike T.' } as any }
+                ] as ProductReview[];
+            }
+            return [];
+        }
     },
 
     // --- Content ---

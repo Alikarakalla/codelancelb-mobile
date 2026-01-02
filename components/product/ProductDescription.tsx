@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface ProductDescriptionProps {
     description: string;
 }
 
 export function ProductDescription({ description }: ProductDescriptionProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     return (
         <View style={styles.container}>
-            <Text style={styles.heading}>Description</Text>
-            <Text style={styles.body}>
+            <Text style={[styles.heading, isDark && { color: '#fff' }]}>Description</Text>
+            <Text style={[styles.body, isDark && { color: '#94A3B8' }]}>
                 {description}
                 <Text style={styles.readMore}> Read more</Text>
             </Text>

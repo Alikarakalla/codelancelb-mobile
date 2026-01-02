@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface AddToCartFooterProps {
     onAddToCart: () => void;
@@ -18,6 +19,9 @@ interface AddToCartFooterProps {
 export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, disabled, price }: AddToCartFooterProps) {
     const [quantity, setQuantity] = React.useState(1);
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     const { triggerAnimation } = useWishlistAnimation();
     const { triggerCartAnimation } = useCartAnimation();
     const favButtonRef = React.useRef<View>(null);
@@ -27,16 +31,16 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
     const decrement = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
 
     return (
-        <View style={styles.outerContainer}>
+        <View style={[styles.outerContainer, isDark && { backgroundColor: '#111' }]}>
             <View style={styles.container}>
                 {/* Quantity Selector */}
-                <View style={styles.quantityBox}>
+                <View style={[styles.quantityBox, isDark && { backgroundColor: '#000', borderColor: '#333' }]}>
                     <Pressable onPress={decrement} style={styles.qtyBtn}>
-                        <Ionicons name="remove" size={16} color="#1F2937" />
+                        <Ionicons name="remove" size={16} color={isDark ? "#fff" : "#1F2937"} />
                     </Pressable>
-                    <Text style={styles.qtyText}>{quantity}</Text>
+                    <Text style={[styles.qtyText, isDark && { color: '#fff' }]}>{quantity}</Text>
                     <Pressable onPress={increment} style={styles.qtyBtn}>
-                        <Ionicons name="add" size={16} color="#1F2937" />
+                        <Ionicons name="add" size={16} color={isDark ? "#fff" : "#1F2937"} />
                     </Pressable>
                 </View>
 
@@ -60,12 +64,19 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
                     disabled={disabled}
                     style={({ pressed }) => [
                         styles.cartButton,
+                        isDark && { backgroundColor: '#fff' },
                         pressed && !disabled && styles.pressedOpacity,
-                        disabled && styles.disabledButton
+                        disabled && styles.disabledButton,
+                        disabled && isDark && { backgroundColor: '#333' }
                     ]}
                     ref={cartButtonRef}
                 >
-                    <Text style={[styles.cartText, disabled && styles.disabledText]}>
+                    <Text style={[
+                        styles.cartText,
+                        isDark && { color: '#000' },
+                        disabled && styles.disabledText,
+                        disabled && isDark && { color: '#666' }
+                    ]}>
                         {disabled ? 'OUT OF STOCK' : 'ADD TO CART'}
                     </Text>
                 </Pressable>
@@ -88,19 +99,29 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
                             onToggleWishlist?.();
                         }
                     }}
-                    style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+                    style={({ pressed }) => [
+                        styles.iconBtn,
+                        isDark && { backgroundColor: '#000', borderColor: '#333' },
+                        pressed && styles.pressed,
+                        pressed && isDark && { backgroundColor: '#222' }
+                    ]}
                     ref={favButtonRef}
                 >
                     <Ionicons
                         name={isWishlisted ? "heart" : "heart-outline"}
                         size={20}
-                        color={isWishlisted ? "#ef4444" : "#1F2937"}
+                        color={isWishlisted ? "#ef4444" : (isDark ? "#fff" : "#1F2937")}
                     />
                 </Pressable>
 
                 {/* Compare Button */}
-                <Pressable style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
-                    <Ionicons name="swap-horizontal" size={20} color="#1F2937" />
+                <Pressable style={({ pressed }) => [
+                    styles.iconBtn,
+                    isDark && { backgroundColor: '#000', borderColor: '#333' },
+                    pressed && styles.pressed,
+                    pressed && isDark && { backgroundColor: '#222' }
+                ]}>
+                    <Ionicons name="swap-horizontal" size={20} color={isDark ? "#fff" : "#1F2937"} />
                 </Pressable>
             </View>
         </View>

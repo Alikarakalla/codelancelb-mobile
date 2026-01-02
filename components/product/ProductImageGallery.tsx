@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, Image, StyleSheet, Dimensions, Pressable, FlatList, ViewToken } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ImageView from "react-native-image-viewing";
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width } = Dimensions.get('window');
 const IMAGE_ASPECT_RATIO = 1; // Square 1:1
@@ -15,6 +16,8 @@ export function ProductImageGallery({ images, selectedImage }: ProductImageGalle
     const [visible, setVisible] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     const formattedImages = images.map(img => ({ uri: img }));
 
@@ -87,7 +90,9 @@ export function ProductImageGallery({ images, selectedImage }: ProductImageGalle
                             key={i}
                             style={[
                                 styles.dot,
-                                i === activeIndex ? styles.activeDot : styles.inactiveDot
+                                i === activeIndex ?
+                                    (isDark ? styles.activeDot : { ...styles.activeDot, backgroundColor: '#1F2937' }) :
+                                    (isDark ? styles.inactiveDot : { ...styles.inactiveDot, backgroundColor: 'rgba(0,0,0,0.2)' })
                             ]}
                         />
                     ))}
@@ -113,6 +118,7 @@ export function ProductImageGallery({ images, selectedImage }: ProductImageGalle
                                 onPress={() => scrollToIndex(index)}
                                 style={[
                                     styles.thumbnailWrapper,
+                                    isDark && { backgroundColor: '#222' },
                                     activeIndex === index && styles.activeThumbnail
                                 ]}
                             >
@@ -144,8 +150,9 @@ const styles = StyleSheet.create({
     },
     swiperContainer: {
         width: width,
-        height: width * IMAGE_ASPECT_RATIO, // e.g. 300 * 1.33 = 400
+        height: width, // Square container
         position: 'relative',
+        paddingTop: 10,
     },
     slide: {
         width: width,
@@ -154,17 +161,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     image: {
-        width: '100%',
-        height: '100%',
+        width: width - 32, // Horizontal padding
+        height: width - 32,
+        borderRadius: 24, // Modern corner radius
     },
     pagination: {
         position: 'absolute',
-        bottom: 16,
+        bottom: 0,
         left: 0,
         right: 0,
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 8,
+        paddingBottom: 16,
     },
     dot: {
         width: 8,
@@ -183,12 +192,12 @@ const styles = StyleSheet.create({
     },
     expandButton: {
         position: 'absolute',
-        bottom: 16,
-        right: 16,
+        bottom: 24,
+        right: 24,
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,

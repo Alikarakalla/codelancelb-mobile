@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import { api } from '@/services/apiClient';
 import { Product } from '@/types/schema';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface RelatedProductsProps {
     currentProductId: number;
@@ -11,6 +12,8 @@ interface RelatedProductsProps {
 export function RelatedProducts({ currentProductId }: RelatedProductsProps) {
     const [relatedItems, setRelatedItems] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     useEffect(() => {
         const fetchRelated = async () => {
@@ -30,7 +33,7 @@ export function RelatedProducts({ currentProductId }: RelatedProductsProps) {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
             </View>
         );
     }
@@ -38,9 +41,9 @@ export function RelatedProducts({ currentProductId }: RelatedProductsProps) {
     if (relatedItems.length === 0) return null;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDark && { borderTopColor: '#333' }]}>
             <View style={styles.header}>
-                <Text style={styles.heading}>Related Products</Text>
+                <Text style={[styles.heading, isDark && { color: '#fff' }]}>Related Products</Text>
                 <Text style={styles.seeAll}>See All</Text>
             </View>
 

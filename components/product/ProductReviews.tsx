@@ -2,19 +2,23 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProductReview } from '@/types/schema';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface ProductReviewsProps {
     reviews?: ProductReview[];
 }
 
 export function ProductReviews({ reviews = [] }: ProductReviewsProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     if (!reviews || reviews.length === 0) return null;
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.heading}>Customer Reviews</Text>
+        <View style={[styles.container, isDark && { borderTopColor: '#333' }]}>
+            <Text style={[styles.heading, isDark && { color: '#fff' }]}>Customer Reviews</Text>
             {reviews.map((review) => (
-                <View key={review.id} style={styles.reviewCard}>
+                <View key={review.id} style={[styles.reviewCard, isDark && { backgroundColor: '#111' }]}>
                     <View style={styles.header}>
                         <View style={styles.rating}>
                             {Array.from({ length: 5 }).map((_, i) => (
@@ -28,8 +32,8 @@ export function ProductReviews({ reviews = [] }: ProductReviewsProps) {
                         </View>
                         <Text style={styles.date}>{review.created_at || 'Recently'}</Text>
                     </View>
-                    <Text style={styles.comment}>{review.review}</Text>
-                    <Text style={styles.user}>Verified Buyer</Text>
+                    <Text style={[styles.comment, isDark && { color: '#E2E8F0' }]}>{review.review}</Text>
+                    <Text style={[styles.user, isDark && { color: '#94A3B8' }]}>Verified Buyer</Text>
                 </View>
             ))}
         </View>

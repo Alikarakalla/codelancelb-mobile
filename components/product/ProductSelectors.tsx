@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProductOption, ProductVariant } from '@/types/schema';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface ProductSelectorsProps {
     options?: ProductOption[];
@@ -10,6 +11,9 @@ interface ProductSelectorsProps {
 }
 
 export function ProductSelectors({ options = [], variants = [], onVariantChange }: ProductSelectorsProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     // Find options dynamically
     const colorOption = options.find(o => o.name.toLowerCase() === 'color');
     const secondOption = options.find(o => o.name.toLowerCase() !== 'color');
@@ -87,7 +91,7 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
             {/* Colors */}
             {allColors.length > 0 && (
                 <View style={styles.section}>
-                    <Text style={styles.heading}>Select Color</Text>
+                    <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select Color</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorsRow}>
                         {allColors.map((colorName) => {
                             const isSelected = selectedColor === colorName;
@@ -99,16 +103,18 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
                                     onPress={() => setSelectedColor(colorName)}
                                     style={[
                                         styles.colorPill,
-                                        isSelected && { borderColor: hex, borderWidth: 1.5 },
+                                        isDark && { backgroundColor: '#111', borderColor: '#333' },
+                                        isSelected && { borderColor: isDark ? '#fff' : hex, borderWidth: 1.5 },
                                     ]}
                                 >
                                     <View style={[
                                         styles.innerDot,
                                         { backgroundColor: hex },
-                                        isWhite && styles.dotBorder
+                                        (isWhite || isDark) && styles.dotBorder
                                     ]} />
                                     <Text style={[
                                         styles.colorName,
+                                        isDark && { color: '#fff' },
                                         isSelected && styles.colorNameSelectedBold
                                     ]}>
                                         {colorName}
@@ -124,7 +130,7 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
             {allSecondOptionValues.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sizeHeader}>
-                        <Text style={styles.heading}>Select {secondOption?.name || 'Option'}</Text>
+                        <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select {secondOption?.name || 'Option'}</Text>
                     </View>
 
                     <View style={styles.sizesRow}>
@@ -139,13 +145,18 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
                                     onPress={() => !isDisabled && setSelectedSecond(val)}
                                     style={[
                                         styles.sizeBox,
+                                        isDark && { backgroundColor: '#111', borderColor: '#333' },
                                         isSelected && styles.sizeBoxSelected,
-                                        isDisabled && styles.sizeBoxDisabled
+                                        isSelected && isDark && { borderColor: '#fff' },
+                                        isDisabled && styles.sizeBoxDisabled,
+                                        isDisabled && isDark && { backgroundColor: '#222', borderColor: '#333' }
                                     ]}
                                 >
                                     <Text style={[
                                         styles.sizeText,
+                                        isDark && { color: '#94A3B8' },
                                         isSelected && styles.sizeTextSelected,
+                                        isSelected && isDark && { color: '#fff' },
                                         isDisabled && styles.sizeTextDisabled
                                     ]}>
                                         {val}

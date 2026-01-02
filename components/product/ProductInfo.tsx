@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface ProductInfoProps {
     brand?: string;
@@ -12,12 +12,15 @@ interface ProductInfoProps {
 }
 
 export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount }: ProductInfoProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     return (
         <View style={styles.container}>
-            <Text style={styles.brand}>{brand}</Text>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={[styles.brand, isDark && { color: '#94A3B8' }]}>{brand}</Text>
+            <Text style={[styles.title, isDark && { color: '#fff' }]}>{title}</Text>
             <View style={styles.priceContainer}>
-                <Text style={styles.price}>$ {price.toFixed(2)}</Text>
+                <Text style={[styles.price, isDark && { color: '#fff' }]}>$ {price.toFixed(2)}</Text>
                 {originalPrice && (
                     <Text style={styles.originalPrice}>$ {originalPrice.toFixed(2)}</Text>
                 )}
@@ -31,11 +34,11 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
                                 key={s}
                                 name={s <= Math.round(rating) ? "star" : "star-outline"}
                                 size={16}
-                                color={s <= Math.round(rating) ? "#111" : "#E2E8F0"}
+                                color={s <= Math.round(rating) ? (isDark ? "#fff" : "#111") : (isDark ? "#333" : "#E2E8F0")}
                             />
                         ))}
                     </View>
-                    <Text style={styles.reviewCount}>({reviewCount})</Text>
+                    <Text style={[styles.reviewCount, isDark && { color: '#94A3B8' }]}>({reviewCount})</Text>
                 </View>
             )}
         </View>
