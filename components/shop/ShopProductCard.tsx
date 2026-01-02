@@ -3,12 +3,17 @@ import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated from 'react-native-reanimated';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
 import { Product } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCart } from '@/hooks/use-cart-context';
 import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface ShopProductCardProps {
     product: Product;
@@ -22,7 +27,6 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     const { addToCart } = useCart();
     const { triggerAnimation } = useWishlistAnimation();
     const { triggerCartAnimation } = useCartAnimation();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const heartIconRef = React.useRef<View>(null);
     const cartButtonRef = React.useRef<View>(null);
     const colorScheme = useColorScheme();
@@ -47,17 +51,14 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     }
 
     const handleCardPress = () => {
-        router.push(`/product/${product.id}`);
-    };
-
-    const toggleMenu = (e?: any) => {
-        e?.stopPropagation && e.stopPropagation();
-        setIsMenuOpen(!isMenuOpen);
+        router.push({
+            pathname: `/product/${product.id}`,
+            params: { initialImage: product.main_image }
+        });
     };
 
     const handleQuickView = (e?: any) => {
         e?.stopPropagation && e.stopPropagation();
-        setIsMenuOpen(false);
         if (onQuickView) onQuickView(product);
     };
 
@@ -98,53 +99,30 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
         }
     };
 
-    const menuBg = isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)';
     const menuIconColor = isDark ? '#fff' : '#1f2937';
-    const menuIconColorActive = inWishlist ? '#ef4444' : menuIconColor;
-    const dividerColor = isDark ? '#333' : '#E5E7EB';
 
     return (
         <Pressable onPress={handleCardPress} style={[styles.container, isDark && styles.containerDark, style]}>
             <View style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
-                <Image
+                <AnimatedImage
                     source={{ uri: product.main_image || 'https://via.placeholder.com/300' }}
                     style={styles.image}
                     contentFit="cover"
-                    transition={200}
+                    sharedTransitionTag={`product-image-${product.id}`}
                 />
 
-                {isMenuOpen ? (
-                    <View style={[styles.menuContainer, { backgroundColor: menuBg }]}>
-                        <Pressable onPress={toggleMenu} style={styles.menuItem} hitSlop={8}>
-                            <Ionicons name="close" size={20} color={menuIconColor} />
-                        </Pressable>
-                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-                        <Pressable onPress={handleQuickView} style={styles.menuItem} hitSlop={8}>
-                            <Ionicons name="eye-outline" size={20} color={menuIconColor} />
-                        </Pressable>
-                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-                        <Pressable
-                            onPress={handleToggleWishlist}
-                            style={styles.menuItem}
-                            hitSlop={8}
-                            ref={heartIconRef}
-                        >
-                            <Ionicons
-                                name={inWishlist ? "heart" : "heart-outline"}
-                                size={20}
-                                color={menuIconColorActive}
-                            />
-                        </Pressable>
-                        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-                        <Pressable onPress={(e) => { e.stopPropagation(); }} style={styles.menuItem} hitSlop={8}>
-                            <MaterialCommunityIcons name="arrow-left-right" size={20} color={menuIconColor} />
-                        </Pressable>
-                    </View>
-                ) : (
-                    <Pressable onPress={toggleMenu} style={[styles.triggerButton, isDark && { backgroundColor: 'rgba(30,30,30,0.9)' }]} hitSlop={12}>
-                        <Ionicons name="add" size={20} color={isDark ? '#fff' : '#1f2937'} />
-                    </Pressable>
-                )}
+                <Pressable
+                    onPress={handleToggleWishlist}
+                    style={[styles.triggerButton, isDark && { backgroundColor: 'rgba(30,30,30,0.9)' }]}
+                    hitSlop={12}
+                    ref={heartIconRef}
+                >
+                    <HugeiconsIcon
+                        icon={FavouriteIcon}
+                        size={20}
+                        color={inWishlist ? '#ef4444' : (isDark ? '#fff' : '#1f2937')}
+                    />
+                </Pressable>
                 {badge}
             </View>
 
@@ -168,10 +146,10 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
 
                     <Pressable
                         style={[styles.cartButton, isDark && { backgroundColor: '#fff' }]}
-                        onPress={handleAddToCart}
+                        onPress={handleQuickView}
                         ref={cartButtonRef}
                     >
-                        <Ionicons name="cart-outline" size={18} color={isDark ? '#000' : '#fff'} />
+                        <HugeiconsIcon icon={ShoppingBag01Icon} size={20} color={isDark ? '#000' : '#fff'} />
                     </Pressable>
                 </View>
             </View>
@@ -225,33 +203,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         zIndex: 10,
     },
-    menuContainer: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 40,
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderRadius: 20,
-        alignItems: 'center',
-        paddingVertical: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
-        zIndex: 20,
-    },
-    menuItem: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    divider: {
-        width: 20,
-        height: 1,
-        backgroundColor: '#E5E7EB',
-    },
+
     badgeContainer: {
         position: 'absolute',
         top: 8,
@@ -314,7 +266,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#1152d4',
+        backgroundColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     }

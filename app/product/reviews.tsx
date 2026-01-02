@@ -23,7 +23,7 @@ export default function ProductReviewsScreen() {
     return (
         <View style={styles.container}>
             {/* Standard Header */}
-            <GlobalHeader title="LUXE" />
+            <GlobalHeader title="REVIEWS" showBack />
 
             <ScrollView contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}>
                 <RatingSummary

@@ -5,9 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface CartFooterProps {
     total: number;
+    onCheckout?: () => void;
 }
 
-export function CartFooter({ total }: CartFooterProps) {
+export function CartFooter({ total, onCheckout }: CartFooterProps) {
     const insets = useSafeAreaInsets();
 
     return (
@@ -19,7 +20,7 @@ export function CartFooter({ total }: CartFooterProps) {
                 </View>
             </View>
 
-            <Pressable style={styles.checkoutBtn}>
+            <Pressable onPress={onCheckout} style={styles.checkoutBtn}>
                 <Text style={styles.checkoutText}>Proceed to Checkout</Text>
                 <Ionicons name="arrow-forward" size={18} color="#fff" />
             </Pressable>

@@ -81,38 +81,7 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
                     </Text>
                 </Pressable>
 
-                {/* Wishlist Button */}
-                <Pressable
-                    onPress={() => {
-                        if (isWishlisted) {
-                            onToggleWishlist?.();
-                        } else if (favButtonRef.current) {
-                            requestAnimationFrame(() => {
-                                favButtonRef.current?.measure((x, y, w, h, px, py) => {
-                                    triggerAnimation(
-                                        { x: px + w / 2, y: py + h / 2 },
-                                        () => onToggleWishlist?.()
-                                    );
-                                });
-                            });
-                        } else {
-                            onToggleWishlist?.();
-                        }
-                    }}
-                    style={({ pressed }) => [
-                        styles.iconBtn,
-                        isDark && { backgroundColor: '#000', borderColor: '#333' },
-                        pressed && styles.pressed,
-                        pressed && isDark && { backgroundColor: '#222' }
-                    ]}
-                    ref={favButtonRef}
-                >
-                    <Ionicons
-                        name={isWishlisted ? "heart" : "heart-outline"}
-                        size={20}
-                        color={isWishlisted ? "#ef4444" : (isDark ? "#fff" : "#1F2937")}
-                    />
-                </Pressable>
+
 
                 {/* Compare Button */}
                 <Pressable style={({ pressed }) => [
@@ -133,6 +102,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         paddingBottom: 20,
         paddingVertical: 12,
+        paddingTop: 30,
     },
     container: {
         flexDirection: 'row',

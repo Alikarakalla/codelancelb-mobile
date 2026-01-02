@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { FavouriteIcon } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { Product } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -26,7 +28,7 @@ export function WishlistItem({ product, onRemove }: WishlistItemProps) {
             <View style={styles.imageContainer}>
                 <Image source={{ uri: product.main_image || '' }} style={styles.image} contentFit="cover" />
                 <Pressable onPress={() => onRemove(product.id)} style={styles.removeBtn}>
-                    <Ionicons name="heart" size={18} color="#ef4444" />
+                    <HugeiconsIcon icon={FavouriteIcon} size={20} color="#ef4444" fill="#ef4444" />
                 </Pressable>
             </View>
             <View style={styles.content}>

@@ -1,8 +1,9 @@
-import { View, StyleSheet, ScrollView, Alert, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useMemo } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useDrawer } from '@/hooks/use-drawer-context';
@@ -20,7 +21,7 @@ import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCart } from '@/hooks/use-cart-context';
 
 export default function ProductDetailsScreen() {
-    const { id } = useLocalSearchParams();
+    const { id, initialImage } = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -37,7 +38,8 @@ export default function ProductDetailsScreen() {
             const fetchProduct = async () => {
                 setLoading(true);
                 try {
-                    const data = await api.getProduct(Array.isArray(id) ? id[0] : id);
+                    const productId = Array.isArray(id) ? id[0] : id;
+                    const data = await api.getProduct(productId);
                     setProduct(data);
                     // Set default variant if exists
                     if (data.variants?.length) {
@@ -57,7 +59,9 @@ export default function ProductDetailsScreen() {
 
     // Combine all images (product images + variant images + selected variant gallery)
     const allImages = useMemo(() => {
-        if (!product) return [];
+        if (!product) {
+            return initialImage ? [initialImage as string] : [];
+        }
         const baseImages = product.images?.map(i => i.path) || [];
         const variantImages = product.variants?.map(v => v.image_path).filter(Boolean) as string[] || [];
 
@@ -73,8 +77,12 @@ export default function ProductDetailsScreen() {
             return [product.main_image];
         }
 
+        if (combined.length === 0 && initialImage) {
+            return [initialImage as string];
+        }
+
         return combined;
-    }, [product, selectedVariant]);
+    }, [product, selectedVariant, initialImage]);
 
     const isWishlisted = product ? isInWishlist(product.id) : false;
 
@@ -107,7 +115,8 @@ export default function ProductDetailsScreen() {
         }
     };
 
-    if (loading) {
+    // If loading AND no initialImage, show full loader
+    if (loading && !product && !initialImage) {
         return (
             <View style={[styles.loadingContainer, isDark && { backgroundColor: '#000' }]}>
                 <GlobalHeader title="LUXE" />
@@ -116,7 +125,7 @@ export default function ProductDetailsScreen() {
         );
     }
 
-    if (error || !product) {
+    if (error && !product) {
         return (
             <View style={[styles.errorContainer, isDark && { backgroundColor: '#000' }]}>
                 <GlobalHeader title="LUXE" />
@@ -125,11 +134,22 @@ export default function ProductDetailsScreen() {
         );
     }
 
+    // Identify ID for tag
+    const productIdForTag = product ? product.id : (id ? Number(Array.isArray(id) ? id[0] : id) : undefined);
+
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
-            <GlobalHeader title="LUXE" />
+            <GlobalHeader
+                title="LUXE"
+                showBack
+                showShare
+                showWishlist
+                showCart
+                isWishlisted={isWishlisted}
+                onWishlistPress={handleToggleWishlist}
+            />
 
-            <ScrollView
+            <Animated.ScrollView
                 contentContainerStyle={{
                     paddingTop: 60 + insets.top, // Space for header
                     paddingBottom: 120 // Space for footer
@@ -139,31 +159,58 @@ export default function ProductDetailsScreen() {
                 <ProductImageGallery
                     images={allImages}
                     selectedImage={selectedVariant?.image_path}
+                    productId={productIdForTag}
                 />
-                <ProductInfo
-                    brand={product.brand?.name}
-                    title={product.name_en || product.name || ''}
-                    price={selectedVariant?.price ?? product.price ?? 0}
-                    originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
-                    rating={4.8} // Simplified for now, or fetch from average
-                    reviewCount={product.reviews?.length || 0}
-                />
-                <ProductDescription description={product.description_en || product.description || ''} />
-                <ProductSelectors
-                    options={product.options}
-                    variants={product.variants}
-                    onVariantChange={setSelectedVariant}
-                />
-                <AddToCartFooter
-                    onAddToCart={handleAddToCart}
-                    onToggleWishlist={handleToggleWishlist}
-                    isWishlisted={isWishlisted}
-                    disabled={isOutOfStock}
-                    price={selectedVariant?.price ?? product.price ?? 0}
-                />
-                <ProductReviews reviews={product.reviews} />
-                <RelatedProducts currentProductId={product.id} />
-            </ScrollView>
+
+                {product ? (
+                    <View>
+                        <Animated.View entering={FadeInDown.delay(300).duration(600).damping(12)}>
+                            <ProductInfo
+                                brand={product.brand?.name}
+                                title={product.name_en || product.name || ''}
+                                price={selectedVariant?.price ?? product.price ?? 0}
+                                originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
+                                rating={4.8} // Simplified for now, or fetch from average
+                                reviewCount={product.reviews?.length || 0}
+                            />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(400).duration(600).damping(12)}>
+                            <ProductDescription description={product.description_en || product.description || ''} />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
+                            <ProductSelectors
+                                options={product.options}
+                                variants={product.variants}
+                                onVariantChange={setSelectedVariant}
+                            />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(600).duration(600).damping(12)}>
+                            <AddToCartFooter
+                                onAddToCart={handleAddToCart}
+                                onToggleWishlist={handleToggleWishlist}
+                                isWishlisted={isWishlisted}
+                                disabled={isOutOfStock}
+                                price={selectedVariant?.price ?? product.price ?? 0}
+                            />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(700).duration(600).damping(12)}>
+                            <ProductReviews reviews={product.reviews} />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(800).duration(600).damping(12)}>
+                            <RelatedProducts currentProductId={product.id} />
+                        </Animated.View>
+                    </View>
+                ) : (
+                    <Animated.View entering={FadeIn.delay(300).duration(600)} style={{ padding: 20, alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
+                    </Animated.View>
+                )}
+            </Animated.ScrollView>
         </View>
     );
 }

@@ -1,8 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Image, StyleSheet, Dimensions, Pressable, FlatList, ViewToken } from 'react-native';
+import { View, StyleSheet, Dimensions, Pressable, FlatList, ViewToken } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import ImageView from "react-native-image-viewing";
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import Animated from 'react-native-reanimated';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 const { width } = Dimensions.get('window');
 const IMAGE_ASPECT_RATIO = 1; // Square 1:1
@@ -10,9 +14,10 @@ const IMAGE_ASPECT_RATIO = 1; // Square 1:1
 interface ProductImageGalleryProps {
     images: string[];
     selectedImage?: string | null;
+    productId?: number;
 }
 
-export function ProductImageGallery({ images, selectedImage }: ProductImageGalleryProps) {
+export function ProductImageGallery({ images, selectedImage, productId }: ProductImageGalleryProps) {
     const [visible, setVisible] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
@@ -72,12 +77,13 @@ export function ProductImageGallery({ images, selectedImage }: ProductImageGalle
                             flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
                         });
                     }}
-                    renderItem={({ item }) => (
+                    renderItem={({ item, index }) => (
                         <View style={styles.slide}>
-                            <Image
+                            <AnimatedImage
                                 source={{ uri: item }}
                                 style={styles.image}
-                                resizeMode="cover" // Cover usually looks more premium, user sees full in modal
+                                contentFit="cover"
+                                sharedTransitionTag={productId && index === 0 ? `product-image-${productId}` : undefined}
                             />
                         </View>
                     )}

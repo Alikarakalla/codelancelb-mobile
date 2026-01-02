@@ -18,6 +18,18 @@ import { CartAnimationProvider } from '@/components/cart/CartAnimationProvider';
 
 /* ... */
 
+import { SideDrawer } from '@/components/ui/SideDrawer';
+import { DrawerProvider, useDrawer } from '@/hooks/use-drawer-context';
+
+function DrawerWrappedRoot({ children }: { children: React.ReactNode }) {
+  const { isOpen, closeDrawer } = useDrawer();
+  return (
+    <SideDrawer isOpen={isOpen} onClose={closeDrawer}>
+      {children}
+    </SideDrawer>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -28,12 +40,18 @@ export default function RootLayout() {
           <CartProvider>
             <WishlistAnimationProvider>
               <CartAnimationProvider>
-                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                  <Stack>
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-                  </Stack>
-                </ThemeProvider>
+                <DrawerProvider>
+                  <DrawerWrappedRoot>
+                    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                      <Stack>
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+                        <Stack.Screen name="product/[id]" options={{ headerShown: false, animation: 'fade' }} />
+                        <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
+                      </Stack>
+                    </ThemeProvider>
+                  </DrawerWrappedRoot>
+                </DrawerProvider>
               </CartAnimationProvider>
             </WishlistAnimationProvider>
           </CartProvider>

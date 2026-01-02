@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { CartItem } from '@/components/cart/CartItem';
@@ -13,6 +14,7 @@ import { useCart } from '@/hooks/use-cart-context';
 
 export default function CartScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const { items, removeFromCart, updateQuantity, cartTotal } = useCart();
     const { openDrawer } = useDrawer();
 
@@ -86,7 +88,12 @@ export default function CartScreen() {
                 )}
             </ScrollView>
 
-            {items.length > 0 && <CartFooter total={totals.total} />}
+            {items.length > 0 && (
+                <CartFooter
+                    total={totals.total}
+                    onCheckout={() => router.push('/checkout')}
+                />
+            )}
         </View>
     );
 }

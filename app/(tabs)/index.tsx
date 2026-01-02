@@ -104,8 +104,10 @@ export default function HomeScreen() {
   const displayLatest = latestProducts.length > 0 ? latestProducts : [...MOCK_PRODUCTS].reverse().slice(0, 4);
 
   const handleProductPress = (product: Product) => {
-    // router.push(`/product/${product.slug}`);
-    console.log('Navigating to:', product.name);
+    router.push({
+      pathname: `/product/${product.id}`,
+      params: { initialImage: product.main_image }
+    });
   };
 
   const scrollY = useSharedValue(0);

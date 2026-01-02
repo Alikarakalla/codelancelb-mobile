@@ -1,4 +1,4 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon } from '@/types/schema';
 import { MOCK_PRODUCTS, MOCK_CATEGORIES, MOCK_BRANDS, MOCK_BANNERS, MOCK_HIGHLIGHTS, MOCK_FEATURES } from '@/constants/mockData';
 
 // 1. CHANGE THIS in your .env file
@@ -91,8 +91,8 @@ export const api = {
             if (IS_DEV) {
                 // Return dummy reviews if API fails
                 return [
-                    { id: 1, product_id: Number(productId), user_id: 101, rating: 5, review: 'Absolutely love this! The quality is outstanding.', created_at: '2 days ago', user: { name: 'Sarah J.' } as any },
-                    { id: 2, product_id: Number(productId), user_id: 102, rating: 4, review: 'Great value for money. Fits perfectly.', created_at: '1 week ago', user: { name: 'Mike T.' } as any }
+                    { id: 1, product_id: Number(productId), user_id: 101, rating: 5, review: 'Absolutely love this! The quality is outstanding.', created_at: '2 days ago' },
+                    { id: 2, product_id: Number(productId), user_id: 102, rating: 4, review: 'Great value for money. Fits perfectly.', created_at: '1 week ago' }
                 ] as ProductReview[];
             }
             return [];
@@ -254,5 +254,55 @@ export const api = {
             body: JSON.stringify({ product_id: productId })
         });
         return handleResponse(res);
+    },
+
+    // --- Checkout ---
+    async createOrder(orderData: any): Promise<Order> {
+        const res = await fetch(`${BASE_URL}/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+        return handleResponse<Order>(res);
+    },
+
+    async validateCoupon(code: string): Promise<Coupon> {
+        if (IS_DEV) {
+            // Mock validation
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    // Match mock code 'rrTest' from SQL
+                    if (code === 'rrTest') {
+                        resolve({
+                            id: 1,
+                            code: 'rrTest',
+                            name: 'Test Coupon',
+                            type: 'free_shipping', // from SQL
+                            value: 0,
+                            minimum_amount: 20,
+                            is_active: true
+                        });
+                    } else if (code === 'TEST20') {
+                        resolve({
+                            id: 2,
+                            code: 'TEST20',
+                            name: '20% Off',
+                            type: 'percentage',
+                            value: 20,
+                            is_active: true
+                        });
+                    } else {
+                        reject(new Error('Invalid or expired coupon code'));
+                    }
+                }, 800);
+            });
+        }
+
+        const res = await fetch(`${BASE_URL}/coupons/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        return handleResponse<Coupon>(res);
     },
 };

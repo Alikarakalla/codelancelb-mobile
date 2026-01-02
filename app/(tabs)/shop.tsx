@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter, useLocalSearchParams } from 'expo-router'; // Updated import
 
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { ShopFilterBar, FilterChip } from '@/components/shop/ShopFilterBar';
@@ -11,7 +12,6 @@ import { ShopFilterModal } from '@/components/shop/ShopFilterModal';
 import { MOCK_PRODUCTS } from '@/constants/mockData';
 import { Product } from '@/types/schema';
 import { useDrawer } from '@/hooks/use-drawer-context';
-import { useLocalSearchParams } from 'expo-router';
 import { api } from '@/services/apiClient';
 import { MOCK_CATEGORIES, MOCK_BRANDS } from '@/constants/mockData';
 
@@ -19,6 +19,7 @@ export default function ShopScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const router = useRouter();
     const { category_id, brand_id } = useLocalSearchParams();
     const { openDrawer } = useDrawer();
     const [filterVisible, setFilterVisible] = React.useState(false);
@@ -91,7 +92,10 @@ export default function ShopScreen() {
     };
 
     const handleProductPress = (product: Product) => {
-        console.log('Product pressed:', product.name);
+        router.push({
+            pathname: `/product/${product.id}`,
+            params: { initialImage: product.main_image }
+        });
     };
 
     return (

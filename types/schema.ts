@@ -211,3 +211,57 @@ export interface CarouselSlide {
     is_active: boolean;
     sort_order: number;
 }
+
+export interface Order {
+    id: number;
+    user_id?: number;
+    session_id?: string;
+    email: string;
+    phone?: string;
+    status: 'pending' | 'processing' | 'completed' | 'cancelled';
+    total_amount: number;
+    currency: string;
+    shipping_address: any; // json
+    billing_address?: any; // json
+    payment_method: string;
+    items?: OrderItem[];
+    created_at?: string;
+}
+
+export interface OrderItem {
+    id: number;
+    order_id: number;
+    product_id: number;
+    quantity: number;
+    price: number;
+    options?: any;
+    product?: Product;
+}
+
+export interface Address {
+    id: number;
+    user_id: number;
+    label: string; // Home, Office, etc.
+    first_name: string;
+    last_name: string;
+    address_line_1: string;
+    address_line_2?: string;
+    city: string;
+    state?: string;
+    zip_code: string;
+    country: string;
+    phone: string;
+    is_default: boolean;
+}
+
+export interface Coupon {
+    id: number;
+    code: string;
+    name: string;
+    description?: string;
+    type: 'percentage' | 'fixed' | 'free_shipping';
+    value: number;
+    minimum_amount?: number;
+    is_active: boolean;
+    expires_at?: string;
+}

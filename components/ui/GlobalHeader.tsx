@@ -7,12 +7,28 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
+import { Share08Icon, FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
 
 interface GlobalHeaderProps {
     title?: string;
+    showBack?: boolean;
+    showShare?: boolean;
+    showWishlist?: boolean;
+    showCart?: boolean;
+    isWishlisted?: boolean;
+    onWishlistPress?: () => void;
 }
 
-export function GlobalHeader({ title = 'LUXE' }: GlobalHeaderProps) {
+export function GlobalHeader({
+    title = 'LUXE',
+    showBack,
+    showShare,
+    showWishlist,
+    showCart,
+    isWishlisted,
+    onWishlistPress
+}: GlobalHeaderProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const router = useRouter();
@@ -25,49 +41,86 @@ export function GlobalHeader({ title = 'LUXE' }: GlobalHeaderProps) {
     const textColor = isDark ? '#fff' : '#18181B';
     const bgColor = isDark ? '#000' : '#fff';
 
+    // If back button is enabled, we assume a "Product/Detail" header style
+    const isDetailMode = showBack;
+
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgColor }]}>
             <View style={styles.content}>
-                {/* Left Section: Always Menu */}
+                {/* Left Section */}
                 <View style={styles.leftSection}>
-                    <Pressable onPress={openDrawer} style={styles.iconButton}>
-                        <Feather name="menu" size={24} color={textColor} />
-                    </Pressable>
+                    {showBack ? (
+                        <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                            <Feather name="chevron-left" size={28} color={textColor} />
+                        </Pressable>
+                    ) : (
+                        <Pressable onPress={openDrawer} style={styles.iconButton}>
+                            <Feather name="menu" size={24} color={textColor} />
+                        </Pressable>
+                    )}
                 </View>
 
-                {/* Center Section: Logo */}
+                {/* Center Section - Hidden in detail mode as per request */}
                 <View style={styles.centerSection}>
-                    <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                    {!isDetailMode && (
+                        <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                    )}
                 </View>
 
                 {/* Right Section */}
                 <View style={styles.rightSection}>
-                    <Pressable style={styles.langButton}>
-                        <Text style={[styles.langText, { color: textColor }]}>EN</Text>
-                    </Pressable>
-                    <Pressable style={styles.iconButton}>
-                        <Feather name="search" size={20} color={textColor} />
-                    </Pressable>
-                    <Pressable
-                        style={styles.iconButton}
-                        onPress={() => router.push('/cart')}
-                        ref={cartIconRef}
-                        onLayout={() => {
-                            cartIconRef.current?.measure((x, y, width, height, px, py) => {
-                                setCartTargetPoint({
-                                    x: px + width / 2,
-                                    y: py + height / 2
+                    {showWishlist && (
+                        <Pressable
+                            style={styles.iconButton}
+                            onPress={onWishlistPress ? onWishlistPress : () => router.push('/wishlist')}
+                        >
+                            <HugeiconsIcon
+                                icon={FavouriteIcon}
+                                size={24}
+                                color={textColor}
+                            />
+                        </Pressable>
+                    )}
+
+                    {showShare && (
+                        <Pressable style={styles.iconButton}>
+                            <HugeiconsIcon icon={Share08Icon} size={24} color={textColor} />
+                        </Pressable>
+                    )}
+
+                    {!isDetailMode && (
+                        <>
+                            <Pressable style={styles.langButton}>
+                                <Text style={[styles.langText, { color: textColor }]}>EN</Text>
+                            </Pressable>
+                            <Pressable style={styles.iconButton}>
+                                <Feather name="search" size={20} color={textColor} />
+                            </Pressable>
+                        </>
+                    )}
+
+                    {(showCart || !isDetailMode) && (
+                        <Pressable
+                            style={styles.iconButton}
+                            onPress={() => router.push('/cart')}
+                            ref={cartIconRef}
+                            onLayout={() => {
+                                cartIconRef.current?.measure((x, y, width, height, px, py) => {
+                                    setCartTargetPoint({
+                                        x: px + width / 2,
+                                        y: py + height / 2
+                                    });
                                 });
-                            });
-                        }}
-                    >
-                        <Feather name="shopping-bag" size={20} color={textColor} />
-                        {cartCount > 0 && (
-                            <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
-                                <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
-                            </View>
-                        )}
-                    </Pressable>
+                            }}
+                        >
+                            <HugeiconsIcon icon={ShoppingBag01Icon} size={24} color={textColor} />
+                            {cartCount > 0 && (
+                                <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
+                                    <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    )}
                 </View>
             </View>
         </View>

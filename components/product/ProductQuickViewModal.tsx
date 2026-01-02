@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ShoppingBag01Icon } from '@/components/ui/icons';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { Product, ProductVariant } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -221,7 +223,7 @@ export const ProductQuickViewModal = ({
                                 onPress={handleAddToCart}
                                 ref={cartButtonRef}
                             >
-                                <MaterialIcons name="shopping-cart" size={20} color="#fff" />
+                                <HugeiconsIcon icon={ShoppingBag01Icon} size={20} color="#fff" />
                                 <Text style={styles.addToCartText}>Add to Cart</Text>
                             </Pressable>
                             <Pressable style={[styles.detailsBtn, isDark && { borderColor: '#333' }]} onPress={() => { onClose(); onViewDetails(product); }}>
