@@ -7,6 +7,7 @@ import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { BlurView } from 'expo-blur';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -19,11 +20,37 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: theme.background,
-          borderTopColor: colorScheme === 'dark' ? '#333' : '#e5e5e5',
-          height: Platform.OS === 'ios' ? 88 : 60,
-        },
+        tabBarStyle: Platform.select({
+          ios: {
+            position: 'absolute',
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            height: 88,
+          },
+          default: {
+            backgroundColor: theme.background,
+            borderTopColor: colorScheme === 'dark' ? '#333' : '#e5e5e5',
+            height: 60,
+          },
+        }),
+        tabBarBackground: () =>
+          Platform.OS === 'ios' ? (
+            <BlurView
+              intensity={100}
+              tint={colorScheme === 'dark' ? 'dark' : 'light'}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: colorScheme === 'dark'
+                  ? 'rgba(28, 28, 30, 0.72)'
+                  : 'rgba(255, 255, 255, 0.72)',
+              }}
+            />
+          ) : null,
       }}>
       <Tabs.Screen
         name="index"
