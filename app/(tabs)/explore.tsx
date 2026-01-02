@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Fonts } from '@/constants/theme';
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useDrawer } from '@/hooks/use-drawer-context';
 
 export default function TabTwoScreen() {
@@ -17,10 +17,7 @@ export default function TabTwoScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LuxeHeader
-        title="LUXE"
-        onOpenMenu={openDrawer}
-      />
+      <GlobalHeader title="LUXE" />
       <ParallaxScrollView
         headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
         headerImage={

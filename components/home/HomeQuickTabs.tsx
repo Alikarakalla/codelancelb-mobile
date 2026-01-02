@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface HomeQuickTabsProps {
     tabs: string[];
@@ -8,6 +9,9 @@ interface HomeQuickTabsProps {
 }
 
 export function HomeQuickTabs({ tabs, activeTab, onChange }: HomeQuickTabsProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     return (
         <View style={styles.container}>
             <View style={styles.tabList}>
@@ -19,10 +23,15 @@ export function HomeQuickTabs({ tabs, activeTab, onChange }: HomeQuickTabsProps)
                             onPress={() => onChange(tab)}
                             style={styles.tabItem}
                         >
-                            <Text style={[styles.tabText, isActive && styles.activeTabText]}>
+                            <Text style={[
+                                styles.tabText,
+                                isDark && { color: '#94A3B8' },
+                                isActive && styles.activeTabText,
+                                isActive && isDark && { color: '#fff' }
+                            ]}>
                                 {tab}
                             </Text>
-                            {isActive && <View style={styles.activeIndicator} />}
+                            {isActive && <View style={[styles.activeIndicator, isDark && { backgroundColor: '#fff' }]} />}
                         </Pressable>
                     );
                 })}

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { HeroSlider } from '@/components/home/HeroSlider';
 import { HeroCarouselSummary } from '@/components/home/HeroCarouselSummary';
 import { PremiumCategoryGrid } from '@/components/home/PremiumCategoryGrid';
@@ -52,6 +53,8 @@ const MOCK_SLIDES: CarouselSlide[] = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -70,26 +73,25 @@ export default function HomeScreen() {
     // Load data from API
     const loadData = async () => {
       try {
-        // Uncomment when API is ready
-        // const [apiSlides, apiCategories, apiHighlights, apiBrands, apiBanners, apiFeatures, apiFeatured, apiLatest] = await Promise.all([
-        //    api.getCarouselSlides(),
-        //    api.getCategories(),
-        //    api.getHighlightSections(),
-        //    api.getBrands(),
-        //    api.getBanners(),
-        //    api.getCMSFeatures(),
-        //    api.getProducts({ is_featured: true, limit: 10 }),
-        //    api.getProducts({ limit: 10 }) // latest
-        // ]);
+        const [apiSlides, apiCategories, apiHighlights, apiBrands, apiBanners, apiFeatures, apiFeatured, apiLatest] = await Promise.all([
+          api.getCarouselSlides().catch(() => MOCK_SLIDES),
+          api.getCategories(),
+          api.getHighlightSections(),
+          api.getBrands(),
+          api.getBanners(),
+          api.getCMSFeatures(),
+          api.getProducts({ is_featured: true, limit: 10 }),
+          api.getProducts({ limit: 10 }) // latest
+        ]);
 
-        // if (apiSlides && apiSlides.length > 0) setSlides(apiSlides);
-        // if (apiCategories && apiCategories.length > 0) setCategories(apiCategories);
-        // if (apiHighlights && apiHighlights.length > 0) setHighlights(apiHighlights);
-        // if (apiBrands && apiBrands.length > 0) setBrands(apiBrands);
-        // if (apiBanners && apiBanners.length > 0) setBanners(apiBanners);
-        // if (apiFeatures && apiFeatures.length > 0) setFeatures(apiFeatures);
-        // if (apiFeatured && apiFeatured.length > 0) setFeaturedProducts(apiFeatured);
-        // if (apiLatest && apiLatest.length > 0) setLatestProducts(apiLatest);
+        if (apiSlides && apiSlides.length > 0) setSlides(apiSlides);
+        if (apiCategories && apiCategories.length > 0) setCategories(apiCategories as any);
+        if (apiHighlights && apiHighlights.length > 0) setHighlights(apiHighlights as any);
+        if (apiBrands && apiBrands.length > 0) setBrands(apiBrands as any);
+        if (apiBanners && apiBanners.length > 0) setBanners(apiBanners as any);
+        if (apiFeatures && apiFeatures.length > 0) setFeatures(apiFeatures as any);
+        if (apiFeatured && apiFeatured.length > 0) setFeaturedProducts(apiFeatured);
+        if (apiLatest && apiLatest.length > 0) setLatestProducts(apiLatest);
       } catch (error) {
         console.error('Failed to load home data', error);
       }
@@ -115,11 +117,8 @@ export default function HomeScreen() {
   });
 
   return (
-    <View style={styles.container}>
-      <LuxeHeader
-        title="LUXE"
-        onOpenMenu={openDrawer}
-      />
+    <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
+      <GlobalHeader title="LUXE" />
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -176,14 +175,20 @@ export default function HomeScreen() {
         </RevealingSection>
 
         <RevealingSection scrollY={scrollY} index={7} animationType="fade-up">
-          <View style={styles.footer}>
+          <View style={[styles.footer, isDark && { backgroundColor: '#111' }]}>
             <Pressable
               onPress={() => router.push('/shop')}
-              style={({ pressed }) => [styles.shopAllButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.shopAllButton,
+                isDark && { backgroundColor: '#fff' },
+                pressed && styles.pressed
+              ]}
             >
-              <Text style={styles.shopAllText}>EXPLORE SHOP</Text>
+              <Text style={[styles.shopAllText, isDark && { color: '#000' }]}>EXPLORE SHOP</Text>
             </Pressable>
-            <Text style={styles.copyright}>© 2024 SADEK ABDELSATER. ALL RIGHTS RESERVED.</Text>
+            <Text style={[styles.copyright, isDark && { color: '#64748B' }]}>
+              © 2024 SADEK ABDELSATER. ALL RIGHTS RESERVED.
+            </Text>
           </View>
         </RevealingSection>
       </Animated.ScrollView>

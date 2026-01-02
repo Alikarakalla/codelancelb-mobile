@@ -5,9 +5,10 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useForm } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
+import { useDrawer } from '@/hooks/use-drawer-context';
 // import { api } from '@/services/apiClient'; // Uncomment when ready
 
 export default function LoginScreen() {
@@ -16,6 +17,7 @@ export default function LoginScreen() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
+    const { openDrawer } = useDrawer();
 
     const { control, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -49,10 +51,7 @@ export default function LoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <LuxeHeader
-                title="Login"
-                showBackButton={true}
-            />
+            <GlobalHeader title="LUXE" />
 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: 60 + insets.top }]}

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -25,10 +25,7 @@ export default function ProfileScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <LuxeHeader
-                title="My Profile"
-                onOpenMenu={openDrawer}
-            />
+            <GlobalHeader title="LUXE" />
 
             <ScrollView
                 ref={scrollViewRef}

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { WishlistItem } from './WishlistItem';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useRouter } from 'expo-router';
+import { useDrawer } from '@/hooks/use-drawer-context';
 
 export default function WishlistScreen() {
     const insets = useSafeAreaInsets();
@@ -14,10 +15,11 @@ export default function WishlistScreen() {
     const router = useRouter();
 
     const { wishlist, removeFromWishlist } = useWishlist();
+    const { openDrawer } = useDrawer();
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
-            <LuxeHeader title="Wishlist" showBackButton={false} />
+            <GlobalHeader title="LUXE" />
 
             <ScrollView
                 contentContainerStyle={{

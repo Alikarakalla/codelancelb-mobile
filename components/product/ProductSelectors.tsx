@@ -10,56 +10,67 @@ interface ProductSelectorsProps {
 }
 
 export function ProductSelectors({ options = [], variants = [], onVariantChange }: ProductSelectorsProps) {
-    // Find specific options
-    const colorOption = options.find(o => o.name === 'Color');
-    const sizeOption = options.find(o => o.name === 'Size');
+    // Find options dynamically
+    const colorOption = options.find(o => o.name.toLowerCase() === 'color');
+    const secondOption = options.find(o => o.name.toLowerCase() !== 'color');
 
     // Safe defaults if data is missing
     const allColors = colorOption?.values || [];
-    const allSizes = sizeOption?.values || [];
+    const allSecondOptionValues = secondOption?.values || [];
 
     // Initialize state
     const [selectedColor, setSelectedColor] = React.useState(allColors[0] || '');
-    const [selectedSize, setSelectedSize] = React.useState('');
+    const [selectedSecond, setSelectedSecond] = React.useState('');
 
     // --- LOGIC: Dependent Options ---
-    // When selectedColor changes, what sizes are available?
-    const availableSizes = React.useMemo(() => {
-        if (!selectedColor) return allSizes;
-        // Filter variants that match the selected color and have >= 1 stock
+    // Filter variants that match the selected color
+    const availableSecondValues = React.useMemo(() => {
+        if (!selectedColor) return allSecondOptionValues;
+
+        // Match color column in variants
         const validVariants = variants.filter(v =>
             v.color === selectedColor &&
             v.stock_quantity > 0
         );
-        // Extract the sizes from these variants
-        const validSizes = validVariants.map(v => v.size).filter(Boolean);
-        return allSizes.filter(size => validSizes.includes(size));
-    }, [selectedColor, variants, allSizes]);
 
-    // Ensure selectedSize is valid when availableSizes changes.
-    // If current selectedSize is NOT in availableSizes, switch to the first available one.
+        // Extract second option values (stored in 'size' column if color is first)
+        const validValues = validVariants.map(v => v.size).filter(Boolean);
+        return allSecondOptionValues.filter(val => validValues.includes(val));
+    }, [selectedColor, variants, allSecondOptionValues]);
+
+    // Update selectedSecond when availableSecondValues changes
     useEffect(() => {
-        if (availableSizes.length > 0) {
-            if (!selectedSize || !availableSizes.includes(selectedSize)) {
-                setSelectedSize(availableSizes[0]);
+        if (availableSecondValues.length > 0) {
+            if (!selectedSecond || !availableSecondValues.includes(selectedSecond)) {
+                setSelectedSecond(availableSecondValues[0]);
             }
         } else {
-            setSelectedSize(''); // No sizes available for this color
+            setSelectedSecond('');
         }
-    }, [availableSizes, selectedSize]);
+    }, [availableSecondValues, selectedSecond]);
 
     // Notify parent of variant change
     useEffect(() => {
-        if (selectedColor && selectedSize) {
-            const variant = variants.find(v => v.color === selectedColor && v.size === selectedSize) || null;
+        if (selectedColor) {
+            // Find variant matching color and (if exists) the second option
+            const variant = variants.find(v =>
+                v.color === selectedColor &&
+                (!secondOption || v.size === selectedSecond)
+            ) || null;
             onVariantChange?.(variant);
         } else {
             onVariantChange?.(null);
         }
-    }, [selectedColor, selectedSize, variants, onVariantChange]);
+    }, [selectedColor, selectedSecond, variants, onVariantChange, secondOption]);
 
-    // Map color names to hex codes
+    // Map color names to hex codes dynamically from variants if possible
     const getColorHex = (name: string) => {
+        // Try to find the hex code in variant option_values
+        const variantWithColor = variants.find(v => v.color === name);
+        if (variantWithColor?.option_values?.color?.code) {
+            return variantWithColor.option_values.color.code;
+        }
+
         const map: Record<string, string> = {
             'Black': '#111827',
             'White': '#ffffff',
@@ -76,62 +87,56 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
             {/* Colors */}
             {allColors.length > 0 && (
                 <View style={styles.section}>
-                    <Text style={styles.heading}>
-                        Color: <Text style={styles.value}>{selectedColor}</Text>
-                    </Text>
-                    <View style={styles.colorsRow}>
+                    <Text style={styles.heading}>Select Color</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorsRow}>
                         {allColors.map((colorName) => {
                             const isSelected = selectedColor === colorName;
                             const hex = getColorHex(colorName);
-                            // Border for white
                             const isWhite = hex.toLowerCase() === '#ffffff';
                             return (
                                 <Pressable
                                     key={colorName}
                                     onPress={() => setSelectedColor(colorName)}
                                     style={[
-                                        styles.colorDot,
-                                        { backgroundColor: hex },
-                                        isSelected && styles.colorSelected,
-                                        isWhite && styles.colorBorder
+                                        styles.colorPill,
+                                        isSelected && { borderColor: hex, borderWidth: 1.5 },
                                     ]}
                                 >
-                                    {isSelected && (
-                                        <Ionicons
-                                            name="checkmark"
-                                            size={16}
-                                            color={isWhite ? '#000' : '#fff'}
-                                        />
-                                    )}
+                                    <View style={[
+                                        styles.innerDot,
+                                        { backgroundColor: hex },
+                                        isWhite && styles.dotBorder
+                                    ]} />
+                                    <Text style={[
+                                        styles.colorName,
+                                        isSelected && styles.colorNameSelectedBold
+                                    ]}>
+                                        {colorName}
+                                    </Text>
                                 </Pressable>
                             );
                         })}
-                    </View>
+                    </ScrollView>
                 </View>
             )}
 
-            {/* Sizes */}
-            {allSizes.length > 0 && (
+            {/* Secondary Option (Size, Hardware, etc.) */}
+            {allSecondOptionValues.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sizeHeader}>
-                        <Text style={styles.heading}>
-                            Size: <Text style={styles.value}>{selectedSize}</Text>
-                        </Text>
-                        <Pressable>
-                            <Text style={styles.sizeGuide}>Size Guide</Text>
-                        </Pressable>
+                        <Text style={styles.heading}>Select {secondOption?.name || 'Option'}</Text>
                     </View>
 
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sizesRow}>
-                        {allSizes.map((s) => {
-                            const isSelected = selectedSize === s;
-                            const isAvailable = availableSizes.includes(s);
+                    <View style={styles.sizesRow}>
+                        {allSecondOptionValues.map((val) => {
+                            const isSelected = selectedSecond === val;
+                            const isAvailable = availableSecondValues.includes(val);
                             const isDisabled = !isAvailable;
 
                             return (
                                 <Pressable
-                                    key={s}
-                                    onPress={() => !isDisabled && setSelectedSize(s)}
+                                    key={val}
+                                    onPress={() => !isDisabled && setSelectedSecond(val)}
                                     style={[
                                         styles.sizeBox,
                                         isSelected && styles.sizeBoxSelected,
@@ -143,14 +148,13 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
                                         isSelected && styles.sizeTextSelected,
                                         isDisabled && styles.sizeTextDisabled
                                     ]}>
-                                        {s}
+                                        {val}
                                     </Text>
-                                    {/* Optional: Add diagonal line for disabled? Or just gray out */}
                                 </Pressable>
                             );
                         })}
-                    </ScrollView>
-                    {availableSizes.length === 0 && selectedColor && (
+                    </View>
+                    {availableSecondValues.length === 0 && selectedColor && (
                         <Text style={styles.outOfStockText}>Out of stock in {selectedColor}</Text>
                     )}
                 </View>
@@ -161,88 +165,95 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
 
 const styles = StyleSheet.create({
     container: {
-        paddingTop: 24,
+        paddingTop: 16,
         gap: 24,
     },
     section: {
         paddingHorizontal: 20,
-        gap: 12,
+        gap: 16,
     },
     heading: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#0F172A',
-    },
-    value: {
-        fontWeight: '400',
-        color: '#64748B',
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+        letterSpacing: -0.2,
     },
     colorsRow: {
-        flexDirection: 'row',
         gap: 12,
+        paddingRight: 20,
     },
-    colorDot: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    colorPill: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        borderWidth: 2,
-        borderColor: 'transparent',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#fff',
+        gap: 10,
     },
-    colorBorder: {
-        borderColor: '#E2E8F0', // faint border for white
+    innerDot: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
     },
-    colorSelected: {
-        borderColor: '#1152d4', // active ring
+    dotBorder: {
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    colorName: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#1F2937',
+    },
+    colorNameSelectedBold: {
+        fontWeight: '700',
     },
     sizeHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    sizeGuide: {
-        color: '#1152d4',
-        fontWeight: '600',
-        fontSize: 14,
-    },
     sizesRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 12,
     },
     sizeBox: {
-        width: 56,
+        width: 64,
         height: 48,
-        borderRadius: 12,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: '#fff',
     },
     sizeBoxSelected: {
-        backgroundColor: '#0F172A',
-        borderColor: '#0F172A',
+        borderColor: '#000',
+        borderWidth: 2,
     },
     sizeBoxDisabled: {
-        backgroundColor: '#F8FAFC',
-        borderColor: '#F1F5F9',
+        backgroundColor: '#F9FAFB',
+        borderColor: '#F3F4F6',
+        opacity: 0.5,
     },
     sizeText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#64748B',
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#1F2937',
     },
     sizeTextSelected: {
-        color: '#fff',
+        fontWeight: '800',
+        color: '#000',
     },
     sizeTextDisabled: {
-        color: '#CBD5E1',
+        color: '#94A3B8',
+        textDecorationLine: 'line-through',
     },
     outOfStockText: {
-        marginTop: 8,
+        marginTop: 4,
         color: '#ef4444',
         fontSize: 13,
         fontWeight: '500'

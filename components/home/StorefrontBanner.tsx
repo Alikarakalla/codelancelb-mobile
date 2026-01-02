@@ -6,6 +6,7 @@ import Animated, {
     Extrapolate,
     SharedValue
 } from 'react-native-reanimated';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { Banner } from '@/types/schema';
 
@@ -18,6 +19,8 @@ interface Props {
 
 export function StorefrontBanner({ scrollY, banner }: Props) {
     const [containerY, setContainerY] = React.useState(0);
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     const onLayout = (event: LayoutChangeEvent) => {
         setContainerY(event.nativeEvent.layout.y);
@@ -51,7 +54,7 @@ export function StorefrontBanner({ scrollY, banner }: Props) {
     }, [containerY, scrollY]);
 
     return (
-        <View onLayout={onLayout} style={styles.container}>
+        <View onLayout={onLayout} style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <Image
                 source={{ uri: displayBanner.image_mobile || displayBanner.image }}
                 style={styles.image}

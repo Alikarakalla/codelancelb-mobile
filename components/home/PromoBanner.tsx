@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import Animated, {
     useAnimatedStyle,
     interpolate,
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export function PromoBanner({ progress, section }: Props) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
     // Fallback data if no section provided
     const data = section || {
         id: 0,
@@ -72,7 +75,7 @@ export function PromoBanner({ progress, section }: Props) {
     });
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <Image
                 source={{ uri: data.image || 'https://via.placeholder.com/600x800' }}
                 style={styles.image}
@@ -81,7 +84,7 @@ export function PromoBanner({ progress, section }: Props) {
 
             <View style={styles.content}>
                 <Animated.View style={titleStyle}>
-                    <Text style={styles.title}>{data.title_en}</Text>
+                    <Text style={[styles.title, isDark && { color: '#fff' }]}>{data.title_en}</Text>
                 </Animated.View>
 
                 <Animated.View style={subtitleStyle}>
@@ -89,15 +92,15 @@ export function PromoBanner({ progress, section }: Props) {
                 </Animated.View>
 
                 <Animated.View style={descStyle}>
-                    <Text style={styles.description}>
+                    <Text style={[styles.description, isDark && { color: '#94A3B8' }]}>
                         {data.subtitle_en}
                     </Text>
                 </Animated.View>
 
                 <Animated.View style={buttonStyle}>
                     <Pressable style={styles.shopNowButton}>
-                        <Text style={styles.shopNowText}>{data.cta_text_en || 'SHOP NOW'}</Text>
-                        <View style={styles.underline} />
+                        <Text style={[styles.shopNowText, isDark && { color: '#fff' }]}>{data.cta_text_en || 'SHOP NOW'}</Text>
+                        <View style={[styles.underline, isDark && { backgroundColor: '#fff' }]} />
                     </Pressable>
                 </Animated.View>
             </View>

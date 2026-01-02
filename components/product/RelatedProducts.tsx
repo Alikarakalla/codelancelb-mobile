@@ -1,10 +1,41 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { MOCK_PRODUCTS } from '@/constants/mockData';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
+import { api } from '@/services/apiClient';
+import { Product } from '@/types/schema';
 
-export function RelatedProducts() {
-    const relatedItems = MOCK_PRODUCTS.slice(0, 4);
+interface RelatedProductsProps {
+    currentProductId: number;
+}
+
+export function RelatedProducts({ currentProductId }: RelatedProductsProps) {
+    const [relatedItems, setRelatedItems] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchRelated = async () => {
+            try {
+                const data = await api.getRelatedProducts(currentProductId);
+                setRelatedItems(data);
+            } catch (err) {
+                console.error('Error fetching related products:', err);
+                // Fallback to empty if fails
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchRelated();
+    }, [currentProductId]);
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#000" />
+            </View>
+        );
+    }
+
+    if (relatedItems.length === 0) return null;
 
     return (
         <View style={styles.container}>
@@ -22,7 +53,7 @@ export function RelatedProducts() {
                     <ShopProductCard
                         key={item.id}
                         product={item}
-                        style={{ width: 140, marginBottom: 0 }}
+                        style={{ width: 200, marginBottom: 0 }}
                     />
                 ))}
             </ScrollView>
@@ -37,12 +68,16 @@ const styles = StyleSheet.create({
         borderTopColor: '#F1F5F9',
         marginTop: 24,
     },
+    loadingContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        marginBottom: 16,
+        marginBottom: 20,
     },
     heading: {
         fontSize: 18,
@@ -56,7 +91,7 @@ const styles = StyleSheet.create({
     },
     scroll: {
         paddingHorizontal: 20,
-        gap: 16,
-        paddingBottom: 20, // Add padding for shadows
+        gap: 20,
+        paddingBottom: 20,
     },
 });

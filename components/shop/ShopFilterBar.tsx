@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export interface FilterChip {
     id: string;
@@ -21,8 +22,11 @@ export function ShopFilterBar({
     onSortPress,
     onRemoveFilter
 }: ShopFilterBarProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDark && { backgroundColor: '#111', borderBottomColor: '#222' }]}>
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -30,28 +34,28 @@ export function ShopFilterBar({
             >
                 {/* Tune / Filter Button */}
                 <Pressable
-                    style={styles.filterButton}
+                    style={[styles.filterButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
                     onPress={onFilterPress}
                 >
-                    <MaterialIcons name="tune" size={20} color="#1152d4" />
+                    <MaterialIcons name="tune" size={20} color={isDark ? '#fff' : '#1152d4'} />
                     {activeFilters.length > 0 && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{activeFilters.length}</Text>
+                        <View style={[styles.badge, isDark && { backgroundColor: '#fff' }]}>
+                            <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{activeFilters.length}</Text>
                         </View>
                     )}
                 </Pressable>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, isDark && { backgroundColor: '#333' }]} />
 
                 {/* Active Filter Chips */}
                 {activeFilters.map((filter) => (
                     <Pressable
                         key={filter.id}
-                        style={styles.chip}
+                        style={[styles.chip, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
                         onPress={() => onRemoveFilter(filter.id)}
                     >
-                        <Text style={styles.chipText}>{filter.label}</Text>
-                        <MaterialIcons name="close" size={16} color="#94a3b8" />
+                        <Text style={[styles.chipText, isDark && { color: '#e5e5e5' }]}>{filter.label}</Text>
+                        <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#94a3b8'} />
                     </Pressable>
                 ))}
 
@@ -59,8 +63,8 @@ export function ShopFilterBar({
                     OR we can make it sticky at the end if preferred.
                     The HTML has it at the end of the scroll but with 'ml-auto'.
                 */}
-                <Pressable style={styles.sortButton} onPress={onSortPress}>
-                    <MaterialIcons name="swap-vert" size={22} color="#64748b" />
+                <Pressable style={[styles.sortButton, isDark && { backgroundColor: '#222' }]} onPress={onSortPress}>
+                    <MaterialIcons name="swap-vert" size={22} color={isDark ? '#e5e5e5' : '#64748b'} />
                 </Pressable>
             </ScrollView>
         </View>

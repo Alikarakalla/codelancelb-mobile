@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { CartItem } from '@/components/cart/CartItem';
 import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
 import { OrderSummary } from '@/components/cart/OrderSummary';
@@ -26,7 +26,7 @@ export default function CartScreen() {
 
     return (
         <View style={styles.container}>
-            <LuxeHeader showBackButton={false} title="LUXE" onOpenMenu={openDrawer} />
+            <GlobalHeader title="LUXE" />
 
             <ScrollView
                 contentContainerStyle={{

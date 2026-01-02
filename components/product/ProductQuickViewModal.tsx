@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { Product, ProductVariant } from '@/types/schema';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -34,6 +36,10 @@ export const ProductQuickViewModal = ({
     const [selectedSize, setSelectedSize] = useState<string | null>(null);
     const [selectedColor, setSelectedColor] = useState<string | null>(null);
     const [quantity, setQuantity] = useState(1);
+    const { triggerCartAnimation } = useCartAnimation();
+    const cartButtonRef = React.useRef<View>(null);
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     if (!product) return null;
 
@@ -58,12 +64,30 @@ export const ProductQuickViewModal = ({
     }, [product]);
 
     const handleAddToCart = () => {
-        onAddToCart({
-            product,
-            quantity,
-            variant: product.variants?.find(v => v.size === selectedSize && v.color === selectedColor)
-        });
-        onClose();
+        if (cartButtonRef.current) {
+            requestAnimationFrame(() => {
+                cartButtonRef.current?.measure((x, y, w, h, px, py) => {
+                    triggerCartAnimation(
+                        { x: px + w / 2, y: py + h / 2 },
+                        () => {
+                            onAddToCart({
+                                product,
+                                quantity,
+                                variant: product.variants?.find(v => v.size === selectedSize && v.color === selectedColor)
+                            });
+                            onClose();
+                        }
+                    );
+                });
+            });
+        } else {
+            onAddToCart({
+                product,
+                quantity,
+                variant: product.variants?.find(v => v.size === selectedSize && v.color === selectedColor)
+            });
+            onClose();
+        }
     }
 
     return (
@@ -78,10 +102,10 @@ export const ProductQuickViewModal = ({
                     <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
                 </BlurView>
 
-                <View style={styles.modalContainer}>
+                <View style={[styles.modalContainer, isDark && { backgroundColor: '#111' }]}>
                     {/* Close Button */}
-                    <Pressable style={styles.closeButton} onPress={onClose}>
-                        <MaterialIcons name="close" size={20} color="#64748b" />
+                    <Pressable style={[styles.closeButton, isDark && { backgroundColor: 'rgba(50,50,50,0.8)' }]} onPress={onClose}>
+                        <MaterialIcons name="close" size={20} color={isDark ? "#fff" : "#64748b"} />
                     </Pressable>
 
                     {/* Product Image */}
@@ -91,9 +115,6 @@ export const ProductQuickViewModal = ({
                             style={styles.image}
                             resizeMode="cover"
                         />
-                        <View style={styles.newBadge}>
-                            <Text style={styles.newBadgeText}>NEW ARRIVAL</Text>
-                        </View>
                     </View>
 
                     <ScrollView style={styles.content} bounces={false} showsVerticalScrollIndicator={false}>
@@ -101,12 +122,12 @@ export const ProductQuickViewModal = ({
                         <View style={styles.header}>
                             <View style={{ flex: 1 }}>
                                 {product.brand && (
-                                    <Text style={styles.brandName}>{product.brand.name}</Text>
+                                    <Text style={[styles.brandName, isDark && { color: '#94A3B8' }]}>{product.brand.name}</Text>
                                 )}
-                                <Text style={styles.productName}>{product.name_en || product.name}</Text>
+                                <Text style={[styles.productName, isDark && { color: '#fff' }]}>{product.name_en || product.name}</Text>
                             </View>
                             <View style={styles.priceContainer}>
-                                <Text style={styles.price}>${finalPrice?.toFixed(2)}</Text>
+                                <Text style={[styles.price, isDark && { color: '#1152d4' }]}>${finalPrice?.toFixed(2)}</Text>
                                 {hasDiscount && (
                                     <View style={styles.discountBadge}>
                                         <Text style={styles.discountText}>
@@ -120,7 +141,7 @@ export const ProductQuickViewModal = ({
                         {/* Color Selector */}
                         {colors.length > 0 && (
                             <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Available Colors</Text>
+                                <Text style={[styles.sectionTitle, isDark && { color: '#e5e5e5' }]}>Available Colors</Text>
                                 <View style={styles.colorRow}>
                                     {colors.map(color => (
                                         <Pressable
@@ -129,7 +150,8 @@ export const ProductQuickViewModal = ({
                                             style={[
                                                 styles.colorDot,
                                                 { backgroundColor: color.toLowerCase() },
-                                                selectedColor === color && styles.colorDotSelected
+                                                selectedColor === color && styles.colorDotSelected,
+                                                isDark && { borderColor: '#333' }
                                             ]}
                                         >
                                             {selectedColor === color && (
@@ -145,7 +167,7 @@ export const ProductQuickViewModal = ({
                         {sizes.length > 0 && (
                             <View style={styles.section}>
                                 <View style={styles.sectionHeader}>
-                                    <Text style={styles.sectionTitle}>Select Size</Text>
+                                    <Text style={[styles.sectionTitle, isDark && { color: '#e5e5e5' }]}>Select Size</Text>
                                     <Pressable><Text style={styles.sizeChartText}>Size Chart</Text></Pressable>
                                 </View>
                                 <View style={styles.sizeGrid}>
@@ -155,11 +177,13 @@ export const ProductQuickViewModal = ({
                                             onPress={() => setSelectedSize(size)}
                                             style={[
                                                 styles.sizeBox,
-                                                selectedSize === size && styles.sizeBoxSelected
+                                                selectedSize === size && styles.sizeBoxSelected,
+                                                isDark && { borderColor: '#333' }
                                             ]}
                                         >
                                             <Text style={[
                                                 styles.sizeText,
+                                                isDark && { color: '#94A3B8' },
                                                 selectedSize === size && styles.sizeTextSelected
                                             ]}>{size}</Text>
                                         </Pressable>
@@ -170,34 +194,38 @@ export const ProductQuickViewModal = ({
 
                         {/* Quantity Selector */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Quantity</Text>
-                            <View style={styles.quantityContainer}>
+                            <Text style={[styles.sectionTitle, isDark && { color: '#e5e5e5' }]}>Quantity</Text>
+                            <View style={[styles.quantityContainer, isDark && { borderColor: '#333' }]}>
                                 <Pressable
                                     style={styles.qtyBtn}
                                     onPress={() => setQuantity(Math.max(1, quantity - 1))}
                                 >
-                                    <MaterialIcons name="remove" size={20} color="#64748b" />
+                                    <MaterialIcons name="remove" size={20} color={isDark ? "#94A3B8" : "#64748b"} />
                                 </Pressable>
-                                <View style={styles.qtyValue}>
-                                    <Text style={styles.qtyText}>{quantity}</Text>
+                                <View style={[styles.qtyValue, isDark && { backgroundColor: '#222', borderColor: '#333' }]}>
+                                    <Text style={[styles.qtyText, isDark && { color: '#fff' }]}>{quantity}</Text>
                                 </View>
                                 <Pressable
                                     style={styles.qtyBtn}
                                     onPress={() => setQuantity(quantity + 1)}
                                 >
-                                    <MaterialIcons name="add" size={20} color="#64748b" />
+                                    <MaterialIcons name="add" size={20} color={isDark ? "#94A3B8" : "#64748b"} />
                                 </Pressable>
                             </View>
                         </View>
 
                         {/* Action Buttons */}
                         <View style={styles.actions}>
-                            <Pressable style={styles.addToCartBtn} onPress={handleAddToCart}>
+                            <Pressable
+                                style={styles.addToCartBtn}
+                                onPress={handleAddToCart}
+                                ref={cartButtonRef}
+                            >
                                 <MaterialIcons name="shopping-cart" size={20} color="#fff" />
                                 <Text style={styles.addToCartText}>Add to Cart</Text>
                             </Pressable>
-                            <Pressable style={styles.detailsBtn} onPress={() => { onClose(); onViewDetails(product); }}>
-                                <Text style={styles.detailsText}>View Full Details</Text>
+                            <Pressable style={[styles.detailsBtn, isDark && { borderColor: '#333' }]} onPress={() => { onClose(); onViewDetails(product); }}>
+                                <Text style={[styles.detailsText, isDark && { color: '#fff' }]}>View Full Details</Text>
                             </Pressable>
                         </View>
                     </ScrollView>

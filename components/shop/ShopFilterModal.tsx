@@ -24,6 +24,7 @@ import Animated, {
     interpolate,
     Extrapolate
 } from 'react-native-reanimated';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -34,35 +35,38 @@ interface ShopFilterModalProps {
 }
 
 // Optimized Price Display to prevent whole modal re-renders
-const PriceRangeDisplay = memo(({ values, onMinChange, onMaxChange }: {
+const PriceRangeDisplay = memo(({ values, onMinChange, onMaxChange, isDark }: {
     values: number[],
     onMinChange: (v: string) => void,
-    onMaxChange: (v: string) => void
+    onMaxChange: (v: string) => void,
+    isDark: boolean
 }) => {
     return (
         <View style={styles.priceInputs}>
-            <View style={styles.priceInputGroup}>
+            <View style={[styles.priceInputGroup, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
                 <Text style={styles.inputLabel}>Min Price</Text>
                 <View style={styles.inputWrapper}>
-                    <Text style={styles.currencySymbol}>$</Text>
+                    <Text style={[styles.currencySymbol, isDark && { color: '#fff' }]}>$</Text>
                     <TextInput
-                        style={styles.textInput}
+                        style={[styles.textInput, isDark && { color: '#fff' }]}
                         value={values[0].toString()}
                         onChangeText={onMinChange}
                         keyboardType="numeric"
+                        placeholderTextColor={isDark ? '#555' : '#999'}
                     />
                 </View>
             </View>
-            <Text style={styles.rangeDivider}>-</Text>
-            <View style={styles.priceInputGroup}>
+            <Text style={[styles.rangeDivider, isDark && { color: '#555' }]}>-</Text>
+            <View style={[styles.priceInputGroup, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
                 <Text style={styles.inputLabel}>Max Price</Text>
                 <View style={styles.inputWrapper}>
-                    <Text style={styles.currencySymbol}>$</Text>
+                    <Text style={[styles.currencySymbol, isDark && { color: '#fff' }]}>$</Text>
                     <TextInput
-                        style={styles.textInput}
+                        style={[styles.textInput, isDark && { color: '#fff' }]}
                         value={values[1].toString()}
                         onChangeText={onMaxChange}
                         keyboardType="numeric"
+                        placeholderTextColor={isDark ? '#555' : '#999'}
                     />
                 </View>
             </View>
@@ -73,6 +77,8 @@ const PriceRangeDisplay = memo(({ values, onMinChange, onMaxChange }: {
 export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalProps) {
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
     const snapPoints = useMemo(() => ['85%'], []);
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     useEffect(() => {
         if (visible) {
@@ -142,23 +148,23 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
     const renderFooter = useCallback(
         (props: any) => (
             <BottomSheetFooter {...props} bottomInset={0}>
-                <View style={styles.footer}>
-                    <Pressable style={styles.clearButton}>
-                        <Text style={styles.clearButtonText}>Clear All</Text>
+                <View style={[styles.footer, isDark && { backgroundColor: '#111', borderTopColor: '#222' }]}>
+                    <Pressable style={[styles.clearButton, isDark && { borderColor: '#444' }]}>
+                        <Text style={[styles.clearButtonText, isDark && { color: '#fff' }]}>Clear All</Text>
                     </Pressable>
-                    <Pressable style={styles.applyButton} onPress={handleApply}>
-                        <Text style={styles.applyButtonText}>Apply Filters (3)</Text>
+                    <Pressable style={[styles.applyButton, isDark && { backgroundColor: '#fff' }]} onPress={handleApply}>
+                        <Text style={[styles.applyButtonText, isDark && { color: '#000' }]}>Apply Filters (3)</Text>
                     </Pressable>
                 </View>
             </BottomSheetFooter>
         ),
-        [handleApply]
+        [handleApply, isDark]
     );
 
     const categoriesList = ['T-Shirts & Tops', 'Jeans & Denim', 'Jackets'];
     const colorsList = [
         { name: 'White', value: '#FFFFFF', border: '#E2E8F0' },
-        { name: 'Black', value: '#000000' },
+        { name: 'Black', value: '#000000', border: isDark ? '#333' : undefined },
         { name: 'Blue', value: '#2563EB' },
         { name: 'Red', value: '#EF4444' },
         { name: 'Beige', value: '#F5F5DC', border: '#E2E8F0' },
@@ -174,14 +180,14 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
             onDismiss={onClose}
             backdropComponent={renderBackdrop}
             footerComponent={renderFooter}
-            handleIndicatorStyle={styles.handleIndicator}
-            backgroundStyle={styles.sheetBackground}
+            handleIndicatorStyle={[styles.handleIndicator, isDark && { backgroundColor: '#444' }]}
+            backgroundStyle={[styles.sheetBackground, isDark && { backgroundColor: '#000' }]}
             enablePanDownToClose
         >
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Filters</Text>
-                <Pressable onPress={() => bottomSheetModalRef.current?.dismiss()} style={styles.closeButton}>
-                    <Ionicons name="close" size={20} color="#64748b" />
+            <View style={[styles.header, isDark && { backgroundColor: '#000', borderBottomColor: '#222' }]}>
+                <Text style={[styles.headerTitle, isDark && { color: '#fff' }]}>Filters</Text>
+                <Pressable onPress={() => bottomSheetModalRef.current?.dismiss()} style={[styles.closeButton, isDark && { backgroundColor: '#222' }]}>
+                    <Ionicons name="close" size={20} color={isDark ? "#fff" : "#64748b"} />
                 </Pressable>
             </View>
 
@@ -193,7 +199,7 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                 {/* Categories */}
                 <View style={[styles.section, { marginTop: 10 }]}>
                     <Pressable style={styles.sectionHeader} onPress={() => toggleSection('categories')}>
-                        <Text style={styles.sectionTitle}>Categories</Text>
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Categories</Text>
                         <Ionicons name={expandedSections.categories ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
 
@@ -203,7 +209,7 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                                 <Ionicons name="checkbox" size={20} color="#1152d4" />
                                 <Text style={styles.categoryHeaderText}>Clothing</Text>
                             </View>
-                            <View style={styles.subCategoryList}>
+                            <View style={[styles.subCategoryList, isDark && { borderLeftColor: '#222' }]}>
                                 {categoriesList.map((cat) => {
                                     const isSelected = selectedCategory.includes(cat);
                                     return (
@@ -218,10 +224,10 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                                                 }
                                             }}
                                         >
-                                            <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                                            <View style={[styles.checkbox, isDark && { borderColor: '#444' }, isSelected && styles.checkboxActive]}>
                                                 {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
                                             </View>
-                                            <Text style={[styles.checkboxLabel, isSelected && styles.checkboxLabelActive]}>{cat}</Text>
+                                            <Text style={[styles.checkboxLabel, isDark && { color: '#94A3B8' }, isSelected && isDark && { color: '#fff' }, isSelected && styles.checkboxLabelActive]}>{cat}</Text>
                                         </Pressable>
                                     );
                                 })}
@@ -230,12 +236,12 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                     )}
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, isDark && { backgroundColor: '#222' }]} />
 
                 {/* Price Range */}
                 <View style={styles.section}>
                     <Pressable style={styles.sectionHeader} onPress={() => toggleSection('price')}>
-                        <Text style={styles.sectionTitle}>Price Range</Text>
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Price Range</Text>
                         <Ionicons name={expandedSections.price ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
 
@@ -252,7 +258,7 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                                     allowOverlap={false}
                                     snapped
                                     selectedStyle={{ backgroundColor: '#1152d4' }}
-                                    unselectedStyle={{ backgroundColor: '#e2e8f0' }}
+                                    unselectedStyle={{ backgroundColor: isDark ? '#333' : '#e2e8f0' }}
                                     trackStyle={{ height: 6, borderRadius: 3 }}
                                     markerStyle={styles.sliderThumb}
                                     pressedMarkerStyle={styles.sliderThumbPressed}
@@ -263,17 +269,18 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                                 values={priceRange}
                                 onMinChange={(v) => setPriceRange([parseInt(v) || 0, priceRange[1]])}
                                 onMaxChange={(v) => setPriceRange([priceRange[0], parseInt(v) || 0])}
+                                isDark={isDark}
                             />
                         </View>
                     )}
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, isDark && { backgroundColor: '#222' }]} />
 
                 {/* Colors */}
                 <View style={styles.section}>
                     <Pressable style={styles.sectionHeader} onPress={() => toggleSection('colors')}>
-                        <Text style={styles.sectionTitle}>Colors</Text>
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Colors</Text>
                         <Ionicons name={expandedSections.colors ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
 
@@ -298,12 +305,12 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                     )}
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, isDark && { backgroundColor: '#222' }]} />
 
                 {/* Sizes */}
                 <View style={styles.section}>
                     <Pressable style={styles.sectionHeader} onPress={() => toggleSection('sizes')}>
-                        <Text style={styles.sectionTitle}>Sizes</Text>
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Sizes</Text>
                         <Ionicons name={expandedSections.sizes ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
 
@@ -314,10 +321,10 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                                 return (
                                     <Pressable
                                         key={s}
-                                        style={[styles.sizeBox, isSelected && styles.sizeBoxActive]}
+                                        style={[styles.sizeBox, isDark && { borderColor: '#333' }, isSelected && styles.sizeBoxActive]}
                                         onPress={() => setSelectedSize(s)}
                                     >
-                                        <Text style={[styles.sizeText, isSelected && styles.sizeTextActive]}>{s}</Text>
+                                        <Text style={[styles.sizeText, isDark && { color: '#94A3B8' }, isSelected && styles.sizeTextActive]}>{s}</Text>
                                     </Pressable>
                                 );
                             })}
@@ -325,18 +332,18 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                     )}
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, isDark && { backgroundColor: '#222' }]} />
 
                 {/* Brands */}
                 <View style={styles.section}>
                     <Pressable style={styles.sectionHeader} onPress={() => toggleSection('brands')}>
-                        <Text style={styles.sectionTitle}>Brands</Text>
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Brands</Text>
                         <Ionicons name={expandedSections.brands ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
                     {!expandedSections.brands && (
                         <View style={styles.brandPreview}>
                             {['Nike', 'Adidas'].map(b => (
-                                <View key={b} style={styles.previewTag}><Text style={styles.previewTagText}>{b}</Text></View>
+                                <View key={b} style={[styles.previewTag, isDark && { backgroundColor: '#222' }]}><Text style={[styles.previewTagText, isDark && { color: '#94A3B8' }]}>{b}</Text></View>
                             ))}
                             <Text style={styles.moreText}>+12 more</Text>
                         </View>

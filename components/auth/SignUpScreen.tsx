@@ -8,6 +8,8 @@ import { useRouter } from 'expo-router';
 import { CountryPicker } from 'react-native-country-codes-picker';
 import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { useDrawer } from '@/hooks/use-drawer-context';
 
 export default function SignUpScreen() {
     const insets = useSafeAreaInsets();
@@ -15,6 +17,7 @@ export default function SignUpScreen() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
+    const { openDrawer } = useDrawer();
 
     const { control, handleSubmit, watch, formState: { errors } } = useForm({
         defaultValues: {
@@ -109,14 +112,7 @@ export default function SignUpScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            {/* Top App Bar */}
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <MaterialIcons name="arrow-back" size={24} color={isDark ? '#fff' : '#111318'} />
-                </Pressable>
-                <Text style={styles.headerTitle}>Sign Up</Text>
-                <View style={{ width: 48 }} /> {/* Spacer for centering */}
-            </View>
+            <GlobalHeader title="LUXE" />
 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}

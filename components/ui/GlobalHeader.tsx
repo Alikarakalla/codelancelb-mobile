@@ -1,25 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { IconSymbol } from '@/components/ui/icon-symbol'; // Using our SF Symbol wrapper or vector icons
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
+import { useDrawer } from '@/hooks/use-drawer-context';
+import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 
-interface LuxeHeaderProps {
-    showBackButton?: boolean;
+interface GlobalHeaderProps {
     title?: string;
-    onOpenMenu?: () => void;
 }
 
-export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu }: LuxeHeaderProps) {
+export function GlobalHeader({ title = 'LUXE' }: GlobalHeaderProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const router = useRouter();
     const { cartCount } = useCart();
+    const { openDrawer } = useDrawer();
+    const { setCartTargetPoint } = useCartAnimation();
+    const cartIconRef = React.useRef<View>(null);
+
     const isDark = colorScheme === 'dark';
     const textColor = isDark ? '#fff' : '#18181B';
     const bgColor = isDark ? '#000' : '#fff';
@@ -27,17 +28,11 @@ export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: bgColor }]}>
             <View style={styles.content}>
-                {/* Left Section */}
+                {/* Left Section: Always Menu */}
                 <View style={styles.leftSection}>
-                    {showBackButton ? (
-                        <Pressable onPress={() => router.back()} style={styles.iconButton}>
-                            <Feather name="arrow-left" size={22} color={textColor} />
-                        </Pressable>
-                    ) : (
-                        <Pressable onPress={onOpenMenu} style={styles.iconButton}>
-                            <Feather name="menu" size={24} color={textColor} />
-                        </Pressable>
-                    )}
+                    <Pressable onPress={openDrawer} style={styles.iconButton}>
+                        <Feather name="menu" size={24} color={textColor} />
+                    </Pressable>
                 </View>
 
                 {/* Center Section: Logo */}
@@ -53,7 +48,19 @@ export function LuxeHeader({ showBackButton = false, title = 'LUXE', onOpenMenu 
                     <Pressable style={styles.iconButton}>
                         <Feather name="search" size={20} color={textColor} />
                     </Pressable>
-                    <Pressable style={styles.iconButton} onPress={() => router.push('/cart')}>
+                    <Pressable
+                        style={styles.iconButton}
+                        onPress={() => router.push('/cart')}
+                        ref={cartIconRef}
+                        onLayout={() => {
+                            cartIconRef.current?.measure((x, y, width, height, px, py) => {
+                                setCartTargetPoint({
+                                    x: px + width / 2,
+                                    y: py + height / 2
+                                });
+                            });
+                        }}
+                    >
                         <Feather name="shopping-bag" size={20} color={textColor} />
                         {cartCount > 0 && (
                             <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
@@ -88,11 +95,11 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 18,
-        fontWeight: '800', // extrabold
-        letterSpacing: 2, // tracking-[0.1em]
+        fontWeight: '800',
+        letterSpacing: 2,
         textAlign: 'center',
         textTransform: 'uppercase',
-        fontFamily: Platform.select({ ios: 'Avenir Next', android: 'Roboto' }), // fallback for "Manrope"
+        fontFamily: Platform.select({ ios: 'Avenir Next', android: 'Roboto' }),
     },
     leftSection: {
         flex: 1,
@@ -126,9 +133,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 18,
-    },
-    pressed: {
-        backgroundColor: 'rgba(0,0,0,0.05)',
     },
     badge: {
         position: 'absolute',

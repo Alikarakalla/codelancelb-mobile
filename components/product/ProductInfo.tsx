@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 
 interface ProductInfoProps {
+    brand?: string;
     title: string;
     price: number;
     originalPrice?: number;
@@ -10,38 +11,33 @@ interface ProductInfoProps {
     reviewCount: number;
 }
 
-export function ProductInfo({ title, price, originalPrice, rating, reviewCount }: ProductInfoProps) {
+export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount }: ProductInfoProps) {
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>{title}</Text>
-                <View style={styles.priceContainer}>
-                    <Text style={styles.price}>${price.toFixed(2)}</Text>
-                    {originalPrice && (
-                        <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
-                    )}
-                </View>
+            <Text style={styles.brand}>{brand}</Text>
+            <Text style={styles.title}>{title}</Text>
+            <View style={styles.priceContainer}>
+                <Text style={styles.price}>$ {price.toFixed(2)}</Text>
+                {originalPrice && (
+                    <Text style={styles.originalPrice}>$ {originalPrice.toFixed(2)}</Text>
+                )}
             </View>
 
-            <View style={styles.ratingRow}>
-                <View style={styles.stars}>
-                    {[1, 2, 3, 4, 5].map((s) => (
-                        <Ionicons
-                            key={s}
-                            name={s <= Math.round(rating) ? "star" : "star-outline"}
-                            size={18}
-                            color={s <= Math.round(rating) ? "#FBBF24" : "#CBD5E1"}
-                        />
-                    ))}
+            {reviewCount > 0 && (
+                <View style={styles.ratingRow}>
+                    <View style={styles.stars}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                                key={s}
+                                name={s <= Math.round(rating) ? "star" : "star-outline"}
+                                size={16}
+                                color={s <= Math.round(rating) ? "#111" : "#E2E8F0"}
+                            />
+                        ))}
+                    </View>
+                    <Text style={styles.reviewCount}>({reviewCount})</Text>
                 </View>
-                <Text style={styles.ratingValue}>{rating}</Text>
-                <Link href={`./reviews`} asChild>
-                    <Pressable style={styles.reviewsLink}>
-                        <Text style={styles.reviewCount}>({reviewCount} Reviews)</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                    </Pressable>
-                </Link>
-            </View>
+            )}
         </View>
     );
 }
@@ -49,59 +45,52 @@ export function ProductInfo({ title, price, originalPrice, rating, reviewCount }
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 20,
-        paddingTop: 16,
-        gap: 8,
+        paddingTop: 20,
+        gap: 4,
     },
-    reviewsLink: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 16,
+    brand: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     title: {
-        flex: 1,
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#0F172A',
-        lineHeight: 32,
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#1F2937',
+        textTransform: 'uppercase',
     },
     priceContainer: {
-        alignItems: 'flex-end',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
     },
     price: {
         fontSize: 20,
         fontWeight: '800',
-        color: '#1152d4',
+        color: '#1F2937',
     },
     originalPrice: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#94A3B8',
         textDecorationLine: 'line-through',
-        marginTop: 2,
-        fontWeight: '600',
+        fontWeight: '500',
     },
     ratingRow: {
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 8,
+        gap: 8,
     },
     stars: {
         flexDirection: 'row',
         gap: 2,
     },
-    ratingValue: {
-        marginLeft: 6,
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#334155',
-    },
     reviewCount: {
-        marginLeft: 4,
         fontSize: 14,
         color: '#94A3B8',
+        fontWeight: '500',
     },
 });

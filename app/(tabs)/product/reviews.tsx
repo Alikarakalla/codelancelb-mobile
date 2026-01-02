@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LuxeHeader } from '@/components/home/LuxeHeader';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { useDrawer } from '@/hooks/use-drawer-context';
 import { RatingSummary } from '@/components/reviews/RatingSummary';
 import { ReviewFilters } from '@/components/reviews/ReviewFilters';
 import { ReviewItem } from '@/components/reviews/ReviewItem';
@@ -10,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function ProductReviewsScreen() {
     const insets = useSafeAreaInsets();
+    const { openDrawer } = useDrawer();
 
     const mockReviews = [
         { id: 1, author: 'Emily Parker', initials: 'EP', colorClass: '#DBEAFE', date: '2 days ago', rating: 5, text: 'The quality of this trench coat is exceptional. Fits true to size and the color is exactly as shown in the pictures. Highly recommend!', helpfulCount: 12 },
@@ -20,8 +22,8 @@ export default function ProductReviewsScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header - Reusing Home Header with Back Button */}
-            <LuxeHeader showBackButton title="Customer Reviews" />
+            {/* Standard Header */}
+            <GlobalHeader title="LUXE" />
 
             <ScrollView contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}>
                 <RatingSummary

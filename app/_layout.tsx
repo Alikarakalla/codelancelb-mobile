@@ -13,6 +13,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { WishlistProvider } from '@/hooks/use-wishlist-context';
 import { CartProvider } from '@/hooks/use-cart-context';
+import { WishlistAnimationProvider } from '@/components/wishlist/WishlistAnimationProvider';
+import { CartAnimationProvider } from '@/components/cart/CartAnimationProvider';
 
 /* ... */
 
@@ -24,18 +26,16 @@ export default function RootLayout() {
       <BottomSheetModalProvider>
         <WishlistProvider>
           <CartProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-                <Stack.Screen name="product/reviews" options={{ headerShown: false }} />
-                <Stack.Screen name="cart" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-                <Stack.Screen name="login" options={{ headerShown: false }} />
-                <Stack.Screen name="signup" options={{ headerShown: false }} />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
+            <WishlistAnimationProvider>
+              <CartAnimationProvider>
+                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                  <Stack>
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+                  </Stack>
+                </ThemeProvider>
+              </CartAnimationProvider>
+            </WishlistAnimationProvider>
           </CartProvider>
         </WishlistProvider>
       </BottomSheetModalProvider>

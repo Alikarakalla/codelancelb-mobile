@@ -1,32 +1,32 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ScrollView, Dimensions } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { SharedValue } from 'react-native-reanimated';
+import { Brand } from '@/types/schema';
+import { MOCK_BRANDS } from '@/constants/mockData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.42;
-
-import { SharedValue } from 'react-native-reanimated';
-import { RevealingItem } from './RevealingItem';
-import { Brand } from '@/types/schema';
-
-const MOCK_BRANDS = [
-    { id: 1, name: 'LATTAFA', name_en: 'LATTAFA', name_ar: 'لطافة', slug: 'lattafa', logo: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?q=80&w=1000&auto=format&fit=crop', is_active: true },
-    { id: 2, name: 'MAYBELLINE', name_en: 'MAYBELLINE', name_ar: 'ميبيلين', slug: 'maybelline', logo: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1000&auto=format&fit=crop', is_active: true },
-    { id: 3, name: 'YSL', name_en: 'YVES SAINT LAURENT', name_ar: 'YSL', slug: 'ysl', logo: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=1000&auto=format&fit=crop', is_active: true },
-    { id: 4, name: 'BOURJOIS', name_en: 'BOURJOIS', name_ar: 'بورجوا', slug: 'bourjois', logo: 'https://images.unsplash.com/photo-1512496011951-a99932826d04?q=80&w=1000&auto=format&fit=crop', is_active: true },
-];
 
 interface Props {
     scrollY: SharedValue<number>;
     brands?: Brand[];
 }
-
 export function BrandSlider({ scrollY, brands }: Props) {
+    const router = useRouter();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const displayBrands = (brands && brands.length > 0) ? brands : (MOCK_BRANDS as Brand[]);
 
+    const handlePress = (brandId: number) => {
+        router.push({ pathname: '/shop', params: { brand_id: brandId } });
+    };
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Must Have</Text>
+                <Text style={[styles.title, isDark && { color: '#fff' }]}>Must Have</Text>
                 <Text style={styles.subtitle}>FEATURED BRANDS</Text>
             </View>
 
@@ -38,7 +38,7 @@ export function BrandSlider({ scrollY, brands }: Props) {
                 decelerationRate="fast"
             >
                 {displayBrands.map((brand) => (
-                    <View key={brand.id} style={styles.card}>
+                    <Pressable key={brand.id} style={styles.card} onPress={() => handlePress(brand.id)}>
                         <Image source={{ uri: brand.logo || 'https://via.placeholder.com/400x800' }} style={styles.bgImage} />
                         <View style={[StyleSheet.absoluteFill, styles.cardOverlay]} />
 
@@ -47,11 +47,11 @@ export function BrandSlider({ scrollY, brands }: Props) {
                                 <Text style={styles.brandName}>{brand.name_en || brand.name}</Text>
                             </View>
 
-                            <Pressable style={styles.exploreButton}>
+                            <View style={styles.exploreButton}>
                                 <Text style={styles.exploreText}>EXPLORE</Text>
-                            </Pressable>
+                            </View>
                         </View>
-                    </View>
+                    </Pressable>
                 ))}
             </ScrollView>
         </View>

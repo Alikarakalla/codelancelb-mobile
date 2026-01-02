@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Product } from '@/types/schema';
+import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
+import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
+import { useWishlist } from '@/hooks/use-wishlist-context';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 40 - 12) / 2; // (Screen - padding - gap) / 2
@@ -23,6 +26,13 @@ export const ProductGridItem = ({
     onToggleWishlist,
     onQuickView
 }: ProductGridItemProps) => {
+    const { triggerAnimation } = useWishlistAnimation();
+    const { triggerCartAnimation } = useCartAnimation();
+    const { isInWishlist } = useWishlist();
+    const wishlistIconRef = React.useRef<View>(null);
+    const cartButtonRef = React.useRef<View>(null);
+
+    const isWishlisted = isInWishlist(product.id);
     const hasDiscount = product.discount_amount && product.discount_amount > 0;
     const imageUrl = product.main_image || 'https://via.placeholder.com/300x400';
 
@@ -51,11 +61,51 @@ export const ProductGridItem = ({
 
                 {/* Top Right: Grouped Actions (Site uses + at top right) */}
                 <View style={styles.actionGroup}>
-                    <Pressable style={styles.fab} onPress={onAddToCart}>
+                    <Pressable
+                        style={styles.fab}
+                        onPress={() => {
+                            if (cartButtonRef.current) {
+                                requestAnimationFrame(() => {
+                                    cartButtonRef.current?.measure((x, y, w, h, px, py) => {
+                                        triggerCartAnimation(
+                                            { x: px + w / 2, y: py + h / 2 },
+                                            () => onAddToCart?.()
+                                        );
+                                    });
+                                });
+                            } else {
+                                onAddToCart?.();
+                            }
+                        }}
+                        ref={cartButtonRef}
+                    >
                         <MaterialIcons name="add" size={20} color="#fff" />
                     </Pressable>
-                    <Pressable style={[styles.miniFab, { marginTop: 8 }]} onPress={onToggleWishlist}>
-                        <MaterialIcons name="favorite-border" size={16} color="#475569" />
+                    <Pressable
+                        style={[styles.miniFab, { marginTop: 8 }]}
+                        onPress={() => {
+                            if (isWishlisted) {
+                                onToggleWishlist?.();
+                            } else if (wishlistIconRef.current) {
+                                requestAnimationFrame(() => {
+                                    wishlistIconRef.current?.measure((x, y, w, h, px, py) => {
+                                        triggerAnimation(
+                                            { x: px + w / 2, y: py + h / 2 },
+                                            () => onToggleWishlist?.()
+                                        );
+                                    });
+                                });
+                            } else {
+                                onToggleWishlist?.();
+                            }
+                        }}
+                        ref={wishlistIconRef}
+                    >
+                        <MaterialIcons
+                            name={isWishlisted ? "favorite" : "favorite-border"}
+                            size={16}
+                            color={isWishlisted ? "#ef4444" : "#475569"}
+                        />
                     </Pressable>
                 </View>
             </View>
