@@ -2,30 +2,89 @@ import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, Highlig
 import { MOCK_PRODUCTS, MOCK_CATEGORIES, MOCK_BRANDS, MOCK_BANNERS, MOCK_HIGHLIGHTS, MOCK_FEATURES } from '@/constants/mockData';
 
 // 1. CHANGE THIS in your .env file
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const ENV_URL = process.env.EXPO_PUBLIC_API_URL;
+// If env url is placeholder or missing, use the real one
+const BASE_URL = (!ENV_URL || ENV_URL.includes('your-website.com'))
+    ? 'https://sadekabdelsater.com/api/v1'
+    : ENV_URL;
+
+console.log('API Client Initialized with BASE_URL:', BASE_URL);
+
 const IS_DEV = __DEV__;
-const IS_PLACEHOLDER = !BASE_URL || BASE_URL.includes('your-website.com');
+const IS_PLACEHOLDER = false; // We are connecting to real DB now
 
 // Helper to handle response
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
         const errorBody = await response.text();
+        console.error(`API Error [${response.status}] at ${response.url}:`, errorBody.substring(0, 200));
         throw new Error(`API Error: ${response.status} - ${errorBody}`);
     }
 
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.warn('Expected JSON but got:', text.substring(0, 100));
+        console.error('Invalid Response Format!');
+        console.error('URL:', response.url);
+        console.error('Status:', response.status);
+        console.error('Received Body Preview:', text.substring(0, 500));
         throw new Error('Invalid response format: Expected JSON');
     }
 
     try {
         return await response.json();
     } catch (err) {
-        console.error('JSON Parse Error:', err);
+        console.error('JSON Parse Error at', response.url, err);
         throw new Error('Failed to parse response');
     }
+}
+
+// Helper to fix image URL
+const fixUrl = (url?: string | null) =>
+    (url && !url.startsWith('http')) ? `https://sadekabdelsater.com/storage/${url}` : url;
+
+// Helper to transform product data (fix images, convert prices)
+function transformProduct(p: any): Product {
+    const product = {
+        ...p,
+        price: p.price ? parseFloat(p.price) : null,
+        compare_at_price: p.compare_at_price ? parseFloat(p.compare_at_price) : null,
+        cost_price: p.cost_price ? parseFloat(p.cost_price) : null,
+        discount_amount: p.discount_amount ? parseFloat(p.discount_amount) : null,
+        main_image: fixUrl(p.main_image),
+        // Transform Relations if present
+        variants: Array.isArray(p.variants) ? p.variants.map(transformVariant) : [],
+        images: Array.isArray(p.images) ? p.images.map(transformImage) : [],
+        // Brand logo if loaded
+        brand: p.brand ? { ...p.brand, logo: fixUrl(p.brand.logo) } : p.brand
+    };
+
+    // Ensure options values are parsed if they come as strings (sometimes API returns json-stringified columns)
+    if (Array.isArray(product.options)) {
+        product.options = product.options.map((opt: any) => ({
+            ...opt,
+            values: Array.isArray(opt.values) ? opt.values : (typeof opt.values === 'string' ? JSON.parse(opt.values) : opt.values)
+        }));
+    }
+
+    return product;
+}
+
+function transformVariant(v: any): any {
+    return {
+        ...v,
+        price: v.price ? parseFloat(v.price) : null,
+        compare_at_price: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
+        cost_price: v.cost_price ? parseFloat(v.cost_price) : null,
+        image_path: fixUrl(v.image_path)
+    };
+}
+
+function transformImage(img: any): any {
+    return {
+        ...img,
+        path: fixUrl(img.path)
+    };
 }
 
 export const api = {
@@ -52,12 +111,49 @@ export const api = {
 
     async getProduct(id: number | string): Promise<Product> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetch(`${BASE_URL}/products/${id}?include=variants,options,images,reviews,brand,category`);
-            return await handleResponse<Product>(res);
+            // 1. Fetch Main Product
+            const productRes = await fetch(`${BASE_URL}/products/${id}`);
+            const product = await handleResponse<any>(productRes);
+
+            // 2. Conditionally Fetch details if missing from main response
+            const fetches: Promise<Response>[] = [];
+            const keys: string[] = [];
+
+            // If variants missing, fetch them
+            if (!product.variants || !Array.isArray(product.variants)) {
+                fetches.push(fetch(`${BASE_URL}/products/${id}/variants`));
+                keys.push('variants');
+            }
+            // If options missing, fetch them (The main API example lacked options)
+            if (!product.options || !Array.isArray(product.options)) {
+                fetches.push(fetch(`${BASE_URL}/products/${id}/options`));
+                keys.push('options');
+            }
+            // If images missing or empty (Example showed empty images array, might need fetch)
+            if (!product.images || product.images.length === 0) {
+                fetches.push(fetch(`${BASE_URL}/products/${id}/images`));
+                keys.push('images');
+            }
+
+            if (fetches.length > 0) {
+                const results = await Promise.allSettled(fetches);
+                for (let i = 0; i < results.length; i++) {
+                    const res = results[i];
+                    if (res.status === 'fulfilled' && res.value.ok) {
+                        try {
+                            const data = await handleResponse<any>(res.value);
+                            const list = Array.isArray(data) ? data : (data.data || []);
+                            product[keys[i]] = list;
+                        } catch (e) {
+                            console.warn(`Failed to load ${keys[i]} for product ${id}`, e);
+                        }
+                    }
+                }
+            }
+
+            return transformProduct(product);
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error(`Error fetching product ${id}:`, err);
-            // Fallback to mock in DEV
+            console.error(`Error fetching product ${id}:`, err);
             if (IS_DEV) {
                 const mock = MOCK_PRODUCTS.find(p => p.id.toString() === id.toString());
                 if (mock) return mock;
@@ -68,26 +164,41 @@ export const api = {
 
     async getRelatedProducts(productId: number | string): Promise<Product[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
+            // 1. Try Dedicated Related Products Endpoint
             const res = await fetch(`${BASE_URL}/products/${productId}/related`);
-            return await handleResponse<Product[]>(res);
-        } catch (err) {
-            if (!IS_PLACEHOLDER) console.error(`Error fetching related products for ${productId}:`, err);
-            if (IS_DEV) {
-                // Return some mock related products (excluding the current one)
-                return MOCK_PRODUCTS.filter(p => p.id !== Number(productId)).slice(0, 4);
+            if (res.status === 200) {
+                const responseData = await handleResponse<any>(res);
+                const related = Array.isArray(responseData) ? responseData : (responseData.data || []);
+                if (related.length > 0) return related.map(transformProduct);
             }
-            throw err;
+
+            // 2. Fallback: Fetch products from the same category to ensure section isn't empty
+            const product = await this.getProduct(productId);
+            if (product.category_id) {
+                const results = await this.getProducts({
+                    category_id: product.category_id,
+                    limit: 6
+                });
+                // Exclude current product
+                return results.filter(p => p.id.toString() !== productId.toString());
+            }
+
+            return [];
+        } catch (err) {
+            console.warn(`Error fetching related products for ${productId}:`, err);
+            return [];
         }
     },
 
     async getProductReviews(productId: number | string): Promise<ProductReview[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
             const res = await fetch(`${BASE_URL}/products/${productId}/reviews`);
-            return await handleResponse<ProductReview[]>(res);
+            if (res.status === 404) return [];
+            const responseData = await handleResponse<any>(res);
+            // Handle both raw array and { data: [...] }
+            return Array.isArray(responseData) ? responseData : (responseData.data || []);
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error(`Error fetching reviews for ${productId}:`, err);
+            console.warn(`Error fetching reviews for ${productId} (using fallback):`, err);
             if (IS_DEV) {
                 // Return dummy reviews if API fails
                 return [
@@ -101,18 +212,38 @@ export const api = {
 
     // --- Content ---
     async getCarouselSlides(): Promise<CarouselSlide[]> {
-        const res = await fetch(`${BASE_URL}/content/carousel`);
-        return handleResponse<CarouselSlide[]>(res);
+        const res = await fetch(`${BASE_URL}/carousel`);
+        const slides = await handleResponse<CarouselSlide[]>(res);
+
+        // Transform image URLs
+        return slides.map(slide => ({
+            ...slide,
+            image_desktop: slide.image_desktop?.startsWith('http')
+                ? slide.image_desktop
+                : `https://sadekabdelsater.com/storage/${slide.image_desktop}`,
+            image_mobile: slide.image_mobile?.startsWith('http')
+                ? slide.image_mobile
+                : `https://sadekabdelsater.com/storage/${slide.image_mobile}`
+        }));
     },
 
     // --- Categories ---
     async getCategories(): Promise<Category[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
             const res = await fetch(`${BASE_URL}/categories`);
-            return await handleResponse<Category[]>(res);
+            const responseData = await handleResponse<any>(res);
+            const categories: Category[] = Array.isArray(responseData) ? responseData : (responseData.data || []);
+
+            const transformCat = (c: Category): Category => ({
+                ...c,
+                thumbnail: fixUrl(c.thumbnail),
+                sub_categories: Array.isArray(c.sub_categories) ? c.sub_categories.map(transformCat) : undefined,
+                sub_sub_categories: Array.isArray(c.sub_sub_categories) ? c.sub_sub_categories.map(transformCat) : undefined
+            });
+
+            return categories.map(transformCat);
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching categories:', err);
+            console.error('Error fetching categories:', err);
             if (IS_DEV) return MOCK_CATEGORIES as any;
             throw err;
         }
@@ -121,11 +252,15 @@ export const api = {
     // --- Highlight Sections ---
     async getHighlightSections(): Promise<HighlightSection[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetch(`${BASE_URL}/content/highlights`);
-            return await handleResponse<HighlightSection[]>(res);
+            // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
+            const res = await fetch(`${BASE_URL}/highlights`);
+            const highlights = await handleResponse<HighlightSection[]>(res);
+            return highlights.map(h => ({
+                ...h,
+                image: h.image?.startsWith('http') ? h.image : `https://sadekabdelsater.com/storage/${h.image}`
+            }));
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching highlights:', err);
+            console.error('Error fetching highlights:', err);
             if (IS_DEV) return MOCK_HIGHLIGHTS as any;
             throw err;
         }
@@ -134,24 +269,33 @@ export const api = {
     // --- Brands ---
     async getBrands(): Promise<Brand[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
             const res = await fetch(`${BASE_URL}/brands`);
-            return await handleResponse<Brand[]>(res);
+            if (res.status === 404) return [];
+            const brands = await handleResponse<Brand[]>(res);
+            return brands.map(b => ({
+                ...b,
+                logo: fixUrl(b.logo)
+            }));
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching brands:', err);
+            console.warn('Error fetching brands (using fallback):');
             if (IS_DEV) return MOCK_BRANDS as any;
-            throw err;
+            return [];
         }
     },
 
     // --- Banners ---
     async getBanners(): Promise<Banner[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
+            // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
             const res = await fetch(`${BASE_URL}/banners`);
-            return await handleResponse<Banner[]>(res);
+            const banners = await handleResponse<Banner[]>(res);
+            return banners.map(b => ({
+                ...b,
+                image: b.image?.startsWith('http') ? b.image : `https://sadekabdelsater.com/storage/${b.image}`,
+                image_mobile: b.image_mobile?.startsWith('http') ? b.image_mobile : `https://sadekabdelsater.com/storage/${b.image_mobile}`
+            }));
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching banners:', err);
+            console.error('Error fetching banners:', err);
             if (IS_DEV) return MOCK_BANNERS as any;
             throw err;
         }
@@ -160,51 +304,58 @@ export const api = {
     // --- CMS Features ---
     async getCMSFeatures(): Promise<CMSFeature[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetch(`${BASE_URL}/content/features`);
-            return await handleResponse<CMSFeature[]>(res);
+            const res = await fetch(`${BASE_URL}/features`);
+            if (res.status === 404) return [];
+            const features = await handleResponse<CMSFeature[]>(res);
+            return features.map(f => ({
+                ...f,
+                image: fixUrl(f.image),
+                // Icons might be library names (like 'truck') or URLs. if it has a dot, it's likely a URL
+                icon: (f.icon && f.icon.includes('.')) ? fixUrl(f.icon)! : f.icon
+            }));
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching features:', err);
+            console.warn('Error fetching features (using fallback):');
             if (IS_DEV) return MOCK_FEATURES as any;
-            throw err;
+            return [];
         }
     },
 
     // --- Products ---
-    async getProducts(params?: { category_id?: number; brand_id?: number; is_featured?: boolean; limit?: number }): Promise<Product[]> {
+    async getProducts(params: { category_id?: number, brand_id?: number, category_ids?: number[], brand_ids?: number[], search?: string, limit?: number } = {}): Promise<Product[]> {
         try {
-            if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            let url = `${BASE_URL}/products`;
-            if (params) {
-                const query = new URLSearchParams();
-                if (params.category_id) query.append('category_id', params.category_id.toString());
-                if (params.brand_id) query.append('brand_id', params.brand_id.toString());
-                if (params.is_featured !== undefined) query.append('is_featured', params.is_featured ? '1' : '0');
-                if (params.limit) query.append('limit', params.limit.toString());
-                const queryString = query.toString();
-                if (queryString) url += `?${queryString}`;
+            const url = new URL(`${BASE_URL}/products`);
+            if (params.category_id) url.searchParams.append('category_id', params.category_id.toString());
+            if (params.brand_id) url.searchParams.append('brand_id', params.brand_id.toString());
+
+            if (params.category_ids?.length) {
+                params.category_ids.forEach(id => url.searchParams.append('category_ids[]', id.toString()));
             }
-            const res = await fetch(url);
-            return await handleResponse<Product[]>(res);
+            if (params.brand_ids?.length) {
+                params.brand_ids.forEach(id => url.searchParams.append('brand_ids[]', id.toString()));
+            }
+
+            if (params.search) url.searchParams.append('search', params.search);
+            if (params.limit) url.searchParams.append('limit', params.limit.toString());
+
+            const res = await fetch(url.toString());
+            const responseData = await handleResponse<any>(res);
+            // Products endpoint also usually wraps in { data: [] }
+            const products = Array.isArray(responseData) ? responseData : (responseData.data || []);
+            return products.map(transformProduct);
         } catch (err) {
-            if (!IS_PLACEHOLDER) console.error('Error fetching products:', err);
+            console.error('Error fetching products:', err);
             if (IS_DEV) {
                 let filtered = [...MOCK_PRODUCTS];
-                if (params?.category_id) {
-                    filtered = filtered.filter(p => p.category_id === params.category_id);
-                }
-                if (params?.brand_id) {
-                    filtered = filtered.filter(p => p.brand_id === params.brand_id);
-                }
-                if (params?.is_featured !== undefined) {
-                    filtered = filtered.filter(p => p.is_featured === params.is_featured);
-                }
-                if (params?.limit) {
-                    filtered = filtered.slice(0, params.limit);
-                }
+                // Mock filtering logic...
+                if (params?.category_id) filtered = filtered.filter(p => p.category_id === params.category_id);
+                if (params?.brand_id) filtered = filtered.filter(p => p.brand_id === params.brand_id);
+                if (params?.category_ids?.length) filtered = filtered.filter(p => p.category_id && params.category_ids?.includes(p.category_id));
+                if (params?.brand_ids?.length) filtered = filtered.filter(p => p.brand_id && params.brand_ids?.includes(p.brand_id));
+                if (params?.search) filtered = filtered.filter(p => p.name.toLowerCase().includes(params.search!.toLowerCase()));
+                if (params?.limit) filtered = filtered.slice(0, params.limit);
                 return filtered;
             }
-            throw err;
+            return [];
         }
     },
 

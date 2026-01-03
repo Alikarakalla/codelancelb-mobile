@@ -89,10 +89,12 @@ export interface ProductReview {
     review: string; // text
     status: 'pending' | 'approved' | 'rejected';
     created_at?: string;
+    user?: { id: number; name: string; avatar?: string };
 }
 
 export interface Category {
     id: number;
+    parent_id?: number | null;
     name: string;
     name_en?: string;
     name_ar?: string;
@@ -104,6 +106,8 @@ export interface Category {
     is_active: boolean;
     show_in_header: boolean;
     sort_order: number;
+    sub_categories?: Category[];
+    sub_sub_categories?: Category[];
 }
 
 export interface HighlightSection {

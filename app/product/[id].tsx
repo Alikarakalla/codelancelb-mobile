@@ -13,7 +13,6 @@ import { ProductDescription } from '@/components/product/ProductDescription';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { AddToCartFooter } from '@/components/product/AddToCartFooter';
-import { ProductReviews } from '@/components/product/ProductReviews';
 
 import { api } from '@/services/apiClient';
 import { Product, ProductVariant } from '@/types/schema';
@@ -97,6 +96,35 @@ export default function ProductDetailsScreen() {
         return product.stock_quantity <= 0;
     }, [product, selectedVariant]);
 
+    // Calculate effective price (handling discounts)
+    const priceData = useMemo(() => {
+        const target = selectedVariant || product;
+        if (!target) return { price: 0, originalPrice: undefined };
+
+        let finalPrice = target.price || 0;
+        let originalPrice = target.compare_at_price || undefined;
+
+        // Apply discount if present
+        if (target.discount_amount && target.discount_amount > 0) {
+            // If we have a discount, the current 'price' is implicitly the Original Price unless compare_at is set?
+            // Usually in APIs: Price is the selling price. But if discount is active, usually generated on the fly.
+            // Let's assume 'price' is the Base Price, and we calculate the discounted one.
+            originalPrice = finalPrice; // The base price becomes the "was" price
+
+            if (target.discount_type === 'percent') {
+                finalPrice = finalPrice * (1 - target.discount_amount / 100);
+            } else if (target.discount_type === 'fixed') {
+                finalPrice = Math.max(0, finalPrice - target.discount_amount);
+            }
+        }
+
+        // Return rounded for display
+        return {
+            price: finalPrice, // The actual price to pay
+            originalPrice: originalPrice // The strikethrough price (if any)
+        };
+    }, [product, selectedVariant]);
+
     const handleAddToCart = () => {
         if (!product) return;
         if (product.has_variants && !selectedVariant) {
@@ -168,10 +196,11 @@ export default function ProductDetailsScreen() {
                             <ProductInfo
                                 brand={product.brand?.name}
                                 title={product.name_en || product.name || ''}
-                                price={selectedVariant?.price ?? product.price ?? 0}
-                                originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
-                                rating={4.8} // Simplified for now, or fetch from average
+                                price={priceData.price}
+                                originalPrice={priceData.originalPrice}
+                                rating={product.reviews?.length ? (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length) : 0}
                                 reviewCount={product.reviews?.length || 0}
+                                productId={product.id}
                             />
                         </Animated.View>
 
@@ -193,12 +222,9 @@ export default function ProductDetailsScreen() {
                                 onToggleWishlist={handleToggleWishlist}
                                 isWishlisted={isWishlisted}
                                 disabled={isOutOfStock}
-                                price={selectedVariant?.price ?? product.price ?? 0}
+                                price={priceData.price}
+                                originalPrice={priceData.originalPrice}
                             />
-                        </Animated.View>
-
-                        <Animated.View entering={FadeInDown.delay(700).duration(600).damping(12)}>
-                            <ProductReviews reviews={product.reviews} />
                         </Animated.View>
 
                         <Animated.View entering={FadeInDown.delay(800).duration(600).damping(12)}>

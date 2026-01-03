@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Link } from 'expo-router';
 
 interface ProductInfoProps {
     brand?: string;
@@ -9,11 +10,30 @@ interface ProductInfoProps {
     originalPrice?: number;
     rating: number;
     reviewCount: number;
+    productId?: number;
 }
 
-export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount }: ProductInfoProps) {
+export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount, productId }: ProductInfoProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+
+    const RatingContent = (
+        <View style={styles.ratingRow}>
+            <View style={styles.stars}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                    <Ionicons
+                        key={s}
+                        name={s <= Math.round(rating) ? "star" : "star-outline"}
+                        size={16}
+                        color={s <= Math.round(rating) ? "#eab308" : (isDark ? "#333" : "#E2E8F0")}
+                    />
+                ))}
+            </View>
+            <Text style={[styles.ratingText, isDark && { color: '#fff' }]}>{rating.toFixed(1)}</Text>
+            <Text style={[styles.reviewCount, isDark && { color: '#94A3B8' }]}>({reviewCount} Reviews)</Text>
+            <Ionicons name="chevron-forward" size={16} color={isDark ? "#64748B" : "#94A3B8"} />
+        </View>
+    );
 
     return (
         <View style={styles.container}>
@@ -26,21 +46,13 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
                 )}
             </View>
 
-            {reviewCount > 0 && (
-                <View style={styles.ratingRow}>
-                    <View style={styles.stars}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                            <Ionicons
-                                key={s}
-                                name={s <= Math.round(rating) ? "star" : "star-outline"}
-                                size={16}
-                                color={s <= Math.round(rating) ? (isDark ? "#fff" : "#111") : (isDark ? "#333" : "#E2E8F0")}
-                            />
-                        ))}
-                    </View>
-                    <Text style={[styles.reviewCount, isDark && { color: '#94A3B8' }]}>({reviewCount})</Text>
-                </View>
-            )}
+            {reviewCount > 0 && productId ? (
+                <Link href={`/product/reviews?id=${productId}`} asChild>
+                    <Pressable>{RatingContent}</Pressable>
+                </Link>
+            ) : reviewCount > 0 ? (
+                RatingContent
+            ) : null}
         </View>
     );
 }
@@ -84,15 +96,20 @@ const styles = StyleSheet.create({
     ratingRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 8,
+        marginTop: 12,
         gap: 8,
     },
     stars: {
         flexDirection: 'row',
         gap: 2,
     },
+    ratingText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
     reviewCount: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#94A3B8',
         fontWeight: '500',
     },

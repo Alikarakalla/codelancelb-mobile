@@ -16,79 +16,91 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
 
     // Find options dynamically
     const colorOption = options.find(o => o.name.toLowerCase() === 'color');
-    const secondOption = options.find(o => o.name.toLowerCase() !== 'color');
+    const sizeOption = options.find(o => o.name.toLowerCase() === 'size' || o.name.toLowerCase() === 'shade'); // Added 'shade' just in case
 
-    // Safe defaults if data is missing
+    // Fallback: If no explicit size/color, pick the first non-color option as "secondary"
+    const otherOption = !sizeOption ? options.find(o => o.name.toLowerCase() !== 'color') : sizeOption;
+
+    // Defaults
     const allColors = colorOption?.values || [];
-    const allSecondOptionValues = secondOption?.values || [];
+    const allOtherValues = otherOption?.values || [];
 
-    // Initialize state
-    const [selectedColor, setSelectedColor] = React.useState(allColors[0] || '');
-    const [selectedSecond, setSelectedSecond] = React.useState('');
+    // State
+    const [selectedColor, setSelectedColor] = React.useState('');
+    const [selectedOther, setSelectedOther] = React.useState('');
 
-    // --- LOGIC: Dependent Options ---
-    // Filter variants that match the selected color
-    const availableSecondValues = React.useMemo(() => {
-        if (!selectedColor) return allSecondOptionValues;
-
-        // Match color column in variants
-        const validVariants = variants.filter(v =>
-            v.color === selectedColor &&
-            v.stock_quantity > 0
-        );
-
-        // Extract second option values (stored in 'size' column if color is first)
-        const validValues = validVariants.map(v => v.size).filter(Boolean);
-        return allSecondOptionValues.filter(val => validValues.includes(val));
-    }, [selectedColor, variants, allSecondOptionValues]);
-
-    // Update selectedSecond when availableSecondValues changes
+    // Pre-select defaults
     useEffect(() => {
-        if (availableSecondValues.length > 0) {
-            if (!selectedSecond || !availableSecondValues.includes(selectedSecond)) {
-                setSelectedSecond(availableSecondValues[0]);
-            }
-        } else {
-            setSelectedSecond('');
-        }
-    }, [availableSecondValues, selectedSecond]);
+        if (allColors.length > 0 && !selectedColor) setSelectedColor(allColors[0]);
+        if (allOtherValues.length > 0 && !selectedOther) setSelectedOther(allOtherValues[0]);
+    }, [allColors, allOtherValues]);
 
-    // Notify parent of variant change
-    useEffect(() => {
-        if (selectedColor) {
-            // Find variant matching color and (if exists) the second option
-            const variant = variants.find(v =>
+    // --- AVAILABILITY LOGIC ---
+    // 1. Available Colors (if Size selected) - usually we pick color first, so keep all colors enabled or check stock
+
+    // 2. Available Sizes (depend on Color if Color exists)
+    const availableOtherValues = React.useMemo(() => {
+        if (!otherOption) return [];
+
+        // If we have Color, filter by it
+        if (colorOption && selectedColor) {
+            const validVariants = variants.filter(v =>
                 v.color === selectedColor &&
-                (!secondOption || v.size === selectedSecond)
-            ) || null;
-            onVariantChange?.(variant);
-        } else {
-            onVariantChange?.(null);
+                v.stock_quantity > 0
+            );
+            // In user data context: variant.size holds the value for the second option
+            const validValues = validVariants.map(v => v.size).filter(Boolean);
+            return allOtherValues.filter(val => validValues.includes(val));
         }
-    }, [selectedColor, selectedSecond, variants, onVariantChange, secondOption]);
 
-    // Map color names to hex codes dynamically from variants if possible
+        // If NO Color option (e.g. Foundation only has Size/Shade), check generic stock
+        // The variants list has `size` property corresponding to this option
+        const validVariants = variants.filter(v => v.stock_quantity > 0);
+        const validValues = validVariants.map(v => v.size).filter(Boolean);
+        return allOtherValues.filter(val => validValues.includes(val));
+
+    }, [colorOption, selectedColor, otherOption, variants, allOtherValues]);
+
+
+    // Notify parent
+    useEffect(() => {
+        if (variants.length === 0) return;
+
+        let found: ProductVariant | undefined;
+
+        if (colorOption && otherOption) {
+            // Both exist
+            if (selectedColor && selectedOther) {
+                found = variants.find(v => v.color === selectedColor && v.size === selectedOther);
+            }
+        } else if (colorOption && !otherOption) {
+            // Only Color
+            if (selectedColor) found = variants.find(v => v.color === selectedColor);
+        } else if (!colorOption && otherOption) {
+            // Only Size (Foundation case)
+            if (selectedOther) found = variants.find(v => v.size === selectedOther);
+        }
+
+        onVariantChange?.(found || null);
+    }, [selectedColor, selectedOther, variants, colorOption, otherOption]);
+
+
+    // Helper for Hex
     const getColorHex = (name: string) => {
-        // Try to find the hex code in variant option_values
         const variantWithColor = variants.find(v => v.color === name);
         if (variantWithColor?.option_values?.color?.code) {
             return variantWithColor.option_values.color.code;
         }
-
         const map: Record<string, string> = {
-            'Black': '#111827',
-            'White': '#ffffff',
-            'Red': '#ef4444',
-            'Blue': '#3b82f6',
-            'Navy': '#1e3a8a',
-            'Beige': '#d6cbb6'
+            'Black': '#111827', 'White': '#ffffff', 'Red': '#ef4444',
+            'Blue': '#3b82f6', 'Navy': '#1e3a8a', 'Beige': '#d6cbb6'
         };
         return map[name] || '#ccc';
     };
 
     return (
         <View style={styles.container}>
-            {/* Colors */}
+            {/* COLOR SELECTOR */}
             {allColors.length > 0 && (
                 <View style={styles.section}>
                     <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select Color</Text>
@@ -126,25 +138,31 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
                 </View>
             )}
 
-            {/* Secondary Option (Size, Hardware, etc.) */}
-            {allSecondOptionValues.length > 0 && (
+            {/* OTHER OPTION SELECTOR (Size/Shade) */}
+            {allOtherValues.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sizeHeader}>
-                        <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select {secondOption?.name || 'Option'}</Text>
+                        <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select {otherOption?.name || 'Option'}</Text>
                     </View>
 
                     <View style={styles.sizesRow}>
-                        {allSecondOptionValues.map((val) => {
-                            const isSelected = selectedSecond === val;
-                            const isAvailable = availableSecondValues.includes(val);
+                        {allOtherValues.map((val) => {
+                            const isSelected = selectedOther === val;
+                            const isAvailable = availableOtherValues.includes(val);
                             const isDisabled = !isAvailable;
+
+                            // For Foundation shades, we might want purely text chips, or wider ones.
+                            // keeping "sizeBox" style but maybe allow auto width? 
+                            // existing sizeBox is fixed width 64. Might be too small for "110 Porcelain".
+                            // Let's modify style to be flexible width.
 
                             return (
                                 <Pressable
                                     key={val}
-                                    onPress={() => !isDisabled && setSelectedSecond(val)}
+                                    onPress={() => !isDisabled && setSelectedOther(val)}
                                     style={[
                                         styles.sizeBox,
+                                        { width: 'auto', paddingHorizontal: 12, minWidth: 64 }, // Flexible width
                                         isDark && { backgroundColor: '#111', borderColor: '#333' },
                                         isSelected && styles.sizeBoxSelected,
                                         isSelected && isDark && { borderColor: '#fff' },
@@ -165,7 +183,7 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
                             );
                         })}
                     </View>
-                    {availableSecondValues.length === 0 && selectedColor && (
+                    {availableOtherValues.length === 0 && selectedColor && colorOption && (
                         <Text style={styles.outOfStockText}>Out of stock in {selectedColor}</Text>
                     )}
                 </View>
@@ -173,6 +191,7 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
         </View>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {

@@ -1,23 +1,35 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import { ProductReview } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface ProductReviewsProps {
     reviews?: ProductReview[];
+    productId?: number;
 }
 
-export function ProductReviews({ reviews = [] }: ProductReviewsProps) {
+export function ProductReviews({ reviews = [], productId }: ProductReviewsProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
     if (!reviews || reviews.length === 0) return null;
 
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return 'Recently';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
     return (
         <View style={[styles.container, isDark && { borderTopColor: '#333' }]}>
             <Text style={[styles.heading, isDark && { color: '#fff' }]}>Customer Reviews</Text>
-            {reviews.map((review) => (
+            {reviews.slice(0, 3).map((review) => (
                 <View key={review.id} style={[styles.reviewCard, isDark && { backgroundColor: '#111' }]}>
                     <View style={styles.header}>
                         <View style={styles.rating}>
@@ -30,12 +42,18 @@ export function ProductReviews({ reviews = [] }: ProductReviewsProps) {
                                 />
                             ))}
                         </View>
-                        <Text style={styles.date}>{review.created_at || 'Recently'}</Text>
+                        <Text style={styles.date}>{formatDate(review.created_at)}</Text>
                     </View>
                     <Text style={[styles.comment, isDark && { color: '#E2E8F0' }]}>{review.review}</Text>
-                    <Text style={[styles.user, isDark && { color: '#94A3B8' }]}>Verified Buyer</Text>
+                    <Text style={[styles.user, isDark && { color: '#94A3B8' }]}>{review.user?.name || 'Anonymous'}</Text>
                 </View>
             ))}
+
+            {productId && (
+                <Link href={`/product/reviews?id=${productId}`} asChild>
+                    <Text style={[styles.viewAll, isDark && { color: '#fff' }]}>View All Reviews</Text>
+                </Link>
+            )}
         </View>
     );
 }
@@ -82,5 +100,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#64748B',
+    },
+    viewAll: {
+        marginTop: 16,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        textAlign: 'center',
+        textDecorationLine: 'underline',
     },
 });

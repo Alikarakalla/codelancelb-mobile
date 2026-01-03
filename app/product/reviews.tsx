@@ -8,17 +8,58 @@ import { ReviewFilters } from '@/components/reviews/ReviewFilters';
 import { ReviewItem } from '@/components/reviews/ReviewItem';
 import { Pressable, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
+import { api } from '@/services/apiClient';
+import { Product, ProductReview } from '@/types/schema';
 
 export default function ProductReviewsScreen() {
+    const { id } = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const { openDrawer } = useDrawer();
+    const [product, setProduct] = React.useState<Product | null>(null);
+    const [loading, setLoading] = React.useState(true);
 
-    const mockReviews = [
-        { id: 1, author: 'Emily Parker', initials: 'EP', colorClass: '#DBEAFE', date: '2 days ago', rating: 5, text: 'The quality of this trench coat is exceptional. Fits true to size and the color is exactly as shown in the pictures. Highly recommend!', helpfulCount: 12 },
-        { id: 2, author: 'Michael Chen', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDeRMrRf_BHafVXGg0d4VXpRDssxRMCpeVHPIPR5Y8_fM3XateoFM46xwjj_H2KKvI4a7P38QJ6Kgk5gUqANykLNYn1ElrpL0ylkcdbjLtoYNZlRXpExFuBY_G-bTMoU1Mv6JfWRq7_b4AymBEdRRzEcadqEpoT5-92LxDOEFm7BiiUo704mShT0uswZX3mXPTLMEjGr9qKGesyZ4wkkeN7qS0XrUNDcaOKbBmVM_7_caScuquHkabMyW_nowmSNoNlSFjNeuDmqrFp', date: '1 week ago', rating: 4, text: 'Great coat, very stylish. The sleeves are a bit long for me, but otherwise perfect. The water resistance works well in light rain.', helpfulCount: 4, images: ['placeholder1', 'placeholder2'], colorClass: '' },
-        { id: 3, author: 'Sarah Jones', initials: 'SJ', colorClass: '#FFE4E6', date: '2 weeks ago', rating: 5, text: 'Absolutely in love! It\'s warm enough for chilly evenings but light enough for spring. The beige color is versatile and goes with everything.', helpfulCount: 8 },
-        { id: 4, author: 'David Wilson', initials: 'DW', colorClass: '#D1FAE5', date: '1 month ago', rating: 3, text: 'It\'s okay. The material feels a bit stiffer than I expected. Hopefully it softens up after a few wears. Delivery was fast though.', helpfulCount: 2 },
-    ];
+    React.useEffect(() => {
+        if (id) {
+            const fetchProductData = async () => {
+                setLoading(true);
+                try {
+                    const productId = Array.isArray(id) ? id[0] : id;
+                    const data = await api.getProduct(productId);
+                    setProduct(data);
+                } catch (error) {
+                    console.error('Failed to load product reviews:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchProductData();
+        }
+    }, [id]);
+
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return 'Recently';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Calculate dynamic stats
+    const stats = React.useMemo(() => {
+        const reviews = product?.reviews || [];
+        if (!reviews.length) return { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+        const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+        const average = total / reviews.length;
+        const distribution = reviews.reduce((acc, r) => {
+            acc[r.rating] = (acc[r.rating] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return { average, count: reviews.length, distribution };
+    }, [product]);
 
     return (
         <View style={styles.container}>
@@ -26,19 +67,41 @@ export default function ProductReviewsScreen() {
             <GlobalHeader title="REVIEWS" showBack />
 
             <ScrollView contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}>
+                {product && (
+                    <Text style={styles.productSubtitle} numberOfLines={1}>
+                        {product.name_en || product.name}
+                    </Text>
+                )}
+
                 <RatingSummary
-                    rating={4.2}
-                    reviewCount={128}
-                    distribution={{ 5: 65, 4: 20, 3: 10, 2: 3, 1: 2 }}
+                    rating={stats.average}
+                    reviewCount={stats.count}
+                    distribution={stats.distribution as any}
                 />
 
                 <View style={{ height: 24 }} />
+                {/* Filters might arguably be fake for now if API doesn't support them */}
                 <ReviewFilters />
 
                 <View style={styles.list}>
-                    {mockReviews.map((r) => (
-                        <ReviewItem key={r.id} {...r} />
-                    ))}
+                    {loading ? (
+                        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>Loading reviews...</Text>
+                    ) : (product?.reviews?.length || 0) === 0 ? (
+                        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>No reviews yet.</Text>
+                    ) : (
+                        product!.reviews!.map((r) => (
+                            <ReviewItem
+                                key={r.id}
+                                author={r.user?.name || 'Anonymous'}
+                                initials={r.user?.name ? r.user.name.substring(0, 2).toUpperCase() : 'AN'}
+                                date={formatDate(r.created_at)}
+                                rating={r.rating}
+                                text={r.review}
+                                helpfulCount={0} // Not in API yet
+                                colorClass="#DBEAFE" // Random or fixed
+                            />
+                        ))
+                    )}
                 </View>
             </ScrollView>
 
@@ -57,6 +120,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
+    },
+    productSubtitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#64748B',
+        textAlign: 'center',
+        paddingHorizontal: 20,
+        marginBottom: 8,
     },
     list: {
         paddingHorizontal: 20,

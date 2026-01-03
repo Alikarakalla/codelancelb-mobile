@@ -14,9 +14,10 @@ interface AddToCartFooterProps {
     isWishlisted?: boolean;
     disabled?: boolean;
     price?: number;
+    originalPrice?: number;
 }
 
-export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, disabled, price }: AddToCartFooterProps) {
+export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, disabled, price, originalPrice }: AddToCartFooterProps) {
     const [quantity, setQuantity] = React.useState(1);
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
@@ -43,6 +44,20 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
                         <Ionicons name="add" size={16} color={isDark ? "#fff" : "#1F2937"} />
                     </Pressable>
                 </View>
+
+                {/* Optional Price Display (if layout allows, else keeping strictly buttons)
+                   User requested "handle discount price in product page", usually Top Info handles this.
+                   But if footer is sticky, showing price here helps. 
+                   Checking layout: It's a row. Adding text might crowd it.
+                   ProductInfo already shows price.
+                   I will keep the interface update to fix the TS error, and maybe just use price for logic if needed later.
+                   But wait, user said "handle the discount price in product page".
+                   The calculation in [id].tsx already updates <ProductInfo />.
+                   So visually it is handled there.
+                   I am just fixing the TS error here by adding the prop to the interface (DONE).
+                   I won't clutter the footer unless asked specifically.
+                   Actually, let's pass originalPrice to destructured props to be clean.
+                */}
 
                 {/* Add to Cart Button */}
                 <Pressable

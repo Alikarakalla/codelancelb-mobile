@@ -28,10 +28,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+import { Category, Brand } from '@/types/schema';
+
 interface ShopFilterModalProps {
     visible: boolean;
     onClose: () => void;
     onApply: (filters: any) => void;
+    categories?: Category[];
+    brands?: Brand[];
 }
 
 // Optimized Price Display to prevent whole modal re-renders
@@ -74,7 +78,104 @@ const PriceRangeDisplay = memo(({ values, onMinChange, onMaxChange, isDark }: {
     );
 });
 
-export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalProps) {
+const CategoryNode = memo(({
+    category,
+    selectedIds,
+    expandedIds,
+    onSelect,
+    onToggleExpand,
+    isDark,
+    level = 0
+}: {
+    category: Category,
+    selectedIds: number[],
+    expandedIds: number[],
+    onSelect: (id: number) => void,
+    onToggleExpand: (id: number) => void,
+    isDark: boolean,
+    level?: number
+}) => {
+    const isSelected = selectedIds.includes(category.id);
+    const isExpanded = expandedIds.includes(category.id);
+
+    // Combine sub and sub-sub categories for rendering
+    const children = [
+        ...(category.sub_categories || []),
+        ...(category.sub_sub_categories || [])
+    ];
+    const hasChildren = children.length > 0;
+
+    return (
+        <View style={level > 0 ? styles.nestedCategory : null}>
+            <View style={styles.categoryRow}>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                    <Pressable
+                        style={styles.checkboxWrapper}
+                        onPress={() => onSelect(category.id)}
+                        hitSlop={8}
+                    >
+                        <View style={[styles.checkbox, isDark && { borderColor: '#444' }, isSelected && styles.checkboxActive]}>
+                            {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                        </View>
+                    </Pressable>
+
+                    <Pressable
+                        style={{ flex: 1, paddingVertical: 12 }}
+                        onPress={() => {
+                            if (hasChildren) {
+                                onToggleExpand(category.id);
+                            }
+                            // Always allow selecting the category as well
+                            onSelect(category.id);
+                        }}
+                    >
+                        <Text style={[
+                            styles.checkboxLabel,
+                            isDark && { color: '#94A3B8' },
+                            isSelected && (isDark ? { color: '#fff' } : styles.checkboxLabelActive),
+                            level === 0 && { fontWeight: '700', fontSize: 16, color: isDark ? '#fff' : '#0F172A' }
+                        ]}>
+                            {category.name}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {hasChildren && (
+                    <Pressable
+                        onPress={() => onToggleExpand(category.id)}
+                        style={styles.expandTrigger}
+                        hitSlop={12}
+                    >
+                        <Ionicons
+                            name={isExpanded ? "chevron-up" : "chevron-down"}
+                            size={20}
+                            color={isDark ? "#64748B" : "#94A3B8"}
+                        />
+                    </Pressable>
+                )}
+            </View>
+
+            {hasChildren && isExpanded && (
+                <View style={[styles.subCategoryList, isDark && { borderLeftColor: '#222' }]}>
+                    {children.map(child => (
+                        <CategoryNode
+                            key={child.id}
+                            category={child}
+                            selectedIds={selectedIds}
+                            expandedIds={expandedIds}
+                            onSelect={onSelect}
+                            onToggleExpand={onToggleExpand}
+                            isDark={isDark}
+                            level={level + 1}
+                        />
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+});
+
+export function ShopFilterModal({ visible, onClose, onApply, categories, brands }: ShopFilterModalProps) {
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
     const snapPoints = useMemo(() => ['85%'], []);
     const colorScheme = useColorScheme();
@@ -130,20 +231,23 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
-    const [selectedCategory, setSelectedCategory] = useState<string[]>(['Jeans & Denim']);
-    const [priceRange, setPriceRange] = useState([45, 120]);
-    const [selectedColor, setSelectedColor] = useState('Black');
-    const [selectedSize, setSelectedSize] = useState('M');
+    const [selectedCategory, setSelectedCategory] = useState<number[]>([]);
+    const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+    const [selectedBrands, setSelectedBrands] = useState<number[]>([]);
+    const [priceRange, setPriceRange] = useState([0, 500]);
+    const [selectedColor, setSelectedColor] = useState<string | null>(null);
+    const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
     const handleApply = useCallback(() => {
         onApply({
-            categories: selectedCategory,
+            category_ids: selectedCategory,
+            brand_ids: selectedBrands,
             priceRange: { min: priceRange[0], max: priceRange[1] },
             color: selectedColor,
             size: selectedSize
         });
         onClose();
-    }, [onApply, priceRange, selectedCategory, selectedColor, selectedSize, onClose]);
+    }, [onApply, priceRange, selectedCategory, selectedBrands, selectedColor, selectedSize, onClose]);
 
     const renderFooter = useCallback(
         (props: any) => (
@@ -205,33 +309,25 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
 
                     {expandedSections.categories && (
                         <View style={styles.sectionContent}>
-                            <View style={styles.categoryHeader}>
-                                <Ionicons name="checkbox" size={20} color="#1152d4" />
-                                <Text style={styles.categoryHeaderText}>Clothing</Text>
-                            </View>
-                            <View style={[styles.subCategoryList, isDark && { borderLeftColor: '#222' }]}>
-                                {categoriesList.map((cat) => {
-                                    const isSelected = selectedCategory.includes(cat);
-                                    return (
-                                        <Pressable
-                                            key={cat}
-                                            style={styles.checkboxItem}
-                                            onPress={() => {
-                                                if (isSelected) {
-                                                    setSelectedCategory(selectedCategory.filter(c => c !== cat));
-                                                } else {
-                                                    setSelectedCategory([...selectedCategory, cat]);
-                                                }
-                                            }}
-                                        >
-                                            <View style={[styles.checkbox, isDark && { borderColor: '#444' }, isSelected && styles.checkboxActive]}>
-                                                {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
-                                            </View>
-                                            <Text style={[styles.checkboxLabel, isDark && { color: '#94A3B8' }, isSelected && isDark && { color: '#fff' }, isSelected && styles.checkboxLabelActive]}>{cat}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
+                            {categories?.map(cat => (
+                                <CategoryNode
+                                    key={cat.id}
+                                    category={cat}
+                                    selectedIds={selectedCategory}
+                                    expandedIds={expandedCategories}
+                                    onSelect={(id) => {
+                                        setSelectedCategory(prev =>
+                                            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+                                        );
+                                    }}
+                                    onToggleExpand={(id) => {
+                                        setExpandedCategories(prev =>
+                                            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+                                        );
+                                    }}
+                                    isDark={isDark}
+                                />
+                            ))}
                         </View>
                     )}
                 </View>
@@ -340,12 +436,34 @@ export function ShopFilterModal({ visible, onClose, onApply }: ShopFilterModalPr
                         <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Brands</Text>
                         <Ionicons name={expandedSections.brands ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
                     </Pressable>
+                    {expandedSections.brands && (
+                        <View style={[styles.sectionContent, styles.rowWrap]}>
+                            {brands?.map((brand) => {
+                                const isSelected = selectedBrands.includes(brand.id);
+                                return (
+                                    <Pressable
+                                        key={brand.id}
+                                        style={[styles.sizeBox, isDark && { borderColor: '#333' }, isSelected && styles.sizeBoxActive]}
+                                        onPress={() => {
+                                            if (isSelected) {
+                                                setSelectedBrands(selectedBrands.filter(id => id !== brand.id));
+                                            } else {
+                                                setSelectedBrands([...selectedBrands, brand.id]);
+                                            }
+                                        }}
+                                    >
+                                        <Text style={[styles.sizeText, isDark && { color: '#94A3B8' }, isSelected && styles.sizeTextActive]}>{brand.name}</Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    )}
                     {!expandedSections.brands && (
                         <View style={styles.brandPreview}>
-                            {['Nike', 'Adidas'].map(b => (
-                                <View key={b} style={[styles.previewTag, isDark && { backgroundColor: '#222' }]}><Text style={[styles.previewTagText, isDark && { color: '#94A3B8' }]}>{b}</Text></View>
+                            {brands?.slice(0, 2).map(b => (
+                                <View key={b.id} style={[styles.previewTag, isDark && { backgroundColor: '#222' }]}><Text style={[styles.previewTagText, isDark && { color: '#94A3B8' }]}>{b.name}</Text></View>
                             ))}
-                            <Text style={styles.moreText}>+12 more</Text>
+                            {brands && brands.length > 2 && <Text style={styles.moreText}>+{brands.length - 2} more</Text>}
                         </View>
                     )}
                 </View>
@@ -421,16 +539,34 @@ const styles = StyleSheet.create({
         color: '#1152d4',
     },
     subCategoryList: {
-        paddingLeft: 32,
-        borderLeftWidth: 2,
+        paddingLeft: 20,
+        borderLeftWidth: 1.5,
         borderLeftColor: '#f1f5f9',
         marginLeft: 8,
-        gap: 18,
+        marginTop: 4,
+        gap: 4,
+    },
+    checkboxWrapper: {
+        paddingRight: 12,
+        paddingVertical: 10,
     },
     checkboxItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
+        flex: 1,
+    },
+    categoryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+    },
+    expandTrigger: {
+        padding: 8,
+    },
+    nestedCategory: {
+        marginTop: 4,
     },
     checkbox: {
         width: 22,
