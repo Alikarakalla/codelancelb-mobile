@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCurrency } from '@/hooks/use-currency-context';
 
 interface CartFooterProps {
     total: number;
@@ -10,13 +12,18 @@ interface CartFooterProps {
 
 export function CartFooter({ total, onCheckout }: CartFooterProps) {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const { formatPrice } = useCurrency();
 
     return (
-        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.container, isDark && styles.containerDark, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <View style={styles.row}>
                 <View>
-                    <Text style={styles.label}>Total Price</Text>
-                    <Text style={styles.total}>${total.toFixed(2)}</Text>
+                    <Text style={[styles.label, isDark && styles.labelDark]}>Total Price</Text>
+                    <Text style={[styles.total, isDark && styles.totalDark]}>
+                        {String(formatPrice(total) || `$${total.toFixed(2)}`)}
+                    </Text>
                 </View>
             </View>
 
@@ -45,6 +52,10 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 10,
     },
+    containerDark: {
+        backgroundColor: '#000000',
+        borderTopColor: '#374151',
+    },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -57,11 +68,17 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#64748B',
     },
+    labelDark: {
+        color: '#94A3B8',
+    },
     total: {
         fontSize: 24,
         fontWeight: '700',
         color: '#0F172A',
         letterSpacing: -0.5,
+    },
+    totalDark: {
+        color: '#F8FAFC',
     },
     checkoutBtn: {
         height: 50,

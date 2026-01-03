@@ -78,7 +78,14 @@ export default function SignUpScreen() {
         }
     }), [isDark]);
 
-    const { register } = useAuth();
+    const { register, isAuthenticated } = useAuth();
+
+    // Redirect if already authenticated
+    React.useEffect(() => {
+        if (isAuthenticated) {
+            router.replace('/(tabs)');
+        }
+    }, [isAuthenticated]);
 
     const onSubmit = async (data: any) => {
         if (!data.agreeToTerms) {

@@ -287,3 +287,23 @@ export interface Currency {
     is_active: boolean;
     sort_order: number;
 }
+
+export interface LoyaltyReward {
+    id: number;
+    name: string;
+    description?: string;
+    points_required: number;
+    image?: string;
+    is_active: boolean;
+    can_redeem?: boolean; // Helper from API
+}
+
+export interface LoyaltyLog {
+    id: number;
+    user_id: number;
+    points: number; // Signed integer (+/-)
+    type: string;
+    reference_id?: string;
+    description?: string;
+    created_at: string;
+}

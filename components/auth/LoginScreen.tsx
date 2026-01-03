@@ -26,9 +26,16 @@ export default function LoginScreen() {
         }
     });
 
-    const { login } = useAuth();
+    const { login, isAuthenticated } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // Redirect if already authenticated
+    React.useEffect(() => {
+        if (isAuthenticated) {
+            router.replace('/(tabs)');
+        }
+    }, [isAuthenticated]);
 
     const onSubmit = async (data: any) => {
         setLoading(true);

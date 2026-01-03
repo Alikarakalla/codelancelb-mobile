@@ -14,6 +14,7 @@ interface AuthContextType {
     register: (userData: any) => Promise<void>;
     logout: () => Promise<void>;
     isLoading: boolean;
+    reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +47,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const reloadUser = async () => {
+        // We can leverage the stored token or just check if we have one in state
+        const currentToken = token || apiToken; // Assuming apiToken is module-level var we can check? But safer to rely on state.
+
+        // Actually, we should probably check if we are authenticated
+        if (!currentToken) return;
+
+        try {
+            const freshUser = await api.getMe();
+            setUser(freshUser);
+            await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(freshUser));
+        } catch (e) {
+            console.warn('Failed to reload user:', e);
+        }
+    };
+
     const login = async (credentials: any) => {
         setIsLoading(true);
         try {
@@ -74,10 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(user);
         setToken(token);
         setApiToken(token);
-        console.log('--- AUTH SUCCESS ---');
-        console.log('User:', JSON.stringify(user, null, 2));
-        console.log('Token:', token);
-        console.log('--------------------');
         await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
         await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
     };
@@ -106,7 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             login,
             register,
             logout,
-            isLoading
+            isLoading,
+            reloadUser
         }}>
             {children}
         </AuthContext.Provider>

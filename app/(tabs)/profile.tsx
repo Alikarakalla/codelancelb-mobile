@@ -14,6 +14,8 @@ import { LoyaltyCard } from '@/components/profile/LoyaltyCard';
 import { SecuritySettings } from '@/components/profile/SecuritySettings';
 import { ReferralCard } from '@/components/profile/ReferralCard';
 import { SignOutButton } from '@/components/profile/SignOutButton';
+import { LoyaltyRewards } from '@/components/profile/LoyaltyRewards';
+import { LoyaltyHistory } from '@/components/profile/LoyaltyHistory';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
@@ -51,6 +53,8 @@ export default function ProfileScreen() {
                     {activeTab === 'Loyalty' && (
                         <View style={{ gap: 24 }}>
                             <LoyaltyCard />
+                            <LoyaltyRewards />
+                            <LoyaltyHistory />
                             <ReferralCard />
                         </View>
                     )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet, SafeAreaView, Switch, Platform, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -20,7 +21,7 @@ export default function CheckoutScreen() {
     const { user, isAuthenticated } = useAuth();
     const { formatPrice, currency } = useCurrency();
 
-    const [paymentMethod, setPaymentMethod] = useState<'cod'>('cod');
+    const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery'>('cash_on_delivery');
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isUsingSavedAddress, setIsUsingSavedAddress] = useState(true);
     const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
@@ -42,6 +43,10 @@ export default function CheckoutScreen() {
     const [placingOrder, setPlacingOrder] = useState(false);
     const [notes, setNotes] = useState('');
 
+    // Loyalty Rewards Logic
+    const [myRewards, setMyRewards] = useState<any[]>([]);
+    const [appliedReward, setAppliedReward] = useState<any>(null);
+
     // Dynamic Store Settings
     const [storeSettings, setStoreSettings] = useState<any>(null);
     const [loadingSettings, setLoadingSettings] = useState(true);
@@ -59,8 +64,26 @@ export default function CheckoutScreen() {
             setFirstName(user.first_name || '');
             setLastName(user.last_name || '');
             loadAddresses();
+            loadMyRewards();
         }
     }, [isAuthenticated, user]);
+
+    const loadMyRewards = async () => {
+        try {
+            const history = await api.getLoyaltyHistory();
+            const list = Array.isArray(history) ? history : (history.data || []);
+
+            // Filter using 'source' instead of 'type'
+            // Based on logs, it can be REWARD_REDEMPTION or redemption
+            const redemptions = list.filter((item: any) =>
+                ['REWARD_REDEMPTION', 'redemption'].includes(item.source)
+            );
+
+            setMyRewards(redemptions);
+        } catch (e) {
+            console.log('Failed to load rewards', e);
+        }
+    };
 
     const loadStoreSettings = async () => {
         setLoadingSettings(true);
@@ -71,8 +94,8 @@ export default function CheckoutScreen() {
             console.error('Failed to load store settings:', error);
             // Fallback to defaults
             setStoreSettings({
-                shipping: { free_threshold: 250, flat_fee: 15 },
-                tax: { rate_percent: 15 },
+                shipping: { free_threshold: 250, flat_fee: 4 },
+                tax: { rate_percent: 0 },
                 currency: { code: 'USD', symbol: '$' }
             });
         } finally {
@@ -119,28 +142,78 @@ export default function CheckoutScreen() {
         setAppliedCoupon(null);
     };
 
-    // Calculations
-    const subtotal = cartTotal;
+    // Calculations - Calculate subtotal with discounts applied
+    const subtotal = items.reduce((sum, item) => {
+        const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
+        const sourceDiscount = variant || item.product;
+        const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
+        let itemPrice = item.price;
 
-    // Calculate Discount Amount
+        if (hasDiscount && sourceDiscount.discount_amount) {
+            const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
+            if (sourceDiscount.discount_type === 'percent') {
+                itemPrice = item.price * (1 - discountAmount / 100);
+            } else if (sourceDiscount.discount_type === 'fixed') {
+                itemPrice = item.price - discountAmount;
+            }
+        }
+
+        return sum + (itemPrice * item.qty);
+    }, 0);
+
+    // Calculate Discount Amount (from coupon)
     let discountAmount = 0;
     if (appliedCoupon) {
-        discountAmount = appliedCoupon.discount_amount || 0;
+        // Backend might return 'discount_amount' (calculated) or 'value' (definition)
+        discountAmount = parseFloat(appliedCoupon.discount_amount || appliedCoupon.value || 0);
     }
 
+    // Calculate Reward Discount
+    let rewardDiscount = 0;
+    if (appliedReward) {
+        // Optimistic parsing: Try to determine value from description or reward data
+        // Example descs: "Redeemed reward: Discount 20%", "Redeemed reward: 5%"
+        // We lack context on WHAT it applies to (total or item). Assuming Total Percentage or Fixed Value is ambiguous.
+        // However, if it says "Discount 20%", is it 20% off total?
+
+        const data = appliedReward.reward_data || {};
+        const desc = appliedReward.description || data.description || '';
+        const name = data.name || appliedReward.name || '';
+        const textToSearch = (name + " " + desc).toLowerCase();
+
+        // Check for percentage
+        const percentMatch = textToSearch.match(/(\d+)%/);
+        const moneyMatch = textToSearch.match(/\$(\d+)/); // $10 or similar
+        // Also checks for just numbers if it says "Discount 20" (ambiguous, assume money if no %?)
+        // Let's rely on explicit symbols first.
+
+        if (percentMatch) {
+            const percent = parseFloat(percentMatch[1]);
+            // Apply percentage to subtotal
+            rewardDiscount = subtotal * (percent / 100);
+        } else if (moneyMatch) {
+            rewardDiscount = parseFloat(moneyMatch[1]);
+        } else {
+            // Fallback: Check for "Discount 20" -> assume fixed if no % sign?
+            // "Discount 20%" was in log.
+            // If it says "Redeemed reward: Discount 20%", it matched percent logic above.
+            // If "Redeemed: 5%", it matched percent logic.
+        }
+    }
     // Calculate shipping (dynamic from backend)
-    const freeShippingThreshold = storeSettings?.shipping?.free_threshold || 250;
-    const shippingFee = storeSettings?.shipping?.flat_fee || 15;
+    const freeShippingThreshold = storeSettings?.shipping?.free_threshold ?? 250;
+    const shippingFee = storeSettings?.shipping?.flat_fee ?? 15;
 
     let shippingCost = subtotal >= freeShippingThreshold ? 0 : shippingFee;
-    if (appliedCoupon?.free_shipping || user?.loyaltyTier?.free_shipping) {
+    if (appliedCoupon?.free_shipping || (user?.loyaltyTier as any)?.free_shipping) {
         shippingCost = 0;
     }
 
     // Calculate tax (dynamic from backend)
-    const taxRatePercent = storeSettings?.tax?.rate_percent || 15;
+    // Use nullish coalescing (??) because 0 is a valid rate, but || treats it as falsy
+    const taxRatePercent = storeSettings?.tax?.rate_percent ?? 0;
     const taxes = Math.max(0, subtotal * (taxRatePercent / 100));
-    const total = Math.max(0, subtotal - discountAmount + shippingCost + taxes);
+    const total = Math.max(0, subtotal - discountAmount - rewardDiscount + shippingCost + taxes);
 
     const handlePlaceOrder = async () => {
         // Validation
@@ -169,6 +242,13 @@ export default function CheckoutScreen() {
         setPlacingOrder(true);
         try {
             const selectedAddr = addresses.find(a => a.id === selectedAddressId);
+
+            // Append reward info to notes
+            let finalNotes = notes;
+            if (appliedReward) {
+                const rewardName = appliedReward.reward_data?.name || 'Loyalty Reward';
+                finalNotes += ` [Redeemed Reward Applied: ${rewardName} (ID: ${appliedReward.id})]`;
+            }
 
             const orderData = {
                 first_name: firstName,
@@ -200,21 +280,35 @@ export default function CheckoutScreen() {
                     // Find the variant by slug to get its numeric ID
                     const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
 
+                    // Calculate discounted price for this item
+                    const sourceDiscount = variant || item.product;
+                    const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
+                    let itemPrice = item.price;
+
+                    if (hasDiscount && sourceDiscount.discount_amount) {
+                        const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
+                        if (sourceDiscount.discount_type === 'percent') {
+                            itemPrice = item.price * (1 - discountAmount / 100);
+                        } else if (sourceDiscount.discount_type === 'fixed') {
+                            itemPrice = item.price - discountAmount;
+                        }
+                    }
+
                     return {
                         product_id: item.product_id || item.id,
-                        variant_id: variant?.id || null,  // Use numeric ID instead of slug
+                        variant_id: variant?.id || null,
                         quantity: item.qty,
-                        price: parseFloat(item.price.toFixed(2)),  // Round to 2 decimals
+                        price: parseFloat(itemPrice.toFixed(2)),  // Send DISCOUNTED price
                         options: item.options || null,
                     };
                 }),
                 subtotal: parseFloat(subtotal.toFixed(2)),
                 tax_amount: parseFloat(taxes.toFixed(2)),
                 shipping_amount: parseFloat(shippingCost.toFixed(2)),
-                discount_amount: parseFloat(discountAmount.toFixed(2)),
+                discount_amount: parseFloat((discountAmount + rewardDiscount).toFixed(2)),
                 total_amount: parseFloat(total.toFixed(2)),  // Fix floating point precision
                 payment_method: paymentMethod,
-                notes: notes,
+                notes: finalNotes,
                 coupon_code: appliedCoupon?.code || null,
                 currency_code: 'USD',  // TEMP: Testing if LBP causes backend error
             };
@@ -323,13 +417,29 @@ export default function CheckoutScreen() {
                                 {items.map((item) => {
                                     // Find variant details for display
                                     const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
-                                    const image = variant?.image_path || item.product?.main_image || '';
+
+                                    // Use variant gallery first for image
+                                    const image = variant?.gallery?.[0] || variant?.image_path || item.product?.main_image || '';
+
                                     let details = '';
                                     if (variant) {
                                         details = [variant.color, variant.size].filter(Boolean).join(' / ');
                                     } else if (item.options) {
-                                        // Fallback if options stored directly
                                         details = Object.values(item.options).join(' / ');
+                                    }
+
+                                    // Calculate discount - same logic as cart
+                                    const sourceDiscount = variant || item.product;
+                                    const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
+                                    let displayPrice = item.price;
+
+                                    if (hasDiscount && sourceDiscount.discount_amount) {
+                                        const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
+                                        if (sourceDiscount.discount_type === 'percent') {
+                                            displayPrice = item.price * (1 - discountAmount / 100);
+                                        } else if (sourceDiscount.discount_type === 'fixed') {
+                                            displayPrice = item.price - discountAmount;
+                                        }
                                     }
 
                                     return (
@@ -347,45 +457,12 @@ export default function CheckoutScreen() {
                                                 <Text style={[styles.itemVariant, isDark && styles.textGrayDark]}>{details}</Text>
                                             </View>
                                             <Text style={[styles.itemPrice, isDark && styles.textDark]}>
-                                                {formatPrice(item.price * item.qty)}
+                                                {formatPrice(displayPrice * item.qty)}
                                             </Text>
                                         </View>
                                     )
                                 })}
                             </View>
-
-                            <View style={styles.codeRow}>
-                                <TextInput
-                                    style={[styles.input, isDark && styles.inputDark, { flex: 1, marginBottom: 0 }]}
-                                    placeholder="Discount code"
-                                    placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
-                                    value={discountCode}
-                                    onChangeText={setDiscountCode}
-                                    autoCapitalize="none"
-                                />
-                                <Pressable
-                                    style={[styles.applyButton, isDark && styles.applyButtonDark, (isValidatingCoupon || !discountCode) && { opacity: 0.5 }]}
-                                    onPress={handleApplyCoupon}
-                                    disabled={isValidatingCoupon || !discountCode}
-                                >
-                                    {isValidatingCoupon ? (
-                                        <ActivityIndicator color={isDark ? "#fff" : "#000"} size="small" />
-                                    ) : (
-                                        <Text style={[styles.applyButtonText, isDark && styles.textGrayDark]}>Apply</Text>
-                                    )}
-                                </Pressable>
-                            </View>
-
-                            {/* Applied Coupon Chip */}
-                            {appliedCoupon && (
-                                <View style={styles.couponChip}>
-                                    <MaterialIcons name="local-offer" size={16} color="#000" />
-                                    <Text style={styles.couponText}>{appliedCoupon.code} Applied</Text>
-                                    <Pressable onPress={handleRemoveCoupon}>
-                                        <MaterialIcons name="close" size={16} color="#64748B" />
-                                    </Pressable>
-                                </View>
-                            )}
 
                             <View style={[styles.costBreakdown, isDark && styles.costBreakdownDark]}>
                                 <View style={styles.costRow}>
@@ -394,15 +471,47 @@ export default function CheckoutScreen() {
                                 </View>
                                 {discountAmount > 0 && (
                                     <View style={styles.costRow}>
-                                        <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Discount</Text>
+                                        <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Coupon Discount</Text>
                                         <Text style={[styles.costValue, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
                                     </View>
                                 )}
-                                <View style={styles.costRow}>
-                                    <View style={styles.flexRow}>
-                                        <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Shipping</Text>
+                                {rewardDiscount > 0 && (
+                                    <View style={styles.costRow}>
+                                        <View>
+                                            <Text style={[styles.costLabel, isDark && styles.textGrayDark, { fontWeight: '600', color: isDark ? '#fff' : '#000' }]}>Loyalty Reward</Text>
+                                            {appliedReward && (
+                                                <Text style={{ fontSize: 11, color: isDark ? '#9ca3af' : '#4b5563', marginTop: 2, fontWeight: '500' }}>
+                                                    {appliedReward.reward_data?.name || appliedReward.description?.replace('Redeemed reward: ', '').replace('Redeemed: ', '') || 'Applied'}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <Text style={[styles.costValue, { color: isDark ? '#fff' : '#000', fontWeight: '600' }]}>-{formatPrice(rewardDiscount)}</Text>
                                     </View>
-                                    <Text style={[styles.costValue, isDark && styles.textDark]}>
+                                )}
+                                <View style={styles.costRow}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Shipping</Text>
+                                        {shippingCost === 0 && (user?.loyaltyTier as any)?.free_shipping && (
+                                            <View style={{
+                                                backgroundColor: isDark ? '#0f172a' : '#eff6ff',
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 2,
+                                                borderRadius: 12,
+                                                marginLeft: 8,
+                                                borderWidth: 1,
+                                                borderColor: isDark ? '#1e293b' : '#dbeafe'
+                                            }}>
+                                                <Text style={{ fontSize: 10, color: '#2563eb', fontWeight: '600' }}>
+                                                    {user?.loyaltyTier?.name || 'Loyalty'} Benefit
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={[
+                                        styles.costValue,
+                                        isDark && styles.textDark,
+                                        shippingCost === 0 && { color: '#16a34a', fontWeight: '600' }
+                                    ]}>
                                         {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
                                     </Text>
                                 </View>
@@ -419,6 +528,109 @@ export default function CheckoutScreen() {
                                     <Text style={[styles.totalValue, isDark && styles.textDark]}>{formatPrice(total)}</Text>
                                 </View>
                             </View>
+                        </View>
+                    )}
+                </View>
+
+                {/* Discounts & Rewards Section */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Discounts & Rewards</Text>
+
+                    {/* Loyalty Rewards List */}
+                    {myRewards.length > 0 ? (
+                        <View style={{ marginBottom: 24 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <Text style={[styles.label, isDark && styles.labelDark]}>
+                                    Your Rewards ({myRewards.length})
+                                </Text>
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 20 }}>
+                                {myRewards.map((rewardItem) => {
+                                    const isSelected = appliedReward?.id === rewardItem.id;
+                                    const rData = rewardItem.reward_data || {};
+                                    // Use description from item directly if name is missing, stripping prefix if possible
+                                    let displayName = rData.name || rewardItem.description || 'Reward';
+
+                                    // Clean up "Redeemed reward: " prefix
+                                    displayName = displayName.replace('Redeemed reward: ', '').replace('Redeemed: ', '');
+
+                                    return (
+                                        <Pressable
+                                            key={rewardItem.id}
+                                            onPress={() => setAppliedReward(isSelected ? null : rewardItem)}
+                                            style={[
+                                                styles.rewardCard,
+                                                isDark && styles.rewardCardDark,
+                                                isSelected && styles.rewardCardSelected
+                                            ]}
+                                        >
+                                            {isSelected && (
+                                                <LinearGradient
+                                                    colors={isDark ? ['#000000', '#18181b'] : ['#0f172a', '#1e293b']}
+                                                    start={{ x: 0, y: 0 }}
+                                                    end={{ x: 1, y: 1 }}
+                                                    style={StyleSheet.absoluteFillObject}
+                                                />
+                                            )}
+
+                                            <View style={styles.rewardCardContent}>
+                                                <View style={[styles.rewardIconContainer, isSelected && { backgroundColor: 'rgba(255,255,255,0.2)' }, !isSelected && { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                                                    <MaterialIcons
+                                                        name={isSelected ? "check" : "loyalty"}
+                                                        size={20}
+                                                        color={isSelected ? "#fff" : (isDark ? "#94a3b8" : "#0f172a")}
+                                                    />
+                                                </View>
+                                                <View>
+                                                    <Text style={[styles.rewardCardTitle, isSelected && { color: '#fff' }, isDark && !isSelected && { color: '#f1f5f9' }]}>
+                                                        {displayName}
+                                                    </Text>
+                                                    <Text style={[styles.rewardCardSubtitle, isSelected && { color: 'rgba(255,255,255,0.8)' }, isDark && !isSelected && { color: '#94a3b8' }]}>
+                                                        Tap to {isSelected ? 'remove' : 'apply'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    ) : (
+                        <Text style={{ color: isDark ? '#64748b' : '#94a3b8', marginBottom: 16, fontSize: 13 }}>
+                            No active rewards found. Redeem points in your profile!
+                        </Text>
+                    )}
+
+                    <View style={styles.codeRow}>
+                        <TextInput
+                            style={[styles.input, isDark && styles.inputDark, { flex: 1, marginBottom: 0 }]}
+                            placeholder="Discount code"
+                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                            value={discountCode}
+                            onChangeText={setDiscountCode}
+                            autoCapitalize="none"
+                        />
+                        <Pressable
+                            style={[styles.applyButton, isDark && styles.applyButtonDark, (isValidatingCoupon || !discountCode) && { opacity: 0.5 }]}
+                            onPress={handleApplyCoupon}
+                            disabled={isValidatingCoupon || !discountCode}
+                        >
+                            {isValidatingCoupon ? (
+                                <ActivityIndicator color={isDark ? "#fff" : "#000"} size="small" />
+                            ) : (
+                                <Text style={[styles.applyButtonText, isDark && styles.textGrayDark]}>Apply</Text>
+                            )}
+                        </Pressable>
+                    </View>
+
+                    {/* Applied Coupon Chip */}
+                    {appliedCoupon && (
+                        <View style={styles.couponChip}>
+                            <MaterialIcons name="local-offer" size={16} color="#000" />
+                            <Text style={styles.couponText}>{appliedCoupon.code} Applied</Text>
+                            <Pressable onPress={handleRemoveCoupon}>
+                                <MaterialIcons name="close" size={16} color="#64748B" />
+                            </Pressable>
                         </View>
                     )}
                 </View>
@@ -616,11 +828,11 @@ export default function CheckoutScreen() {
                         {/* COD (Cash on Delivery) - ONLY OPTION */}
                         <Pressable
                             style={[styles.radioItem, styles.radioActive]}
-                            onPress={() => setPaymentMethod('cod')}
+                            onPress={() => setPaymentMethod('cash_on_delivery')}
                         >
                             <View style={styles.radioRow}>
                                 <View style={styles.flexRow}>
-                                    <View style={[styles.radioCircle, paymentMethod === 'cod' && styles.radioCircleSelected]} />
+                                    <View style={[styles.radioCircle, paymentMethod === 'cash_on_delivery' && styles.radioCircleSelected]} />
                                     <Text style={[styles.radioLabel, isDark && styles.textDark]}>Cash on Delivery (COD)</Text>
                                 </View>
                                 <Text style={[styles.radioSubLabel, isDark && styles.textGrayDark, { fontSize: 12 }]}>Pay when you receive</Text>
@@ -1070,6 +1282,51 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
+    },
+    // Rewards Modern UI
+    rewardCard: {
+        minWidth: 150,
+        maxWidth: 280,
+        borderRadius: 16,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        overflow: 'hidden',
+        position: 'relative',
+        justifyContent: 'center',
+    },
+    rewardCardDark: {
+        backgroundColor: '#1e293b',
+        borderColor: '#334155',
+    },
+    rewardCardSelected: {
+        borderColor: '#0f172a',
+        borderWidth: 0,
+    },
+    rewardCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        gap: 12,
+        zIndex: 1,
+    },
+    rewardIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#e0e7ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    rewardCardTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 2,
+    },
+    rewardCardSubtitle: {
+        fontSize: 11,
+        color: '#64748b',
     },
     secureFooterText: {
         fontSize: 11,

@@ -483,9 +483,9 @@ export const api = {
             });
         }
 
-        const res = await fetch(`${BASE_URL}/coupons/validate`, {
+        const res = await fetch(`${BASE_URL}/coupons/apply`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify({ code })
         });
         return handleResponse<Coupon>(res);

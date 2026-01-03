@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCurrency } from '@/hooks/use-currency-context';
 
 interface OrderSummaryProps {
     subtotal: number;
@@ -10,37 +12,49 @@ interface OrderSummaryProps {
 }
 
 export function OrderSummary({ subtotal, shipping, tax, discount, total }: OrderSummaryProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const { formatPrice } = useCurrency();
+
     return (
-        <View style={styles.container}>
-            <Text style={styles.heading}>Order Summary</Text>
+        <View style={[styles.container, isDark && styles.containerDark]}>
+            <Text style={[styles.heading, isDark && styles.headingDark]}>Order Summary</Text>
 
             <View style={styles.row}>
-                <Text style={styles.label}>Subtotal</Text>
-                <Text style={styles.value}>${subtotal.toFixed(2)}</Text>
+                <Text style={[styles.label, isDark && styles.labelDark]}>Subtotal</Text>
+                <Text style={[styles.value, isDark && styles.valueDark]}>
+                    {String(formatPrice(subtotal) || `$${subtotal.toFixed(2)}`)}
+                </Text>
             </View>
 
             <View style={styles.row}>
-                <Text style={styles.label}>Shipping</Text>
-                <Text style={styles.value}>${shipping.toFixed(2)}</Text>
+                <Text style={[styles.label, isDark && styles.labelDark]}>Shipping</Text>
+                <Text style={[styles.value, isDark && styles.valueDark]}>
+                    {String(formatPrice(shipping) || `$${shipping.toFixed(2)}`)}
+                </Text>
             </View>
 
             <View style={styles.row}>
-                <Text style={styles.label}>Tax</Text>
-                <Text style={styles.value}>${tax.toFixed(2)}</Text>
+                <Text style={[styles.label, isDark && styles.labelDark]}>Tax</Text>
+                <Text style={[styles.value, isDark && styles.valueDark]}>
+                    {String(formatPrice(tax) || `$${tax.toFixed(2)}`)}
+                </Text>
             </View>
 
             {discount && (
                 <View style={styles.row}>
                     <Text style={styles.discountLabel}>Discount (PROMO20)</Text>
-                    <Text style={styles.discountValue}>-${discount.toFixed(2)}</Text>
+                    <Text style={styles.discountValue}>-{String(formatPrice(discount) || `$${discount.toFixed(2)}`)}</Text>
                 </View>
             )}
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, isDark && styles.dividerDark]} />
 
             <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+                <Text style={[styles.totalLabel, isDark && styles.totalLabelDark]}>Total</Text>
+                <Text style={[styles.totalValue, isDark && styles.totalValueDark]}>
+                    {String(formatPrice(total) || `$${total.toFixed(2)}`)}
+                </Text>
             </View>
         </View>
     );
@@ -56,11 +70,18 @@ const styles = StyleSheet.create({
         gap: 12,
         marginTop: 8,
     },
+    containerDark: {
+        backgroundColor: '#1F2937',
+        borderColor: '#374151',
+    },
     heading: {
         fontSize: 16,
         fontWeight: '700',
         color: '#0F172A',
         marginBottom: 4,
+    },
+    headingDark: {
+        color: '#F8FAFC',
     },
     row: {
         flexDirection: 'row',
@@ -68,16 +89,22 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 14,
-        color: '#64748B', // gray-500
+        color: '#64748B',
+    },
+    labelDark: {
+        color: '#94A3B8',
     },
     value: {
         fontSize: 14,
         fontWeight: '500',
         color: '#0F172A',
     },
+    valueDark: {
+        color: '#F8FAFC',
+    },
     discountLabel: {
         fontSize: 14,
-        color: '#16A34A', // green-600
+        color: '#16A34A',
     },
     discountValue: {
         fontSize: 14,
@@ -90,6 +117,9 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginBottom: 4,
     },
+    dividerDark: {
+        backgroundColor: '#374151',
+    },
     totalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -100,9 +130,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#0F172A',
     },
+    totalLabelDark: {
+        color: '#F8FAFC',
+    },
     totalValue: {
         fontSize: 20,
-        fontWeight: '900', // heavy
+        fontWeight: '900',
         color: '#000',
+    },
+    totalValueDark: {
+        color: '#F8FAFC',
     },
 });

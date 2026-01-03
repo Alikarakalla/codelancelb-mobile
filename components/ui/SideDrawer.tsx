@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Drawer } from 'react-native-drawer-layout';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/use-auth-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.85, 320);
@@ -29,7 +30,8 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
     const isDark = colorScheme === 'dark';
     const router = useRouter();
 
-    const [isLoggedIn] = React.useState(false);
+    const { isAuthenticated, user, logout } = useAuth();
+    const isLoggedIn = isAuthenticated;
 
     const renderDrawerContent = useCallback(() => {
         const NavItem = ({ icon, label, badge, active = false }: any) => (
@@ -75,7 +77,7 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                     <View style={styles.avatarContainer}>
                         <View style={[styles.avatar, { backgroundColor: isLoggedIn ? '#1152d4' : (isDark ? '#374151' : '#e2e8f0') }]}>
                             {isLoggedIn ? (
-                                <Text style={styles.avatarText}>JD</Text>
+                                <Text style={styles.avatarText}>{user?.name?.[0] || user?.email?.[0] || 'U'}</Text>
                             ) : (
                                 <MaterialIcons name="person" size={32} color={isDark ? '#9ca3af' : '#64748b'} />
                             )}
@@ -84,13 +86,13 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                     </View>
                     <View style={styles.profileInfo}>
                         <Text style={[styles.userName, { color: isDark ? '#fff' : '#0f172a' }]}>
-                            {isLoggedIn ? 'Jane Doe' : 'Welcome!'}
+                            {isLoggedIn ? (user?.name || 'User') : 'Welcome!'}
                         </Text>
                         <Pressable
                             style={styles.viewProfile}
                             onPress={() => {
                                 onClose();
-                                router.push(isLoggedIn ? '/profile' : '/login');
+                                router.push(isLoggedIn ? '/(tabs)/profile' : '/login');
                             }}
                         >
                             <Text style={styles.viewProfileText}>
@@ -118,7 +120,10 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                 {/* Footer */}
                 {isLoggedIn && (
                     <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
-                        <Pressable style={styles.signOutButton}>
+                        <Pressable style={styles.signOutButton} onPress={() => {
+                            logout();
+                            onClose();
+                        }}>
                             <MaterialIcons name="logout" size={22} color="#64748b" />
                             <Text style={styles.signOutText}>Sign Out</Text>
                         </Pressable>
@@ -126,7 +131,7 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                 )}
             </View>
         );
-    }, [isDark, insets, onClose, isLoggedIn]);
+    }, [isDark, insets, onClose, isLoggedIn, user, logout, router]);
 
     return (
         <Drawer

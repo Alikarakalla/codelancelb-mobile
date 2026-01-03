@@ -88,17 +88,47 @@ export default function CartScreen() {
             >
                 {items.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>Your cart is empty.</Text>
+                        <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>Your cart is empty.</Text>
                     </View>
                 ) : (
                     <>
                         <View style={styles.list}>
                             {items.map((item) => {
+                                // Debug logging
+                                console.log('Cart Item:', {
+                                    id: item.id,
+                                    variant_key: item.variant_key,
+                                    product_name: item.product?.name_en,
+                                    variants_count: item.product?.variants?.length,
+                                    variant_slugs: item.product?.variants?.map(v => v.slug),
+                                });
+
                                 // Find variant based on key
                                 const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
 
-                                // Determine image: specific variant image -> product main image
-                                const displayImage = variant?.image_path || item.product?.main_image || '';
+                                console.log('Found Variant:', {
+                                    found: !!variant,
+                                    variant_id: variant?.id,
+                                    variant_color: variant?.color,
+                                    variant_size: variant?.size,
+                                    variant_image: variant?.image_path,
+                                    variant_discount: variant?.discount_amount,
+                                });
+
+                                // Determine image: variant gallery -> variant image -> product images -> main image
+                                let displayImage = '';
+                                if (variant?.gallery && variant.gallery.length > 0) {
+                                    // Use first image from variant's gallery
+                                    displayImage = variant.gallery[0];
+                                } else if (variant?.image_path) {
+                                    displayImage = variant.image_path;
+                                } else if (item.product?.images && item.product.images.length > 0) {
+                                    // Try to get different image from product images array
+                                    const variantIndex = item.product.variants?.findIndex(v => v.slug === item.variant_key) || 0;
+                                    displayImage = item.product.images[Math.min(variantIndex, item.product.images.length - 1)]?.path || item.product.main_image || '';
+                                } else {
+                                    displayImage = item.product?.main_image || '';
+                                }
 
                                 // Determine details text
                                 let details = '';
@@ -114,13 +144,46 @@ export default function CartScreen() {
                                         .join(' • ');
                                 }
 
+                                // Calculate discount - check variant first, then product
+                                const sourceDiscount = variant || item.product;
+                                const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
+                                let displayPrice = item.price; // Default to cart price
+                                let originalPrice: number | undefined;
+                                let discountPercent: number | undefined;
+
+                                if (hasDiscount && sourceDiscount.discount_amount) {
+                                    const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
+
+                                    // Cart stores ORIGINAL price, we need to calculate DISCOUNTED price
+                                    originalPrice = item.price; // Original price (before discount)
+
+                                    if (sourceDiscount.discount_type === 'percent') {
+                                        displayPrice = item.price * (1 - discountAmount / 100);
+                                        discountPercent = discountAmount;
+                                    } else if (sourceDiscount.discount_type === 'fixed') {
+                                        displayPrice = item.price - discountAmount;
+                                        discountPercent = Math.round((discountAmount / item.price) * 100);
+                                    }
+                                }
+
+                                console.log('Discount Calc:', {
+                                    hasDiscount,
+                                    cartStoredPrice: item.price,
+                                    displayPrice,
+                                    originalPrice,
+                                    discountPercent,
+                                    source: variant ? 'variant' : 'product',
+                                });
+
                                 return (
                                     <CartItem
                                         key={item.id}
                                         id={item.id}
                                         name={item.product?.name_en || item.product?.name || ''}
                                         details={details}
-                                        price={item.price}
+                                        price={displayPrice}
+                                        originalPrice={originalPrice}
+                                        discountPercent={discountPercent}
                                         image={displayImage}
                                         quantity={item.qty}
                                         onRemove={() => removeFromCart(item.id)}
@@ -130,7 +193,6 @@ export default function CartScreen() {
                             })}
                         </View>
 
-                        <PromoCodeInput />
                         <OrderSummary {...totals} />
                     </>
                 )}
@@ -152,17 +214,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#F6F6F8',
     },
     containerDark: {
-        backgroundColor: '#111827',
+        backgroundColor: '#000000',
     },
     nativeGlassWrapper: {
         width: 20,
         height: 20,
         borderRadius: 50,
-        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
-        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
-        // if it's inside a native header and has a fixed width/height.
         ...Platform.select({
             ios: {
                 shadowColor: 'transparent',
@@ -176,7 +236,7 @@ const styles = StyleSheet.create({
     },
     list: {
         flexDirection: 'column',
-        gap: 0, // individual items have margin bottom
+        gap: 0,
     },
     emptyContainer: {
         flex: 1,
@@ -188,5 +248,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
         fontWeight: '500',
+    },
+    emptyTextDark: {
+        color: '#94A3B8',
     },
 });
