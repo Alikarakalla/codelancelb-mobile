@@ -182,11 +182,16 @@ export interface User {
     last_name?: string | null;
     email: string;
     phone?: string | null;
+    phone_country?: string | null;
+    city?: string | null;
+    country?: string | null;
     avatar?: string | null;
     referral_code?: string | null;
     role: string;
     is_active: boolean;
     loyalty_points_balance: number;
+    loyaltyTier?: { id: number; name: string } | null;
+    loyalty_tier_id?: number | null;
     created_at?: string;
 }
 
@@ -268,4 +273,17 @@ export interface Coupon {
     minimum_amount?: number;
     is_active: boolean;
     expires_at?: string;
+}
+
+// Currency Interface
+export interface Currency {
+    id: number;
+    code: string;          // e.g., 'USD', 'EUR', 'LBP'
+    name_en: string;       // e.g., 'US Dollar'
+    name_ar: string;       // e.g., 'الدولار الأمريكي'
+    symbol: string;        // e.g., '$', '€', 'L.L.'
+    exchange_rate: number; // e.g., 1.00 for base currency
+    is_base: boolean;      // true if this is the base currency
+    is_active: boolean;
+    sort_order: number;
 }

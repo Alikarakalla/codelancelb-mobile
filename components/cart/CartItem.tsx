@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCurrency } from '@/hooks/use-currency-context';
 
 interface CartItemProps {
     id: number;
@@ -14,6 +15,8 @@ interface CartItemProps {
 }
 
 export function CartItem(props: CartItemProps) {
+    const { formatPrice } = useCurrency();
+
     return (
         <View style={styles.container}>
             <Image source={{ uri: props.image }} style={styles.image} resizeMode="cover" />
@@ -30,7 +33,7 @@ export function CartItem(props: CartItemProps) {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.price}>${props.price.toFixed(2)}</Text>
+                    <Text style={styles.price}>{formatPrice(props.price)}</Text>
 
                     <View style={styles.counter}>
                         <Pressable

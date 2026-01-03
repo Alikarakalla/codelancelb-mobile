@@ -2,20 +2,60 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useRouter } from 'expo-router';
 
 export function PersonalDetails() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { user, isAuthenticated } = useAuth();
+    const router = useRouter();
+
+    const getFirstName = () => {
+        if (user?.first_name) return user.first_name;
+        return user?.name?.split(' ')[0] || '';
+    };
+
+    const getLastName = () => {
+        if (user?.last_name) return user.last_name;
+        const parts = user?.name?.split(' ');
+        return parts && parts.length > 1 ? parts.slice(1).join(' ') : '';
+    };
 
     const [form, setForm] = useState({
-        firstName: 'Jane',
-        lastName: 'Doe',
-        email: 'jane.doe@example.com',
-        phone: '+1 (555) 123-4567',
-        city: 'New York',
+        firstName: getFirstName(),
+        lastName: getLastName(),
+        email: user?.email || '',
+        phone: user?.phone || '',
+        city: user?.city || '',
+        country: user?.country || 'USA',
     });
 
     const styles = getStyles(isDark);
+
+    const handleSave = async () => {
+        // TODO: Implement API call to save user profile
+        console.log('Saving user profile:', form);
+    };
+
+    if (!isAuthenticated || !user) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.card}>
+                    <View style={{ alignItems: 'center', padding: 24 }}>
+                        <MaterialIcons name="person-outline" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
+                        <Text style={[styles.title, { marginTop: 16, textAlign: 'center' }]}>Sign in to view your profile</Text>
+                        <Pressable
+                            style={[styles.saveButton, { marginTop: 16 }]}
+                            onPress={() => router.push('/login')}
+                        >
+                            <Text style={styles.saveButtonText}>Sign In</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -67,7 +107,7 @@ export function PersonalDetails() {
                     <View style={styles.halfInput}>
                         <Text style={styles.label}>COUNTRY</Text>
                         <View style={styles.selectInput}>
-                            <Text style={styles.selectText}>USA</Text>
+                            <Text style={styles.selectText}>{form.country}</Text>
                             <MaterialIcons name="expand-more" size={20} color={isDark ? '#9ca3af' : '#616f89'} />
                         </View>
                     </View>
@@ -81,7 +121,7 @@ export function PersonalDetails() {
                     </View>
                 </View>
 
-                <Pressable style={styles.saveButton}>
+                <Pressable style={styles.saveButton} onPress={handleSave}>
                     <MaterialIcons name="save" size={20} color="#fff" />
                     <Text style={styles.saveButtonText}>Save Changes</Text>
                 </Pressable>

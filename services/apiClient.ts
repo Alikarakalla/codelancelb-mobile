@@ -1,4 +1,4 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency } from '@/types/schema';
 import { MOCK_PRODUCTS, MOCK_CATEGORIES, MOCK_BRANDS, MOCK_BANNERS, MOCK_HIGHLIGHTS, MOCK_FEATURES } from '@/constants/mockData';
 
 // 1. CHANGE THIS in your .env file
@@ -11,7 +11,27 @@ const BASE_URL = (!ENV_URL || ENV_URL.includes('your-website.com'))
 console.log('API Client Initialized with BASE_URL:', BASE_URL);
 
 const IS_DEV = __DEV__;
-const IS_PLACEHOLDER = false; // We are connecting to real DB now
+const IS_PLACEHOLDER = false;
+
+let apiToken: string | null = null;
+
+export const setApiToken = (token: string | null) => {
+    apiToken = token;
+};
+
+// Helper to get headers
+function getHeaders(extraHeaders: Record<string, string> = {}) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...extraHeaders,
+    };
+    if (apiToken) {
+        headers['Authorization'] = `Bearer ${apiToken}`;
+    }
+    return headers;
+}
 
 // Helper to handle response
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -89,22 +109,38 @@ function transformImage(img: any): any {
 
 export const api = {
     // --- Auth ---
-    async register(data: { name: string; email: string; password: string; phone?: string; phone_country?: string; referral_code?: string }) {
+    async register(data: { name: string; email: string; password: string; password_confirmation: string }) {
         const res = await fetch(`${BASE_URL}/register`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify(data)
         });
-        return handleResponse<{ user: User; token: string }>(res);
+        return handleResponse<{ message: string; access_token: string; user: User }>(res);
     },
 
     async login(data: { email: string; password: string }) {
         const res = await fetch(`${BASE_URL}/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify(data)
         });
-        return handleResponse<{ user: User; token: string }>(res);
+        return handleResponse<{ message: string; access_token: string; user: User }>(res);
+    },
+
+    async logout() {
+        if (!apiToken) return;
+        const res = await fetch(`${BASE_URL}/logout`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
+    async getMe() {
+        const res = await fetch(`${BASE_URL}/me`, {
+            headers: getHeaders()
+        });
+        return handleResponse<User>(res);
     },
 
 
@@ -337,7 +373,9 @@ export const api = {
             if (params.search) url.searchParams.append('search', params.search);
             if (params.limit) url.searchParams.append('limit', params.limit.toString());
 
-            const res = await fetch(url.toString());
+            const res = await fetch(url.toString(), {
+                headers: getHeaders()
+            });
             const responseData = await handleResponse<any>(res);
             // Products endpoint also usually wraps in { data: [] }
             const products = Array.isArray(responseData) ? responseData : (responseData.data || []);
@@ -394,14 +432,10 @@ export const api = {
         return handleResponse<WishlistItem[]>(res);
     },
 
-    async toggleWishlist(productId: number, sessionId?: string, token?: string) {
-        const headers: any = { 'Content-Type': 'application/json' };
-        if (sessionId) headers['X-Session-ID'] = sessionId;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
+    async toggleWishlist(productId: number) {
         const res = await fetch(`${BASE_URL}/wishlist/toggle`, {
             method: 'POST',
-            headers,
+            headers: getHeaders(),
             body: JSON.stringify({ product_id: productId })
         });
         return handleResponse(res);
@@ -456,4 +490,152 @@ export const api = {
         });
         return handleResponse<Coupon>(res);
     },
+
+    // --- Loyalty ---
+    async getLoyaltyInfo() {
+        const res = await fetch(`${BASE_URL}/loyalty`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async getLoyaltyHistory() {
+        const res = await fetch(`${BASE_URL}/loyalty/history`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async getLoyaltyRewards() {
+        const res = await fetch(`${BASE_URL}/loyalty/rewards`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async redeemLoyaltyReward(rewardId: number) {
+        const res = await fetch(`${BASE_URL}/loyalty/redeem/${rewardId}`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    // --- Orders ---
+    async getOrders(page: number = 1) {
+        const res = await fetch(`${BASE_URL}/orders?page=${page}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async getOrderDetails(orderId: number) {
+        const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    // --- Addresses ---
+    async getAddresses() {
+        const res = await fetch(`${BASE_URL}/addresses`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async createAddress(data: any) {
+        const res = await fetch(`${BASE_URL}/addresses`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        return handleResponse<any>(res);
+    },
+
+    async updateAddress(id: number, data: any) {
+        const res = await fetch(`${BASE_URL}/addresses/${id}`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        return handleResponse<any>(res);
+    },
+
+    async deleteAddress(id: number) {
+        const res = await fetch(`${BASE_URL}/addresses/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        return handleResponse<any>(res);
+    },
+
+    async updatePassword(data: { current_password: string; new_password: string; new_password_confirmation: string }) {
+        const res = await fetch(`${BASE_URL}/update-password`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        return handleResponse<any>(res);
+    },
+
+    // --- Orders ---
+    async placeOrder(data: any) {
+        console.log('=== PLACE ORDER DEBUG ===');
+        console.log('Request URL:', `${BASE_URL}/checkout`);
+        console.log('Request Data:', JSON.stringify(data, null, 2));
+        console.log('========================');
+
+        const res = await fetch(`${BASE_URL}/checkout`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        return handleResponse<any>(res);
+    },
+
+    // --- Config ---
+    async getStoreSettings() {
+        const res = await fetch(`${BASE_URL}/config/store-settings`, {
+            method: 'GET',
+            headers: getHeaders(),
+        });
+        return handleResponse<any>(res);
+    },
+
+    // --- Currencies ---
+    async getCurrencies(): Promise<Currency[]> {
+        const res = await fetch(`${BASE_URL}/currencies`, {
+            method: 'GET',
+            headers: getHeaders(),
+        });
+        const response = await handleResponse<{ data: Currency[] }>(res);
+        return response.data || [];
+    },
+
+    async getDefaultCurrency(): Promise<Currency | null> {
+        try {
+            const res = await fetch(`${BASE_URL}/currencies/default`, {
+                method: 'GET',
+                headers: getHeaders(),
+            });
+            const response = await handleResponse<{ data: Currency }>(res);
+            return response.data || null;
+        } catch (error) {
+            console.warn('Error fetching default currency, using fallback:', error);
+            // Fallback to USD if API fails
+            return {
+                id: 0,
+                code: 'USD',
+                name_en: 'US Dollar',
+                name_ar: 'الدولار الأمريكي',
+                symbol: '$',
+                exchange_rate: 1,
+                is_base: true,
+                is_active: true,
+                sort_order: 0,
+            };
+        }
+    },
+
 };

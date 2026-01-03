@@ -148,7 +148,7 @@ export default function ProductDetailsScreen() {
     const handleShare = async () => {
         if (!product) return;
         try {
-            const productUrl = `https://luxe.shop/product/${product.id}`;
+            const productUrl = `https://sadekabdelsater.com/product/${product.name_en}`;
             const result = await Share.share({
                 message: Platform.OS === 'ios'
                     ? product.name_en || product.name || ''

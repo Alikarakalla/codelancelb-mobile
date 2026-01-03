@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, ProductVariant, CartItem } from '@/types/schema';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CART_STORAGE_KEY = 'shopping_cart';
 
 // Mock initial data or empty
 const INITIAL_CART: CartItem[] = [];
@@ -17,7 +20,33 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const [items, setItems] = useState<CartItem[]>(INITIAL_CART);
+    const [items, setItems] = useState<CartItem[]>([]);
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // Initial Load
+    useEffect(() => {
+        const loadCart = async () => {
+            try {
+                const savedCart = await AsyncStorage.getItem(CART_STORAGE_KEY);
+                if (savedCart) {
+                    setItems(JSON.parse(savedCart));
+                }
+            } catch (e) {
+                console.warn('Failed to load cart from storage:', e);
+            } finally {
+                setIsLoaded(true);
+            }
+        };
+        loadCart();
+    }, []);
+
+    // Save on Change
+    useEffect(() => {
+        if (isLoaded) {
+            AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
+                .catch(e => console.warn('Failed to save cart:', e));
+        }
+    }, [items, isLoaded]);
 
     // Calculate derived state
     const cartCount = items.reduce((sum, item) => sum + item.qty, 0);

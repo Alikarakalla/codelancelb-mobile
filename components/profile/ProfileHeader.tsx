@@ -3,16 +3,51 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useRouter } from 'expo-router';
 
 export function ProfileHeader() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { user, isAuthenticated } = useAuth();
+    const router = useRouter();
+
+    const getTierName = () => {
+        if (!user?.loyaltyTier) return 'Member';
+        return user.loyaltyTier.name || 'Member';
+    };
+
+    const getUserAvatar = () => {
+        if (user?.avatar) return user.avatar;
+        return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'Guest') + '&size=256&background=1152d4&color=fff';
+    };
+
+    if (!isAuthenticated || !user) {
+        return (
+            <View style={[styles.container, { backgroundColor: isDark ? '#1a2230' : '#ffffff' }]}>
+                <View style={styles.avatarWrapper}>
+                    <Image
+                        source={{ uri: 'https://ui-avatars.com/api/?name=Guest&size=256&background=9ca3af&color=fff' }}
+                        style={styles.avatar}
+                        contentFit="cover"
+                    />
+                </View>
+
+                <View style={styles.infoContainer}>
+                    <Text style={[styles.name, { color: isDark ? '#fff' : '#111318' }]}>Guest</Text>
+                    <Pressable onPress={() => router.push('/login')}>
+                        <Text style={[styles.badgeText, { color: '#1152d4', fontWeight: '600' }]}>Sign In</Text>
+                    </Pressable>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#1a2230' : '#ffffff' }]}>
             <View style={styles.avatarWrapper}>
                 <Image
-                    source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD_Q_ksyb8HoLCaS0okS7HJaioYo7KP3YJZZpddrsdZvAhRmrbzNFUcJ0Nf8WX-Z7s9N6EPi_zeszi6y7v2afqlsRL3LOkDvxYR85M-CrJkwWjJ4B4HnRT5fwPQ76rVQBIxMinmwxXA9MNp_WNssVr3YbfNtmnTfPRDWl03aUb4eoj6Wn-XiL846QQFxD-E-6_1qT8TazJQUIxOlySkFD9iekvh68IuG_2ONYcxGmP4gIF_Dgf8P22MuNJ4mvkK9-rWTfqcGjQrcTL6' }}
+                    source={{ uri: getUserAvatar() }}
                     style={styles.avatar}
                     contentFit="cover"
                 />
@@ -25,10 +60,10 @@ export function ProfileHeader() {
             </View>
 
             <View style={styles.infoContainer}>
-                <Text style={[styles.name, { color: isDark ? '#fff' : '#111318' }]}>Jane Doe</Text>
+                <Text style={[styles.name, { color: isDark ? '#fff' : '#111318' }]}>{user.name}</Text>
                 <View style={styles.badgeContainer}>
                     <MaterialIcons name="verified" size={18} color="#f59e0b" />
-                    <Text style={[styles.badgeText, { color: isDark ? '#9ca3af' : '#616f89' }]}>Gold Member</Text>
+                    <Text style={[styles.badgeText, { color: isDark ? '#9ca3af' : '#616f89' }]}>{getTierName()}</Text>
                 </View>
             </View>
         </View>

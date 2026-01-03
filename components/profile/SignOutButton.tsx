@@ -2,10 +2,33 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useRouter } from 'expo-router';
+import { Alert } from 'react-native';
 
 export function SignOutButton() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { logout } = useAuth();
+    const router = useRouter();
+
+    const handleSignOut = () => {
+        Alert.alert(
+            'Sign Out',
+            'Are you sure you want to sign out?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/login');
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -17,6 +40,7 @@ export function SignOutButton() {
                         borderColor: isDark ? 'rgba(127, 29, 29, 0.5)' : '#fecaca'
                     }
                 ]}
+                onPress={handleSignOut}
             >
                 <MaterialIcons name="logout" size={20} color={isDark ? '#f87171' : '#dc2626'} />
                 <Text style={[styles.text, { color: isDark ? '#f87171' : '#dc2626' }]}>Sign Out</Text>

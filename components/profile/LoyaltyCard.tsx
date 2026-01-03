@@ -1,12 +1,84 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useRouter } from 'expo-router';
+import { api } from '@/services/apiClient';
+import { LoyaltySkeleton } from '@/components/profile/skeletons/LoyaltySkeleton';
 
 export function LoyaltyCard() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { user, isAuthenticated } = useAuth();
+    const router = useRouter();
+    const [loyaltyData, setLoyaltyData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadLoyaltyData();
+        } else {
+            setLoading(false);
+        }
+    }, [isAuthenticated]);
+
+    const loadLoyaltyData = async () => {
+        try {
+            const data = await api.getLoyaltyInfo();
+            setLoyaltyData(data);
+        } catch (error) {
+            console.error('Failed to load loyalty data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getProgressPercentage = () => {
+        if (!loyaltyData?.currentTier || !loyaltyData?.nextTier) return 0;
+        const current = loyaltyData.points || 0;
+        const min = loyaltyData.currentTier.min_points || 0;
+        const max = loyaltyData.nextTier.min_points || 1000;
+        return Math.min(((current - min) / (max - min)) * 100, 100);
+    };
+
+    if (!isAuthenticated || !user) {
+        return (
+            <View style={styles.container}>
+                <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Loyalty Program</Text>
+                <LinearGradient
+                    colors={['#1152d4', '#2563eb']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
+                >
+                    <View style={styles.content}>
+                        <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                            <MaterialIcons name="card-giftcard" size={48} color="rgba(255,255,255,0.8)" />
+                            <Text style={[styles.label, { marginTop: 16, textAlign: 'center', fontSize: 16 }]}>Sign in to view your loyalty status</Text>
+                            <Pressable
+                                style={[styles.redeemButton, { marginTop: 16 }]}
+                                onPress={() => router.push('/login')}
+                            >
+                                <Text style={styles.redeemText}>Sign In</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </LinearGradient>
+            </View>
+        );
+    }
+
+    if (loading) {
+        return <LoyaltySkeleton />;
+    }
+
+    const points = loyaltyData?.points || user.loyalty_points_balance || 0;
+    const tierName = loyaltyData?.currentTier?.name || user.loyaltyTier?.name || 'Member';
+    const nextTierName = loyaltyData?.nextTier?.name || 'Platinum';
+    const nextTierPoints = loyaltyData?.nextTier?.min_points || 1000;
+    const progressPercent = getProgressPercentage();
 
     return (
         <View style={styles.container}>
@@ -27,28 +99,28 @@ export function LoyaltyCard() {
                         <View>
                             <Text style={styles.label}>Current Balance</Text>
                             <View style={styles.pointsRow}>
-                                <Text style={styles.points}>450</Text>
+                                <Text style={styles.points}>{points}</Text>
                                 <Text style={styles.pointsUnit}>pts</Text>
                             </View>
                         </View>
 
                         <View style={styles.tierBadge}>
                             <MaterialIcons name="star" size={16} color="#fff" />
-                            <Text style={styles.tierText}>Gold Tier</Text>
+                            <Text style={styles.tierText}>{tierName}</Text>
                         </View>
                     </View>
 
                     <View style={styles.progressContainer}>
                         <View style={styles.progressLabels}>
-                            <Text style={styles.progressText}>450 pts</Text>
-                            <Text style={styles.progressText}>1000 pts (Platinum)</Text>
+                            <Text style={styles.progressText}>{points} pts</Text>
+                            <Text style={styles.progressText}>{nextTierPoints} pts ({nextTierName})</Text>
                         </View>
                         <View style={styles.progressBarBg}>
-                            <View style={[styles.progressBarFill, { width: '45%' }]} />
+                            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
                         </View>
                     </View>
 
-                    <Pressable style={styles.redeemButton}>
+                    <Pressable style={styles.redeemButton} onPress={() => console.log('Navigate to rewards')}>
                         <Text style={styles.redeemText}>Redeem Rewards</Text>
                     </Pressable>
                 </View>

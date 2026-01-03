@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { CountryPicker } from 'react-native-country-codes-picker';
 import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useDrawer } from '@/hooks/use-drawer-context';
+import { useAuth } from '@/hooks/use-auth-context';
 
 export default function SignUpScreen() {
     const insets = useSafeAreaInsets();
@@ -77,9 +78,11 @@ export default function SignUpScreen() {
         }
     }), [isDark]);
 
+    const { register } = useAuth();
+
     const onSubmit = async (data: any) => {
         if (!data.agreeToTerms) {
-            alert('Please agree to the Terms of Service and Privacy Policy.');
+            Alert.alert('Terms of Service', 'Please agree to the Terms of Service and Privacy Policy.');
             return;
         }
 
@@ -89,22 +92,23 @@ export default function SignUpScreen() {
                 name: data.name,
                 email: data.email,
                 password: data.password,
+                password_confirmation: data.confirmPassword, // Field required by Laravel
                 phone: `+${callingCode}${data.phone}`,
                 phone_country: countryCode,
                 referral_code: data.referralCode || undefined,
             };
 
-            console.log('Ready to register:', payload);
-            // await api.register(payload);
+            await register(payload);
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Navigate or show success
-            router.push('/login');
-        } catch (error) {
-            console.error(error);
-            alert('An error occurred. Please try again.');
+            Alert.alert('Success', 'Account created successfully!', [
+                { text: 'OK', onPress: () => router.replace('/') }
+            ]);
+        } catch (error: any) {
+            console.error('Registration Error Details:', error);
+            const errorMessage = error.message?.includes('422')
+                ? 'The email or phone number is already taken, or information is invalid.'
+                : 'Server Error (500). Please check your Laravel logs or ensure HasApiTokens is added to User model.';
+            Alert.alert('Registration Failed', errorMessage);
         } finally {
             setLoading(false);
         }
@@ -112,13 +116,41 @@ export default function SignUpScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <GlobalHeader
-                title="REGISTER"
-                showBack
-                alwaysShowTitle
-                showWishlist={false}
-                showShare={false}
-                showCart={false}
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: '',
+                    ...Platform.select({
+                        ios: {
+                            headerLeft: () => (
+                                <Pressable
+                                    onPress={() => router.back()}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="chevron.left"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass',
+                                },
+                            }
+                        },
+                        android: {
+                            headerLeft: () => (
+                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
+                                </Pressable>
+                            ),
+                        }
+                    })
+                } as any}
             />
 
             <ScrollView
@@ -493,6 +525,26 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     primaryButtonPressed: {
         opacity: 0.9,
         transform: [{ scale: 0.98 }],
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     primaryButtonText: {
         fontSize: 16,

@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { CartItem } from '@/components/cart/CartItem';
 import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
 import { OrderSummary } from '@/components/cart/OrderSummary';
@@ -15,6 +16,8 @@ import { useCart } from '@/hooks/use-cart-context';
 export default function CartScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const { items, removeFromCart, updateQuantity, cartTotal } = useCart();
     const { openDrawer } = useDrawer();
 
@@ -27,20 +30,58 @@ export default function CartScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <GlobalHeader
-                title="CART"
-                showBack
-                showWishlist={false}
-                showShare={false}
-                showCart={false}
-                alwaysShowTitle
+        <View style={[styles.container, isDark && styles.containerDark]}>
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: () => (
+                        <Text style={{
+                            fontSize: 17,
+                            fontWeight: '600',
+                            color: isDark ? '#fff' : '#000',
+                            letterSpacing: -0.4,
+                        }}>
+                            Shopping Cart
+                        </Text>
+                    ),
+                    headerTitleAlign: 'center',
+                    ...Platform.select({
+                        ios: {
+                            headerLeft: () => (
+                                <Pressable
+                                    onPress={() => router.back()}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="chevron.left"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass',
+                                },
+                            }
+                        },
+                        android: {
+                            headerLeft: () => (
+                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
+                                </Pressable>
+                            ),
+                        }
+                    })
+                } as any}
             />
 
             <ScrollView
                 contentContainerStyle={{
-                    paddingTop: 80 + insets.top, // Header + extra spacing
-                    paddingBottom: 180, // Footer + cushion
+                    paddingTop: 60 + insets.top,
+                    paddingBottom: 180,
                     paddingHorizontal: 16
                 }}
                 showsVerticalScrollIndicator={false}
@@ -108,7 +149,30 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F6F6F8', // background-light
+        backgroundColor: '#F6F6F8',
+    },
+    containerDark: {
+        backgroundColor: '#111827',
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     list: {
         flexDirection: 'column',

@@ -1,12 +1,170 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useRouter } from 'expo-router';
+import { api } from '@/services/apiClient';
+import { OrderSkeleton } from '@/components/profile/skeletons/OrderSkeleton';
 
 export function RecentOrders() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
+    const { user, isAuthenticated } = useAuth();
+    const router = useRouter();
+    const [orders, setOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadOrders();
+        } else {
+            setLoading(false);
+        }
+    }, [isAuthenticated]);
+
+    const loadOrders = async () => {
+        try {
+            const response = await api.getOrders(1);
+            // Laravel pagination returns { data: [...], current_page, last_page, etc. }
+            setOrders(response.data || response || []);
+        } catch (error) {
+            console.error('Failed to load orders:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status?.toLowerCase()) {
+            case 'delivered':
+            case 'completed':
+                return {
+                    bg: isDark ? 'rgba(21, 128, 61, 0.3)' : '#dcfce7',
+                    text: isDark ? '#4ade80' : '#15803d',
+                    icon: 'check-circle'
+                };
+            case 'shipped':
+            case 'processing':
+                return {
+                    bg: isDark ? 'rgba(194, 65, 12, 0.3)' : '#ffedd5',
+                    text: isDark ? '#fb923c' : '#c2410c',
+                    icon: 'local-shipping'
+                };
+            case 'pending':
+                return {
+                    bg: isDark ? 'rgba(147, 51, 234, 0.3)' : '#f3e8ff',
+                    text: isDark ? '#c084fc' : '#7e22ce',
+                    icon: 'schedule'
+                };
+            case 'cancelled':
+                return {
+                    bg: isDark ? 'rgba(220, 38, 38, 0.3)' : '#fee2e2',
+                    text: isDark ? '#f87171' : '#dc2626',
+                    icon: 'cancel'
+                };
+            default:
+                return {
+                    bg: isDark ? 'rgba(107, 114, 128, 0.3)' : '#f3f4f6',
+                    text: isDark ? '#9ca3af' : '#6b7280',
+                    icon: 'info'
+                };
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    if (!isAuthenticated || !user) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.card}>
+                    <View style={{ alignItems: 'center', padding: 24 }}>
+                        <MaterialIcons name="receipt-long" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
+                        <Text style={[styles.title, { marginTop: 16, textAlign: 'center' }]}>Sign in to view your orders</Text>
+                        <Pressable
+                            style={[styles.viewAll, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }]}
+                            onPress={() => router.push('/login')}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: '700' }}>Sign In</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    if (loading) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Recent Orders</Text>
+                </View>
+                <View style={styles.list}>
+                    <OrderSkeleton />
+                    <OrderSkeleton />
+                    <OrderSkeleton />
+                </View>
+            </View>
+        );
+    }
+
+    if (orders.length === 0) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Recent Orders</Text>
+                </View>
+                <View style={styles.card}>
+                    <View style={{ alignItems: 'center', padding: 24 }}>
+                        <MaterialIcons name="shopping-bag" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
+                        <Text style={[styles.orderDate, { marginTop: 16, textAlign: 'center' }]}>No orders yet</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    const renderOrder = ({ item }: { item: any }) => {
+        const statusInfo = getStatusColor(item.status);
+        const itemCount = item.items?.length || 0;
+        const totalAmount = parseFloat(item.total_amount || 0);
+
+        return (
+            <Pressable
+                style={styles.card}
+                onPress={() => console.log('View order details:', item.id)}
+            >
+                <View style={styles.cardHeader}>
+                    <View style={styles.orderInfo}>
+                        <View style={styles.iconBox}>
+                            <MaterialIcons name={statusInfo.icon as any} size={24} color={statusInfo.text} />
+                        </View>
+                        <View>
+                            <Text style={styles.orderNumber}>Order #{item.id}</Text>
+                            <Text style={styles.orderDate}>{formatDate(item.created_at)}</Text>
+                        </View>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                        <Text style={[styles.statusText, { color: statusInfo.text }]}>{item.status}</Text>
+                    </View>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.cardFooter}>
+                    <Text style={styles.itemCount}>{itemCount} {itemCount === 1 ? 'Item' : 'Items'}</Text>
+                    <View style={styles.priceRow}>
+                        <Text style={styles.price}>${totalAmount.toFixed(2)}</Text>
+                        <View style={styles.chevron}>
+                            <MaterialIcons name="chevron-right" size={20} color={isDark ? '#9ca3af' : '#616f89'} />
+                        </View>
+                    </View>
+                </View>
+            </Pressable>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -17,63 +175,13 @@ export function RecentOrders() {
                 </Pressable>
             </View>
 
-            <View style={styles.list}>
-                {/* Order 1 */}
-                <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.orderInfo}>
-                            <View style={styles.iconBox}>
-                                <MaterialIcons name="inventory-2" size={24} color="#1152d4" />
-                            </View>
-                            <View>
-                                <Text style={styles.orderNumber}>Order #24589</Text>
-                                <Text style={styles.orderDate}>Oct 24, 2023</Text>
-                            </View>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: isDark ? 'rgba(21, 128, 61, 0.3)' : '#dcfce7' }]}>
-                            <Text style={[styles.statusText, { color: isDark ? '#4ade80' : '#15803d' }]}>Delivered</Text>
-                        </View>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.cardFooter}>
-                        <Text style={styles.itemCount}>3 Items</Text>
-                        <View style={styles.priceRow}>
-                            <Text style={styles.price}>$124.50</Text>
-                            <View style={styles.chevron}>
-                                <MaterialIcons name="chevron-right" size={20} color={isDark ? '#9ca3af' : '#616f89'} />
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Order 2 */}
-                <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.orderInfo}>
-                            <View style={styles.iconBox}>
-                                <MaterialIcons name="local-shipping" size={24} color="#f97316" />
-                            </View>
-                            <View>
-                                <Text style={styles.orderNumber}>Order #24601</Text>
-                                <Text style={styles.orderDate}>Nov 02, 2023</Text>
-                            </View>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: isDark ? 'rgba(194, 65, 12, 0.3)' : '#ffedd5' }]}>
-                            <Text style={[styles.statusText, { color: isDark ? '#fb923c' : '#c2410c' }]}>Shipped</Text>
-                        </View>
-                    </View>
-                    <View style={styles.divider} />
-                    <View style={styles.cardFooter}>
-                        <Text style={styles.itemCount}>1 Item</Text>
-                        <View style={styles.priceRow}>
-                            <Text style={styles.price}>$45.00</Text>
-                            <View style={styles.chevron}>
-                                <MaterialIcons name="chevron-right" size={20} color={isDark ? '#9ca3af' : '#616f89'} />
-                            </View>
-                        </View>
-                    </View>
-                </View>
-            </View>
+            <FlatList
+                data={orders.slice(0, 3)} // Show only first 3 orders
+                renderItem={renderOrder}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                contentContainerStyle={styles.list}
+            />
         </View>
     );
 }
@@ -144,6 +252,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     statusText: {
         fontSize: 12,
         fontWeight: '700',
+        textTransform: 'capitalize',
     },
     divider: {
         height: 1,

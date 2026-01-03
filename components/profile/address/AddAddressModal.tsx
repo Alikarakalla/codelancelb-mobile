@@ -10,30 +10,66 @@ interface AddAddressModalProps {
     visible: boolean;
     onClose: () => void;
     onSave: (address: any) => void;
+    initialData?: any;
 }
 
-export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalProps) {
+export function AddAddressModal({ visible, onClose, onSave, initialData }: AddAddressModalProps) {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
     const [form, setForm] = useState({
-        type: 'Shipping Address',
-        address1: '',
-        address2: '',
+        type: 'shipping',
+        address_line_1: '',
+        address_line_2: '',
         city: '',
         state: '',
-        zip: '',
+        postal_code: '',
         phone: '',
-        formattedPhone: '',
         country: 'United States',
         countryCode: 'US',
         callingCode: '1',
+        is_default: false,
     });
 
     const [loading, setLoading] = useState(false);
     const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+    const [typePickerVisible, setTypePickerVisible] = useState(false);
+
+    // Load initial data when editing
+    useEffect(() => {
+        if (visible && initialData) {
+            setForm({
+                type: initialData.type || 'shipping',
+                address_line_1: initialData.address_line_1 || '',
+                address_line_2: initialData.address_line_2 || '',
+                city: initialData.city || '',
+                state: initialData.state || '',
+                postal_code: initialData.postal_code || '',
+                phone: initialData.phone || '',
+                country: initialData.country || 'United States',
+                countryCode: initialData.countryCode || 'US',
+                callingCode: initialData.callingCode || '1',
+                is_default: initialData.is_default || false,
+            });
+        } else if (visible && !initialData) {
+            // Reset form for new address
+            setForm({
+                type: 'shipping',
+                address_line_1: '',
+                address_line_2: '',
+                city: '',
+                state: '',
+                postal_code: '',
+                phone: '',
+                country: 'United States',
+                countryCode: 'US',
+                callingCode: '1',
+                is_default: false,
+            });
+        }
+    }, [visible, initialData]);
 
     // Auto-detect country based on IP
     useEffect(() => {
@@ -50,7 +86,7 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
                             callingCode: data.country_calling_code?.replace('+', '') || '1',
                             city: data.city || prev.city,
                             state: data.region || prev.state,
-                            zip: data.postal || prev.zip,
+                            postal_code: data.postal || prev.postal_code,
                         }));
                     }
                 } catch (error) {
@@ -72,12 +108,36 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
     };
 
     const handleSave = async () => {
+        // Validate required fields
+        if (!form.address_line_1 || !form.city || !form.state || !form.postal_code || !form.country) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
         setLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        onSave(form);
-        setLoading(false);
-        onClose();
+        try {
+            // Format phone number with country code
+            const formattedPhone = form.phone ? `+${form.callingCode}${form.phone}` : '';
+
+            const addressData = {
+                type: form.type, // 'shipping' or 'billing'
+                address_line_1: form.address_line_1,
+                address_line_2: form.address_line_2,
+                city: form.city,
+                state: form.state,
+                postal_code: form.postal_code,
+                country: form.country,
+                phone: formattedPhone,
+                is_default: form.is_default,
+            };
+
+            await onSave(addressData);
+            onClose();
+        } catch (error) {
+            console.error('Error saving address:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -110,10 +170,35 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
                         {/* Address Type */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Address Type <Text style={styles.required}>*</Text></Text>
-                            <View style={styles.selectInput}>
-                                <Text style={styles.inputValue}>{form.type}</Text>
+                            <Pressable
+                                style={styles.selectInput}
+                                onPress={() => setTypePickerVisible(!typePickerVisible)}
+                            >
+                                <Text style={styles.inputValue}>{form.type === 'shipping' ? 'Shipping' : 'Billing'}</Text>
                                 <MaterialIcons name="expand-more" size={24} color={isDark ? '#9ca3af' : '#6b7280'} />
-                            </View>
+                            </Pressable>
+                            {typePickerVisible && (
+                                <View style={styles.pickerDropdown}>
+                                    <Pressable
+                                        style={styles.pickerOption}
+                                        onPress={() => {
+                                            setForm({ ...form, type: 'shipping' });
+                                            setTypePickerVisible(false);
+                                        }}
+                                    >
+                                        <Text style={styles.pickerOptionText}>Shipping</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={styles.pickerOption}
+                                        onPress={() => {
+                                            setForm({ ...form, type: 'billing' });
+                                            setTypePickerVisible(false);
+                                        }}
+                                    >
+                                        <Text style={styles.pickerOptionText}>Billing</Text>
+                                    </Pressable>
+                                </View>
+                            )}
                         </View>
 
                         {/* Country - Using Library */}
@@ -170,8 +255,8 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
                                 style={styles.input}
                                 placeholder="Street address, P.O. box, company name, c/o"
                                 placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                                value={form.address1}
-                                onChangeText={(t) => setForm({ ...form, address1: t })}
+                                value={form.address_line_1}
+                                onChangeText={(t) => setForm({ ...form, address_line_1: t })}
                             />
                         </View>
 
@@ -182,8 +267,8 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
                                 style={styles.input}
                                 placeholder="Apartment, suite, unit, building, floor, etc."
                                 placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                                value={form.address2}
-                                onChangeText={(t) => setForm({ ...form, address2: t })}
+                                value={form.address_line_2}
+                                onChangeText={(t) => setForm({ ...form, address_line_2: t })}
                             />
                         </View>
 
@@ -217,8 +302,8 @@ export function AddAddressModal({ visible, onClose, onSave }: AddAddressModalPro
                                     style={styles.input}
                                     placeholder="Enter postal code"
                                     placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                                    value={form.zip}
-                                    onChangeText={(t) => setForm({ ...form, zip: t })}
+                                    value={form.postal_code}
+                                    onChangeText={(t) => setForm({ ...form, postal_code: t })}
                                 />
                             </View>
                         </View>
@@ -417,6 +502,32 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         flex: 1,
         height: '100%',
         paddingHorizontal: 12,
+        fontSize: 15,
+        color: isDark ? '#fff' : '#111827',
+    },
+    pickerDropdown: {
+        position: 'absolute',
+        top: 60,
+        left: 0,
+        right: 0,
+        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: isDark ? '#374151' : '#e5e7eb',
+        zIndex: 1000,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    pickerOption: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: isDark ? '#374151' : '#f3f4f6',
+    },
+    pickerOptionText: {
         fontSize: 15,
         color: isDark ? '#fff' : '#111827',
     },

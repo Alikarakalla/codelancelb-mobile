@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product } from '@/types/schema';
 import { api } from '@/services/apiClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const WISHLIST_STORAGE_KEY = 'user_wishlist';
 
 // Simply storing full product objects for now, ideally persist IDs
 interface WishlistContextType {
@@ -14,25 +17,34 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
     const [wishlist, setWishlist] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(false);
 
+    // Initial Load
     useEffect(() => {
-        loadWishlist();
+        const loadInitialWishlist = async () => {
+            try {
+                const savedWishlist = await AsyncStorage.getItem(WISHLIST_STORAGE_KEY);
+                if (savedWishlist) {
+                    setWishlist(JSON.parse(savedWishlist));
+                }
+            } catch (e) {
+                console.warn('Failed to load wishlist:', e);
+            } finally {
+                setIsLoaded(true);
+            }
+        };
+        loadInitialWishlist();
     }, []);
 
-    const loadWishlist = async () => {
-        if (loading) return;
-        setLoading(true);
-        try {
-            // TODO: Get sessionId or Auth token
-            // const items = await api.getWishlist(sessionId, token);
-            // setWishlist(items.map(item => item.product).filter(Boolean) as Product[]);
-        } catch (error) {
-            console.error('Failed to load wishlist:', error);
-        } finally {
-            setLoading(false);
+    // Save on Change
+    useEffect(() => {
+        if (isLoaded) {
+            AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlist))
+                .catch(e => console.warn('Failed to save wishlist:', e));
         }
-    };
+    }, [wishlist, isLoaded]);
+
+    // Removal of legacy loadWishlist function as it's now handled by the persistent useEffect above.
 
     const toggleWishlist = async (product: Product) => {
         // Optimistic update

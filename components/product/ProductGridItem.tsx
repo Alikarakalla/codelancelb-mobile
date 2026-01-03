@@ -5,6 +5,7 @@ import { Product } from '@/types/schema';
 import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useWishlist } from '@/hooks/use-wishlist-context';
+import { useCurrency } from '@/hooks/use-currency-context';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 40 - 12) / 2; // (Screen - padding - gap) / 2
@@ -29,6 +30,7 @@ export const ProductGridItem = ({
     const { triggerAnimation } = useWishlistAnimation();
     const { triggerCartAnimation } = useCartAnimation();
     const { isInWishlist } = useWishlist();
+    const { formatPrice } = useCurrency();
     const wishlistIconRef = React.useRef<View>(null);
     const cartButtonRef = React.useRef<View>(null);
 
@@ -120,14 +122,14 @@ export const ProductGridItem = ({
 
                 <View style={styles.priceContainer}>
                     {hasDiscount && (
-                        <Text style={styles.oldPrice}>${product.price?.toFixed(2)}</Text>
+                        <Text style={styles.oldPrice}>{formatPrice(product.price)}</Text>
                     )}
                     <Text style={[styles.price, hasDiscount ? styles.salePrice : null]}>
-                        ${(hasDiscount
+                        {formatPrice(hasDiscount
                             ? (product.discount_type === 'percent'
                                 ? product.price! * (1 - product.discount_amount! / 100)
                                 : product.price! - product.discount_amount!)
-                            : product.price)?.toFixed(2)}
+                            : product.price)}
                     </Text>
                 </View>
             </View>

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { useRouter, Stack } from 'expo-router';
 import { useForm } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { useDrawer } from '@/hooks/use-drawer-context';
-// import { api } from '@/services/apiClient'; // Uncomment when ready
+import { useAuth } from '@/hooks/use-auth-context';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export default function LoginScreen() {
     const insets = useSafeAreaInsets();
@@ -26,24 +26,23 @@ export default function LoginScreen() {
         }
     });
 
+    const { login } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const onSubmit = async (data: any) => {
         setLoading(true);
         try {
-            console.log('Login payload:', data);
-            // await api.login(data); // Implement actual login call
-
-            // Simulate login
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // TODO: Store token and user data
-
-            router.back(); // Or navigate to home
-        } catch (error) {
+            await login(data);
+            router.back();
+        } catch (error: any) {
             console.error(error);
-            alert('Login failed. Please check your credentials.');
+            Alert.alert(
+                'Login Failed',
+                error.message.includes('422')
+                    ? 'The provided credentials are incorrect.'
+                    : 'Something went wrong. Please try again.'
+            );
         } finally {
             setLoading(false);
         }
@@ -51,13 +50,41 @@ export default function LoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
-            <GlobalHeader
-                title="LOGIN"
-                showBack
-                alwaysShowTitle
-                showWishlist={false}
-                showShare={false}
-                showCart={false}
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: '',
+                    ...Platform.select({
+                        ios: {
+                            headerLeft: () => (
+                                <Pressable
+                                    onPress={() => router.back()}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="chevron.left"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass',
+                                },
+                            }
+                        },
+                        android: {
+                            headerLeft: () => (
+                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
+                                </Pressable>
+                            ),
+                        }
+                    })
+                } as any}
             />
 
             <ScrollView
@@ -249,6 +276,26 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     loginButtonPressed: {
         transform: [{ scale: 0.98 }],
         opacity: 0.9,
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     loginButtonText: {
         fontSize: 16,

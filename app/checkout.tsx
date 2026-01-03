@@ -1,63 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet, SafeAreaView, Switch, Platform, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Address, Coupon } from '@/types/schema';
 import { useCart } from '@/hooks/use-cart-context';
+import { useAuth } from '@/hooks/use-auth-context';
+import { useCurrency } from '@/hooks/use-currency-context';
 import { api } from '@/services/apiClient';
-
-// Mock Addresses
-const MOCK_ADDRESSES: Address[] = [
-    {
-        id: 1,
-        user_id: 1,
-        label: 'Home',
-        first_name: 'John',
-        last_name: 'Doe',
-        address_line_1: '123 Main St',
-        city: 'New York',
-        state: 'NY',
-        zip_code: '10001',
-        country: 'United States',
-        phone: '+1 234 567 8900',
-        is_default: true,
-    },
-    {
-        id: 2,
-        user_id: 1,
-        label: 'Office',
-        first_name: 'John',
-        last_name: 'Doe',
-        address_line_1: '456 Corporate Blvd',
-        address_line_2: 'Suite 200',
-        city: 'Seattle',
-        state: 'WA',
-        zip_code: '98101',
-        country: 'United States',
-        phone: '+1 987 654 3210',
-        is_default: false,
-    }
-];
 
 export default function CheckoutScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const insets = useSafeAreaInsets();
-    const { items, cartTotal } = useCart();
+    const { items, cartTotal, clearCart } = useCart();
+    const { user, isAuthenticated } = useAuth();
+    const { formatPrice, currency } = useCurrency();
 
     const [paymentMethod, setPaymentMethod] = useState<'cod'>('cod');
-    const [isSummaryOpen, setIsSummaryOpen] = useState(false); // Collapsed by default like Shopify mobile
+    const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isUsingSavedAddress, setIsUsingSavedAddress] = useState(true);
-    const [selectedAddressId, setSelectedAddressId] = useState<number | null>(1);
+    const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+
+    // User Data
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+
+    // Addresses
+    const [addresses, setAddresses] = useState<any[]>([]);
+    const [loadingAddresses, setLoadingAddresses] = useState(false);
 
     // Discount Logic
     const [discountCode, setDiscountCode] = useState('');
-    const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+    const [placingOrder, setPlacingOrder] = useState(false);
+    const [notes, setNotes] = useState('');
+
+    // Dynamic Store Settings
+    const [storeSettings, setStoreSettings] = useState<any>(null);
+    const [loadingSettings, setLoadingSettings] = useState(true);
+
+    // Load store settings on mount
+    useEffect(() => {
+        loadStoreSettings();
+    }, []);
+
+    // Load user data and addresses on mount
+    useEffect(() => {
+        if (isAuthenticated && user) {
+            setEmail(user.email || '');
+            setPhone(user.phone || '');
+            setFirstName(user.first_name || '');
+            setLastName(user.last_name || '');
+            loadAddresses();
+        }
+    }, [isAuthenticated, user]);
+
+    const loadStoreSettings = async () => {
+        setLoadingSettings(true);
+        try {
+            const settings = await api.getStoreSettings();
+            setStoreSettings(settings);
+        } catch (error) {
+            console.error('Failed to load store settings:', error);
+            // Fallback to defaults
+            setStoreSettings({
+                shipping: { free_threshold: 250, flat_fee: 15 },
+                tax: { rate_percent: 15 },
+                currency: { code: 'USD', symbol: '$' }
+            });
+        } finally {
+            setLoadingSettings(false);
+        }
+    };
+
+    const loadAddresses = async () => {
+        setLoadingAddresses(true);
+        try {
+            const data = await api.getAddresses();
+            setAddresses(data || []);
+
+            // Auto-select default or first address
+            const defaultAddr = data.find((addr: any) => addr.is_default);
+            const firstAddr = defaultAddr || data[0];
+            if (firstAddr) {
+                setSelectedAddressId(firstAddr.id);
+            }
+        } catch (error) {
+            console.error('Failed to load addresses:', error);
+        } finally {
+            setLoadingAddresses(false);
+        }
+    };
 
     const handleApplyCoupon = async () => {
         if (!discountCode.trim()) return;
@@ -85,28 +125,170 @@ export default function CheckoutScreen() {
     // Calculate Discount Amount
     let discountAmount = 0;
     if (appliedCoupon) {
-        if (appliedCoupon.type === 'percentage') {
-            discountAmount = (subtotal * appliedCoupon.value) / 100;
-        } else if (appliedCoupon.type === 'fixed') {
-            discountAmount = appliedCoupon.value;
-        } else if (appliedCoupon.type === 'free_shipping') {
-            discountAmount = 0; // handled in shipping cost logic
-        }
+        discountAmount = appliedCoupon.discount_amount || 0;
     }
 
-    const shippingCost = (appliedCoupon?.type === 'free_shipping') ? 0 : (subtotal > 300 ? 0 : 10); // Mock shipping rule
-    const taxes = Math.max(0, (subtotal - discountAmount) * 0.05); // Mock 5% tax
+    // Calculate shipping (dynamic from backend)
+    const freeShippingThreshold = storeSettings?.shipping?.free_threshold || 250;
+    const shippingFee = storeSettings?.shipping?.flat_fee || 15;
+
+    let shippingCost = subtotal >= freeShippingThreshold ? 0 : shippingFee;
+    if (appliedCoupon?.free_shipping || user?.loyaltyTier?.free_shipping) {
+        shippingCost = 0;
+    }
+
+    // Calculate tax (dynamic from backend)
+    const taxRatePercent = storeSettings?.tax?.rate_percent || 15;
+    const taxes = Math.max(0, subtotal * (taxRatePercent / 100));
     const total = Math.max(0, subtotal - discountAmount + shippingCost + taxes);
+
+    const handlePlaceOrder = async () => {
+        // Validation
+        if (!isAuthenticated || !user) {
+            Alert.alert('Error', 'Please log in to place an order');
+            router.push('/login');
+            return;
+        }
+
+        if (items.length === 0) {
+            Alert.alert('Error', 'Your cart is empty');
+            return;
+        }
+
+        const selectedAddress = addresses.find(a => a.id === selectedAddressId);
+        if (!selectedAddress && isUsingSavedAddress) {
+            Alert.alert('Error', 'Please select a shipping address');
+            return;
+        }
+
+        if (!email || !phone || !firstName || !lastName) {
+            Alert.alert('Error', 'Please fill in all contact information');
+            return;
+        }
+
+        setPlacingOrder(true);
+        try {
+            const selectedAddr = addresses.find(a => a.id === selectedAddressId);
+
+            const orderData = {
+                first_name: firstName,
+                last_name: lastName,
+                email: email,
+                phone: phone,
+
+                // Shipping address fields (flat structure for backend)
+                shipping_address: selectedAddr?.address_line_1 || '',
+                shipping_address_2: selectedAddr?.address_line_2 || '',
+                shipping_city: selectedAddr?.city || '',
+                shipping_state: selectedAddr?.state || '',
+                shipping_zip: selectedAddr?.postal_code || '',
+                shipping_country: selectedAddr?.country || '',
+
+                // Billing address (same as shipping for now)
+                billing_address: selectedAddr?.address_line_1 || '',
+                billing_address_2: selectedAddr?.address_line_2 || '',
+                billing_city: selectedAddr?.city || '',
+                billing_state: selectedAddr?.state || '',
+                billing_zip: selectedAddr?.postal_code || '',
+                billing_country: selectedAddr?.country || '',
+
+                // Also send IDs for reference
+                billing_address_id: selectedAddressId,
+                shipping_address_id: selectedAddressId,
+
+                items: items.map(item => {
+                    // Find the variant by slug to get its numeric ID
+                    const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
+
+                    return {
+                        product_id: item.product_id || item.id,
+                        variant_id: variant?.id || null,  // Use numeric ID instead of slug
+                        quantity: item.qty,
+                        price: parseFloat(item.price.toFixed(2)),  // Round to 2 decimals
+                        options: item.options || null,
+                    };
+                }),
+                subtotal: parseFloat(subtotal.toFixed(2)),
+                tax_amount: parseFloat(taxes.toFixed(2)),
+                shipping_amount: parseFloat(shippingCost.toFixed(2)),
+                discount_amount: parseFloat(discountAmount.toFixed(2)),
+                total_amount: parseFloat(total.toFixed(2)),  // Fix floating point precision
+                payment_method: paymentMethod,
+                notes: notes,
+                coupon_code: appliedCoupon?.code || null,
+                currency_code: 'USD',  // TEMP: Testing if LBP causes backend error
+            };
+
+            const response = await api.placeOrder(orderData);
+
+            if (response.success) {
+                clearCart();
+                Alert.alert(
+                    'Order Placed!',
+                    `Your order #${response.order_number} has been placed successfully.`,
+                    [{
+                        text: 'OK',
+                        onPress: () => router.push('/profile')
+                    }]
+                );
+            } else {
+                Alert.alert('Error', response.message || 'Failed to place order');
+            }
+        } catch (error: any) {
+            console.error('Place order error:', error);
+            Alert.alert('Error', error.message || 'Failed to place order. Please try again.');
+        } finally {
+            setPlacingOrder(false);
+        }
+    };
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
-            <GlobalHeader
-                title="CHECKOUT"
-                showBack
-                alwaysShowTitle
-                showWishlist={false}
-                showShare={false}
-                showCart={false}
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: () => (
+                        <Text style={{
+                            fontSize: 17,
+                            fontWeight: '600',
+                            color: isDark ? '#fff' : '#000',
+                            letterSpacing: -0.4,
+                        }}>
+                            Checkout
+                        </Text>
+                    ),
+                    headerTitleAlign: 'center',
+                    ...Platform.select({
+                        ios: {
+                            headerLeft: () => (
+                                <Pressable
+                                    onPress={() => router.back()}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="chevron.left"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass',
+                                },
+                            }
+                        },
+                        android: {
+                            headerLeft: () => (
+                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
+                                </Pressable>
+                            ),
+                        }
+                    })
+                } as any}
             />
 
             <ScrollView
@@ -132,7 +314,7 @@ export default function CheckoutScreen() {
                                 color={isDark ? "#94A3B8" : "#64748B"}
                             />
                         </View>
-                        <Text style={[styles.summaryTotal, isDark && styles.textDark]}>${total.toFixed(2)}</Text>
+                        <Text style={[styles.summaryTotal, isDark && styles.textDark]}>{formatPrice(total)}</Text>
                     </Pressable>
 
                     {isSummaryOpen && (
@@ -165,7 +347,7 @@ export default function CheckoutScreen() {
                                                 <Text style={[styles.itemVariant, isDark && styles.textGrayDark]}>{details}</Text>
                                             </View>
                                             <Text style={[styles.itemPrice, isDark && styles.textDark]}>
-                                                ${(item.price * item.qty).toFixed(2)}
+                                                {formatPrice(item.price * item.qty)}
                                             </Text>
                                         </View>
                                     )
@@ -208,12 +390,12 @@ export default function CheckoutScreen() {
                             <View style={[styles.costBreakdown, isDark && styles.costBreakdownDark]}>
                                 <View style={styles.costRow}>
                                     <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Subtotal</Text>
-                                    <Text style={[styles.costValue, isDark && styles.textDark]}>${subtotal.toFixed(2)}</Text>
+                                    <Text style={[styles.costValue, isDark && styles.textDark]}>{formatPrice(subtotal)}</Text>
                                 </View>
                                 {discountAmount > 0 && (
                                     <View style={styles.costRow}>
                                         <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Discount</Text>
-                                        <Text style={[styles.costValue, { color: '#ef4444' }]}>-${discountAmount.toFixed(2)}</Text>
+                                        <Text style={[styles.costValue, { color: '#ef4444' }]}>-{formatPrice(discountAmount)}</Text>
                                     </View>
                                 )}
                                 <View style={styles.costRow}>
@@ -221,12 +403,12 @@ export default function CheckoutScreen() {
                                         <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Shipping</Text>
                                     </View>
                                     <Text style={[styles.costValue, isDark && styles.textDark]}>
-                                        {shippingCost === 0 ? 'Free' : `$${shippingCost.toFixed(2)}`}
+                                        {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
                                     </Text>
                                 </View>
                                 <View style={styles.costRow}>
                                     <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Estimated Taxes</Text>
-                                    <Text style={[styles.costValue, isDark && styles.textDark]}>${taxes.toFixed(2)}</Text>
+                                    <Text style={[styles.costValue, isDark && styles.textDark]}>{formatPrice(taxes)}</Text>
                                 </View>
                             </View>
 
@@ -234,7 +416,7 @@ export default function CheckoutScreen() {
                                 <Text style={[styles.totalLabel, isDark && styles.textDark]}>Total</Text>
                                 <View style={styles.flexRow}>
                                     <Text style={[styles.currency, isDark && styles.textGrayDark]}>USD</Text>
-                                    <Text style={[styles.totalValue, isDark && styles.textDark]}>${total.toFixed(2)}</Text>
+                                    <Text style={[styles.totalValue, isDark && styles.textDark]}>{formatPrice(total)}</Text>
                                 </View>
                             </View>
                         </View>
@@ -245,10 +427,24 @@ export default function CheckoutScreen() {
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Contact</Text>
                     <View style={styles.inputGroup}>
-                        <Text style={[styles.label, isDark && styles.labelDark]}>Email or mobile phone number</Text>
+                        <Text style={[styles.label, isDark && styles.labelDark]}>Email</Text>
                         <TextInput
                             style={[styles.input, isDark && styles.inputDark]}
                             placeholder="email@example.com"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                        />
+                    </View>
+                    <View style={styles.inputGroup}>
+                        <Text style={[styles.label, isDark && styles.labelDark]}>Phone</Text>
+                        <TextInput
+                            style={[styles.input, isDark && styles.inputDark]}
+                            placeholder="+1 (555) 555-5555"
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
                             placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
                         />
                     </View>
@@ -258,7 +454,7 @@ export default function CheckoutScreen() {
                 < View style={styles.section} >
                     <View style={styles.sectionHeader}>
                         <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Shipping address</Text>
-                        {MOCK_ADDRESSES.length > 0 && (
+                        {addresses.length > 0 && (
                             <Pressable onPress={() => setIsUsingSavedAddress(!isUsingSavedAddress)}>
                                 <Text style={styles.linkButton}>
                                     {isUsingSavedAddress ? 'Enter new address' : 'Select saved address'}
@@ -268,9 +464,11 @@ export default function CheckoutScreen() {
                     </View>
 
                     {
-                        isUsingSavedAddress && MOCK_ADDRESSES.length > 0 ? (
+                        loadingAddresses ? (
+                            <ActivityIndicator color="#000" style={{ marginVertical: 20 }} />
+                        ) : isUsingSavedAddress && addresses.length > 0 ? (
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addressList}>
-                                {MOCK_ADDRESSES.map((addr) => {
+                                {addresses.map((addr) => {
                                     const isSelected = selectedAddressId === addr.id;
                                     return (
                                         <Pressable
@@ -297,18 +495,20 @@ export default function CheckoutScreen() {
                                                     </View>
                                                 )}
                                             </View>
-                                            <Text style={[styles.addressText, isDark && styles.textGrayDark]}>
-                                                {addr.first_name} {addr.last_name}
-                                            </Text>
                                             <Text style={[styles.addressText, isDark && styles.textGrayDark]} numberOfLines={2}>
                                                 {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}
                                             </Text>
                                             <Text style={[styles.addressText, isDark && styles.textGrayDark]}>
-                                                {addr.city}, {addr.zip_code}
+                                                {addr.city}, {addr.state} {addr.postal_code}
                                             </Text>
                                             <Text style={[styles.addressText, isDark && styles.textGrayDark]}>
-                                                {addr.phone}
+                                                {addr.country}
                                             </Text>
+                                            {addr.phone && (
+                                                <Text style={[styles.addressText, isDark && styles.textGrayDark]}>
+                                                    {addr.phone}
+                                                </Text>
+                                            )}
                                         </Pressable>
                                     );
                                 })}
@@ -321,6 +521,8 @@ export default function CheckoutScreen() {
                                         <TextInput
                                             style={[styles.input, isDark && styles.inputDark]}
                                             placeholder="John"
+                                            value={firstName}
+                                            onChangeText={setFirstName}
                                             placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
                                         />
                                     </View>
@@ -329,6 +531,8 @@ export default function CheckoutScreen() {
                                         <TextInput
                                             style={[styles.input, isDark && styles.inputDark]}
                                             placeholder="Doe"
+                                            value={lastName}
+                                            onChangeText={setLastName}
                                             placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
                                         />
                                     </View>
@@ -429,11 +633,18 @@ export default function CheckoutScreen() {
             {/* Sticky Footer */}
             <View style={[styles.footer, isDark && styles.footerDark, { paddingBottom: insets.bottom || 20 }]}>
                 <Pressable
-                    onPress={() => alert('Order Placed!')}
-                    style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
+                    onPress={handlePlaceOrder}
+                    disabled={placingOrder}
+                    style={({ pressed }) => [styles.payButton, pressed && styles.pressed, placingOrder && { opacity: 0.7 }]}
                 >
-                    <Text style={styles.payButtonText}>Place Order</Text>
-                    <Text style={styles.payButtonTotal}>· ${total.toFixed(2)}</Text>
+                    {placingOrder ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <>
+                            <Text style={styles.payButtonText}>Place Order</Text>
+                            <Text style={styles.payButtonTotal}>· {formatPrice(total)}</Text>
+                        </>
+                    )}
                 </Pressable>
                 <View style={styles.secureFooter}>
                     <MaterialIcons name="lock" size={14} color="#9CA3AF" />
@@ -451,6 +662,26 @@ const styles = StyleSheet.create({
     },
     containerDark: {
         backgroundColor: '#101622',
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     content: {
     },
