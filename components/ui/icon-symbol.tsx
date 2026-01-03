@@ -21,6 +21,8 @@ const MAPPING = {
   'person.fill': 'person',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'chevron.left': 'arrow-back',
+  'square.and.arrow.up': 'share',
 } as IconMapping;
 
 /**

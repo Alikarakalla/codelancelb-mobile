@@ -1,11 +1,12 @@
-import { View, StyleSheet, Alert, ActivityIndicator, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, StyleSheet, Alert, ActivityIndicator, Text, Pressable, Platform, Share } from 'react-native';
+import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useMemo } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductInfo } from '@/components/product/ProductInfo';
@@ -21,6 +22,7 @@ import { useCart } from '@/hooks/use-cart-context';
 
 export default function ProductDetailsScreen() {
     const { id, initialImage } = useLocalSearchParams();
+    const router = useRouter();
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -143,11 +145,33 @@ export default function ProductDetailsScreen() {
         }
     };
 
+    const handleShare = async () => {
+        if (!product) return;
+        try {
+            const productUrl = `https://luxe.shop/product/${product.id}`;
+            const result = await Share.share({
+                message: Platform.OS === 'ios'
+                    ? product.name_en || product.name || ''
+                    : `${product.name_en || product.name}\nCheck this out: ${productUrl}`,
+                url: productUrl,
+                title: product.name_en || product.name || 'LUXE Product',
+            });
+
+            if (result.action === Share.sharedAction) {
+                // Share successful
+            } else if (result.action === Share.dismissedAction) {
+                // Share dismissed
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        }
+    };
+
     // If loading AND no initialImage, show full loader
     if (loading && !product && !initialImage) {
         return (
             <View style={[styles.loadingContainer, isDark && { backgroundColor: '#000' }]}>
-                <GlobalHeader title="LUXE" />
+                <Stack.Screen options={{ headerShown: true, title: 'Loading...', headerTransparent: false }} />
                 <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
             </View>
         );
@@ -156,7 +180,7 @@ export default function ProductDetailsScreen() {
     if (error && !product) {
         return (
             <View style={[styles.errorContainer, isDark && { backgroundColor: '#000' }]}>
-                <GlobalHeader title="LUXE" />
+                <Stack.Screen options={{ headerShown: true, title: 'Error', headerTransparent: false }} />
                 <Text style={[styles.errorText, isDark && { color: '#94A3B8' }]}>{error || 'Product not found'}</Text>
             </View>
         );
@@ -167,19 +191,65 @@ export default function ProductDetailsScreen() {
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
-            <GlobalHeader
-                title="LUXE"
-                showBack
-                showShare
-                showWishlist
-                showCart
-                isWishlisted={isWishlisted}
-                onWishlistPress={handleToggleWishlist}
+
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: '',
+                    // iOS 26 Native Liquid Glass Buttons Logic
+                    ...Platform.select({
+                        ios: {
+                            // Correct way to get circular glass back button
+                            headerLeft: () => (
+                                <Pressable
+                                    onPress={() => router.back()}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="chevron.left"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            // Correct way to get circular glass share button
+                            headerRight: () => (
+                                <Pressable
+                                    onPress={handleShare}
+                                    style={styles.nativeGlassWrapper}
+                                >
+                                    <IconSymbol
+                                        name="square.and.arrow.up"
+                                        color={isDark ? '#fff' : '#000'}
+                                        size={24}
+                                        weight="medium"
+                                    />
+                                </Pressable>
+                            ),
+                            // This property is required for the "Original" iOS 26 Material Look
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass', // Triggers the system GPU refraction
+                                },
+                            }
+                        },
+                        android: {
+                            // Standard Android behavior
+                            headerLeft: () => (
+                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
+                                </Pressable>
+                            ),
+                        }
+                    })
+                } as any}
             />
 
             <Animated.ScrollView
                 contentContainerStyle={{
-                    paddingTop: 60 + insets.top, // Space for header
+                    paddingTop: 0,
                     paddingBottom: 120 // Space for footer
                 }}
                 showsVerticalScrollIndicator={false}
@@ -263,5 +333,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
         textAlign: 'center',
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
 });

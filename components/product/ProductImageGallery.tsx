@@ -158,7 +158,6 @@ const styles = StyleSheet.create({
         width: width,
         height: width, // Square container
         position: 'relative',
-        paddingTop: 10,
     },
     slide: {
         width: width,
@@ -167,9 +166,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     image: {
-        width: width - 32, // Horizontal padding
-        height: width - 32,
-        borderRadius: 24, // Modern corner radius
+        width: width,
+        height: width,
     },
     pagination: {
         position: 'absolute',
