@@ -56,7 +56,7 @@ export default function WishlistScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f6f6f8',
+        backgroundColor: '#ffffff',
     },
     containerDark: {
         backgroundColor: '#101622',

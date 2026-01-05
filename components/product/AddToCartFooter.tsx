@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
+
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -23,9 +23,9 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
-    const { triggerAnimation } = useWishlistAnimation();
+
     const { triggerCartAnimation } = useCartAnimation();
-    const favButtonRef = React.useRef<View>(null);
+
     const cartButtonRef = React.useRef<View>(null);
 
     const increment = () => setQuantity(prev => prev + 1);
@@ -98,15 +98,7 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
 
 
 
-                {/* Compare Button */}
-                <Pressable style={({ pressed }) => [
-                    styles.iconBtn,
-                    isDark && { backgroundColor: '#000', borderColor: '#333' },
-                    pressed && styles.pressed,
-                    pressed && isDark && { backgroundColor: '#222' }
-                ]}>
-                    <Ionicons name="swap-horizontal" size={20} color={isDark ? "#fff" : "#1F2937"} />
-                </Pressable>
+
             </View>
         </View>
     );

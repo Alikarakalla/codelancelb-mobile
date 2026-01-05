@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
         aspectRatio: 3 / 4,
         borderRadius: 8,
         overflow: 'hidden',
-        backgroundColor: '#f6f6f8',
+        backgroundColor: '#ffffff',
         position: 'relative',
     },
     image: {

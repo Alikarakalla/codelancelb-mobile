@@ -82,7 +82,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                             <AnimatedImage
                                 source={{ uri: item }}
                                 style={styles.image}
-                                contentFit="cover"
+                                contentFit="contain"
                                 sharedTransitionTag={productId && index === 0 ? `product-image-${productId}` : undefined}
                             />
                         </View>
@@ -125,7 +125,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                                 style={[
                                     styles.thumbnailWrapper,
                                     isDark && { backgroundColor: '#222' },
-                                    activeIndex === index && styles.activeThumbnail
+                                    activeIndex === index && { borderColor: isDark ? '#fff' : '#000' }
                                 ]}
                             >
                                 <Image
@@ -217,14 +217,11 @@ const styles = StyleSheet.create({
     thumbnailWrapper: {
         width: 64,
         height: 64,
-        borderRadius: 12,
+        borderRadius: 4,
         overflow: 'hidden',
         borderWidth: 2,
         borderColor: 'transparent',
         backgroundColor: '#f1f5f9',
-    },
-    activeThumbnail: {
-        borderColor: '#1152d4',
     },
     thumbnailImage: {
         width: '100%',

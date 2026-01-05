@@ -39,7 +39,6 @@ export function ReviewItem(props: ReviewItemProps) {
                         </View>
                     </View>
                 </View>
-                <Ionicons name="ellipsis-horizontal" size={20} color="#94A3B8" />
             </View>
 
             {/* Content */}
@@ -56,14 +55,6 @@ export function ReviewItem(props: ReviewItemProps) {
                     ))}
                 </View>
             )}
-
-            {/* Footer */}
-            <View style={styles.footer}>
-                <Pressable style={styles.helpfulBtn}>
-                    <Ionicons name="thumbs-up-outline" size={16} color="#94A3B8" />
-                    <Text style={styles.helpfulText}>Helpful ({props.helpfulCount})</Text>
-                </Pressable>
-            </View>
         </View>
     );
 }

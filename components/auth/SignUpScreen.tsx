@@ -122,7 +122,7 @@ export default function SignUpScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#ffffff' }]}>
             <Stack.Screen
                 options={{
                     headerShown: true,
@@ -573,7 +573,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         backgroundColor: isDark ? '#374151' : '#e5e7eb',
     },
     dividerTextWrapper: {
-        backgroundColor: isDark ? '#101622' : '#f6f6f8',
+        backgroundColor: isDark ? '#101622' : '#ffffff',
         paddingHorizontal: 8,
     },
     dividerText: {

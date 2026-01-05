@@ -33,6 +33,20 @@ function getHeaders(extraHeaders: Record<string, string> = {}) {
     return headers;
 }
 
+// Helper to timeout fetch requests
+async function fetchWithTimeout(resource: string, options: RequestInit = {}) {
+    const { timeout = 15000 } = options as any; // Default 15s timeout
+
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+}
+
 // Helper to handle response
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
@@ -110,7 +124,7 @@ function transformImage(img: any): any {
 export const api = {
     // --- Auth ---
     async register(data: { name: string; email: string; password: string; password_confirmation: string }) {
-        const res = await fetch(`${BASE_URL}/register`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/register`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -119,7 +133,7 @@ export const api = {
     },
 
     async login(data: { email: string; password: string }) {
-        const res = await fetch(`${BASE_URL}/login`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/login`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -129,7 +143,7 @@ export const api = {
 
     async logout() {
         if (!apiToken) return;
-        const res = await fetch(`${BASE_URL}/logout`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/logout`, {
             method: 'POST',
             headers: getHeaders()
         });
@@ -137,10 +151,22 @@ export const api = {
     },
 
     async getMe() {
-        const res = await fetch(`${BASE_URL}/me`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/me`, {
             headers: getHeaders()
         });
         return handleResponse<User>(res);
+    },
+
+    async uploadAvatar(formData: FormData) {
+        const headers = getHeaders();
+        delete headers['Content-Type']; // Let the engine set boundary for multipart
+
+        const res = await fetchWithTimeout(`${BASE_URL}/update-profile-image`, {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+        return handleResponse<{ message: string; user: User }>(res);
     },
 
 
@@ -148,7 +174,7 @@ export const api = {
     async getProduct(id: number | string): Promise<Product> {
         try {
             // 1. Fetch Main Product
-            const productRes = await fetch(`${BASE_URL}/products/${id}`);
+            const productRes = await fetchWithTimeout(`${BASE_URL}/products/${id}`);
             const product = await handleResponse<any>(productRes);
 
             // 2. Conditionally Fetch details if missing from main response
@@ -157,17 +183,17 @@ export const api = {
 
             // If variants missing, fetch them
             if (!product.variants || !Array.isArray(product.variants)) {
-                fetches.push(fetch(`${BASE_URL}/products/${id}/variants`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/variants`));
                 keys.push('variants');
             }
             // If options missing, fetch them (The main API example lacked options)
             if (!product.options || !Array.isArray(product.options)) {
-                fetches.push(fetch(`${BASE_URL}/products/${id}/options`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/options`));
                 keys.push('options');
             }
             // If images missing or empty (Example showed empty images array, might need fetch)
             if (!product.images || product.images.length === 0) {
-                fetches.push(fetch(`${BASE_URL}/products/${id}/images`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/images`));
                 keys.push('images');
             }
 
@@ -201,7 +227,7 @@ export const api = {
     async getRelatedProducts(productId: number | string): Promise<Product[]> {
         try {
             // 1. Try Dedicated Related Products Endpoint
-            const res = await fetch(`${BASE_URL}/products/${productId}/related`);
+            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/related`);
             if (res.status === 200) {
                 const responseData = await handleResponse<any>(res);
                 const related = Array.isArray(responseData) ? responseData : (responseData.data || []);
@@ -228,7 +254,7 @@ export const api = {
 
     async getProductReviews(productId: number | string): Promise<ProductReview[]> {
         try {
-            const res = await fetch(`${BASE_URL}/products/${productId}/reviews`);
+            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/reviews`);
             if (res.status === 404) return [];
             const responseData = await handleResponse<any>(res);
             // Handle both raw array and { data: [...] }
@@ -248,7 +274,7 @@ export const api = {
 
     // --- Content ---
     async getCarouselSlides(): Promise<CarouselSlide[]> {
-        const res = await fetch(`${BASE_URL}/carousel`);
+        const res = await fetchWithTimeout(`${BASE_URL}/carousel`);
         const slides = await handleResponse<CarouselSlide[]>(res);
 
         // Transform image URLs
@@ -266,7 +292,7 @@ export const api = {
     // --- Categories ---
     async getCategories(): Promise<Category[]> {
         try {
-            const res = await fetch(`${BASE_URL}/categories`);
+            const res = await fetchWithTimeout(`${BASE_URL}/categories`);
             const responseData = await handleResponse<any>(res);
             const categories: Category[] = Array.isArray(responseData) ? responseData : (responseData.data || []);
 
@@ -289,7 +315,7 @@ export const api = {
     async getHighlightSections(): Promise<HighlightSection[]> {
         try {
             // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetch(`${BASE_URL}/highlights`);
+            const res = await fetchWithTimeout(`${BASE_URL}/highlights`);
             const highlights = await handleResponse<HighlightSection[]>(res);
             return highlights.map(h => ({
                 ...h,
@@ -305,7 +331,7 @@ export const api = {
     // --- Brands ---
     async getBrands(): Promise<Brand[]> {
         try {
-            const res = await fetch(`${BASE_URL}/brands`);
+            const res = await fetchWithTimeout(`${BASE_URL}/brands`);
             if (res.status === 404) return [];
             const brands = await handleResponse<Brand[]>(res);
             return brands.map(b => ({
@@ -323,7 +349,7 @@ export const api = {
     async getBanners(): Promise<Banner[]> {
         try {
             // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetch(`${BASE_URL}/banners`);
+            const res = await fetchWithTimeout(`${BASE_URL}/banners`);
             const banners = await handleResponse<Banner[]>(res);
             return banners.map(b => ({
                 ...b,
@@ -340,7 +366,7 @@ export const api = {
     // --- CMS Features ---
     async getCMSFeatures(): Promise<CMSFeature[]> {
         try {
-            const res = await fetch(`${BASE_URL}/features`);
+            const res = await fetchWithTimeout(`${BASE_URL}/features`);
             if (res.status === 404) return [];
             const features = await handleResponse<CMSFeature[]>(res);
             return features.map(f => ({
@@ -373,7 +399,7 @@ export const api = {
             if (params.search) url.searchParams.append('search', params.search);
             if (params.limit) url.searchParams.append('limit', params.limit.toString());
 
-            const res = await fetch(url.toString(), {
+            const res = await fetchWithTimeout(url.toString(), {
                 headers: getHeaders()
             });
             const responseData = await handleResponse<any>(res);
@@ -400,14 +426,14 @@ export const api = {
     // --- Cart ---
     // Assuming you use a session token or auth token stored in the device
     async getCart(sessionId: string): Promise<CartItem[]> {
-        const res = await fetch(`${BASE_URL}/cart`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/cart`, {
             headers: { 'X-Session-ID': sessionId }
         });
         return handleResponse<CartItem[]>(res);
     },
 
     async addToCart(sessionId: string, productId: number, qty: number, options: any) {
-        const res = await fetch(`${BASE_URL}/cart/add`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/cart/add`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -428,12 +454,12 @@ export const api = {
         if (sessionId) headers['X-Session-ID'] = sessionId;
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch(`${BASE_URL}/wishlist`, { headers });
+        const res = await fetchWithTimeout(`${BASE_URL}/wishlist`, { headers });
         return handleResponse<WishlistItem[]>(res);
     },
 
     async toggleWishlist(productId: number) {
-        const res = await fetch(`${BASE_URL}/wishlist/toggle`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/wishlist/toggle`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ product_id: productId })
@@ -443,7 +469,7 @@ export const api = {
 
     // --- Checkout ---
     async createOrder(orderData: any): Promise<Order> {
-        const res = await fetch(`${BASE_URL}/orders`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/orders`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(orderData)
@@ -483,7 +509,7 @@ export const api = {
             });
         }
 
-        const res = await fetch(`${BASE_URL}/coupons/apply`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/coupons/apply`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ code })
@@ -492,29 +518,36 @@ export const api = {
     },
 
     // --- Loyalty ---
+    async getLoyaltyTiers() {
+        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/tiers`, {
+            headers: getHeaders()
+        });
+        return handleResponse<any[]>(res);
+    },
+
     async getLoyaltyInfo() {
-        const res = await fetch(`${BASE_URL}/loyalty`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/loyalty`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
     },
 
     async getLoyaltyHistory() {
-        const res = await fetch(`${BASE_URL}/loyalty/history`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/history`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
     },
 
     async getLoyaltyRewards() {
-        const res = await fetch(`${BASE_URL}/loyalty/rewards`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/rewards`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
     },
 
     async redeemLoyaltyReward(rewardId: number) {
-        const res = await fetch(`${BASE_URL}/loyalty/redeem/${rewardId}`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/redeem/${rewardId}`, {
             method: 'POST',
             headers: getHeaders()
         });
@@ -523,14 +556,14 @@ export const api = {
 
     // --- Orders ---
     async getOrders(page: number = 1) {
-        const res = await fetch(`${BASE_URL}/orders?page=${page}`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/orders?page=${page}`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
     },
 
     async getOrderDetails(orderId: number) {
-        const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/orders/${orderId}`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
@@ -538,14 +571,14 @@ export const api = {
 
     // --- Addresses ---
     async getAddresses() {
-        const res = await fetch(`${BASE_URL}/addresses`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/addresses`, {
             headers: getHeaders()
         });
         return handleResponse<any>(res);
     },
 
     async createAddress(data: any) {
-        const res = await fetch(`${BASE_URL}/addresses`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/addresses`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -554,7 +587,7 @@ export const api = {
     },
 
     async updateAddress(id: number, data: any) {
-        const res = await fetch(`${BASE_URL}/addresses/${id}`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/addresses/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -563,7 +596,7 @@ export const api = {
     },
 
     async deleteAddress(id: number) {
-        const res = await fetch(`${BASE_URL}/addresses/${id}`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/addresses/${id}`, {
             method: 'DELETE',
             headers: getHeaders()
         });
@@ -571,7 +604,7 @@ export const api = {
     },
 
     async updatePassword(data: { current_password: string; new_password: string; new_password_confirmation: string }) {
-        const res = await fetch(`${BASE_URL}/update-password`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/update-password`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -586,7 +619,7 @@ export const api = {
         console.log('Request Data:', JSON.stringify(data, null, 2));
         console.log('========================');
 
-        const res = await fetch(`${BASE_URL}/checkout`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/checkout`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
@@ -596,7 +629,7 @@ export const api = {
 
     // --- Config ---
     async getStoreSettings() {
-        const res = await fetch(`${BASE_URL}/config/store-settings`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/config/store-settings`, {
             method: 'GET',
             headers: getHeaders(),
         });
@@ -605,7 +638,7 @@ export const api = {
 
     // --- Currencies ---
     async getCurrencies(): Promise<Currency[]> {
-        const res = await fetch(`${BASE_URL}/currencies`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/currencies`, {
             method: 'GET',
             headers: getHeaders(),
         });
@@ -615,7 +648,7 @@ export const api = {
 
     async getDefaultCurrency(): Promise<Currency | null> {
         try {
-            const res = await fetch(`${BASE_URL}/currencies/default`, {
+            const res = await fetchWithTimeout(`${BASE_URL}/currencies/default`, {
                 method: 'GET',
                 headers: getHeaders(),
             });

@@ -10,13 +10,22 @@ export function ProductDescription({ description }: ProductDescriptionProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+    const [expanded, setExpanded] = React.useState(false);
+
     return (
         <View style={styles.container}>
             <Text style={[styles.heading, isDark && { color: '#fff' }]}>Description</Text>
-            <Text style={[styles.body, isDark && { color: '#94A3B8' }]}>
-                {description}
-                <Text style={styles.readMore}> Read more</Text>
-            </Text>
+            <Pressable onPress={() => setExpanded(!expanded)}>
+                <Text
+                    style={[styles.body, isDark && { color: '#94A3B8' }]}
+                    numberOfLines={expanded ? undefined : 3}
+                >
+                    {description}
+                </Text>
+                <Text style={[styles.readMore, { marginTop: 4 }]}>
+                    {expanded ? 'Read less' : 'Read more'}
+                </Text>
+            </Pressable>
         </View>
     );
 }

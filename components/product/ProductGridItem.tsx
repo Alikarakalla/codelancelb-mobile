@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Product } from '@/types/schema';
-import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
+
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCurrency } from '@/hooks/use-currency-context';
@@ -27,16 +27,16 @@ export const ProductGridItem = ({
     onToggleWishlist,
     onQuickView
 }: ProductGridItemProps) => {
-    const { triggerAnimation } = useWishlistAnimation();
+
     const { triggerCartAnimation } = useCartAnimation();
     const { isInWishlist } = useWishlist();
     const { formatPrice } = useCurrency();
-    const wishlistIconRef = React.useRef<View>(null);
+
     const cartButtonRef = React.useRef<View>(null);
 
     const isWishlisted = isInWishlist(product.id);
     const hasDiscount = product.discount_amount && product.discount_amount > 0;
-    const imageUrl = product.main_image || 'https://via.placeholder.com/300x400';
+    const imageUrl = product.main_image || '';
 
     return (
         <Pressable
@@ -85,23 +85,7 @@ export const ProductGridItem = ({
                     </Pressable>
                     <Pressable
                         style={[styles.miniFab, { marginTop: 8 }]}
-                        onPress={() => {
-                            if (isWishlisted) {
-                                onToggleWishlist?.();
-                            } else if (wishlistIconRef.current) {
-                                requestAnimationFrame(() => {
-                                    wishlistIconRef.current?.measure((x, y, w, h, px, py) => {
-                                        triggerAnimation(
-                                            { x: px + w / 2, y: py + h / 2 },
-                                            () => onToggleWishlist?.()
-                                        );
-                                    });
-                                });
-                            } else {
-                                onToggleWishlist?.();
-                            }
-                        }}
-                        ref={wishlistIconRef}
+                        onPress={() => onToggleWishlist?.()}
                     >
                         <MaterialIcons
                             name={isWishlisted ? "favorite" : "favorite-border"}

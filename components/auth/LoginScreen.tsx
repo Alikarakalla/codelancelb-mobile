@@ -56,7 +56,7 @@ export default function LoginScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#ffffff' }]}>
             <Stack.Screen
                 options={{
                     headerShown: true,

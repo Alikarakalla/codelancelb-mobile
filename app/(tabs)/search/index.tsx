@@ -70,7 +70,7 @@ export default function SearchIndex() {
     const loadTrendingSearches = async () => {
         try {
             // TODO: Implement trending searches API endpoint
-            setTrendingSearches(['Winter Collection', 'Designer Bags', 'Sneakers', 'Watches']);
+            setTrendingSearches([]);
         } catch (error) {
             console.error('Error loading trending searches:', error);
         }
@@ -172,8 +172,32 @@ export default function SearchIndex() {
             contentInsetAdjustmentBehavior="automatic"
         >
             {isSearching ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={isDark ? '#fff' : '#007AFF'} />
+                <View style={[styles.section, { paddingHorizontal: 16 }]}>
+                    <View style={styles.productsGrid}>
+                        {[1, 2, 3, 4].map((i) => (
+                            <View
+                                key={i}
+                                style={[
+                                    styles.productCardStyle,
+                                    {
+                                        backgroundColor: isDark ? '#1C1C1E' : '#fff',
+                                        borderRadius: 12,
+                                        overflow: 'hidden',
+                                        marginBottom: 16,
+                                    }
+                                ]}
+                            >
+                                {/* Image Skeleton */}
+                                <View style={{ height: 180, backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB' }} />
+                                {/* Content Skeleton */}
+                                <View style={{ padding: 12, gap: 8 }}>
+                                    <View style={{ height: 12, width: '60%', backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB', borderRadius: 4 }} />
+                                    <View style={{ height: 14, width: '90%', backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB', borderRadius: 4 }} />
+                                    <View style={{ height: 14, width: '40%', backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB', borderRadius: 4 }} />
+                                </View>
+                            </View>
+                        ))}
+                    </View>
                 </View>
             ) : searchQuery.length > 0 && hasResults ? (
                 <>

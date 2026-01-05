@@ -26,7 +26,7 @@ export default function ProfileScreen() {
     const scrollViewRef = useRef<ScrollView>(null);
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#f6f6f8' }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#fff' }]}>
             <GlobalHeader title="LUXE" />
 
             <ScrollView

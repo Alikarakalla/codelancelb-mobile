@@ -15,25 +15,40 @@ export function RecentOrders() {
     const router = useRouter();
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     useEffect(() => {
         if (isAuthenticated) {
-            loadOrders();
+            fetchOrders(1, true);
         } else {
             setLoading(false);
         }
     }, [isAuthenticated]);
 
-    const loadOrders = async () => {
+    const fetchOrders = async (pageNum: number, isReset: boolean = false) => {
         try {
-            const response = await api.getOrders(1);
-            // Laravel pagination returns { data: [...], current_page, last_page, etc. }
-            setOrders(response.data || response || []);
+            if (!isReset) setLoadingMore(true);
+            const response = await api.getOrders(pageNum);
+
+            const newOrders = Array.isArray(response) ? response : (response.data || []);
+            const lastPage = response.last_page || 1;
+
+            setOrders(prev => isReset ? newOrders : [...prev, ...newOrders]);
+            setHasMore(pageNum < lastPage);
+            setPage(pageNum);
         } catch (error) {
             console.error('Failed to load orders:', error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
+    };
+
+    const handleLoadMore = () => {
+        if (!hasMore || loadingMore) return;
+        fetchOrders(page + 1);
     };
 
     const getStatusColor = (status: string) => {
@@ -86,7 +101,7 @@ export function RecentOrders() {
                         <MaterialIcons name="receipt-long" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
                         <Text style={[styles.title, { marginTop: 16, textAlign: 'center' }]}>Sign in to view your orders</Text>
                         <Pressable
-                            style={[styles.viewAll, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }]}
+                            style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }}
                             onPress={() => router.push('/login')}
                         >
                             <Text style={{ color: '#fff', fontWeight: '700' }}>Sign In</Text>
@@ -136,7 +151,7 @@ export function RecentOrders() {
         return (
             <Pressable
                 style={styles.card}
-                onPress={() => console.log('View order details:', item.id)}
+                onPress={() => router.push({ pathname: '/modal/order-details', params: { id: item.id } })}
             >
                 <View style={styles.cardHeader}>
                     <View style={styles.orderInfo}>
@@ -170,17 +185,38 @@ export function RecentOrders() {
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Recent Orders</Text>
-                <Pressable>
-                    <Text style={styles.viewAll}>View All</Text>
-                </Pressable>
+
             </View>
 
             <FlatList
-                data={orders.slice(0, 3)} // Show only first 3 orders
+                data={orders}
                 renderItem={renderOrder}
                 keyExtractor={(item) => item.id.toString()}
                 scrollEnabled={false}
                 contentContainerStyle={styles.list}
+                ListFooterComponent={
+                    <View style={{ marginTop: 8 }}>
+                        {loadingMore ? (
+                            <OrderSkeleton />
+                        ) : hasMore ? (
+                            <Pressable
+                                onPress={handleLoadMore}
+                                style={({ pressed }) => ({
+                                    backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    alignItems: 'center',
+                                    opacity: pressed ? 0.7 : 1
+                                })}
+                            >
+                                <Text style={{
+                                    color: isDark ? '#fff' : '#111827',
+                                    fontWeight: '600'
+                                }}>Load Older Orders</Text>
+                            </Pressable>
+                        ) : null}
+                    </View>
+                }
             />
         </View>
     );

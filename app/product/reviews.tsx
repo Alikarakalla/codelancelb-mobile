@@ -1,21 +1,70 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlobalHeader } from '@/components/ui/GlobalHeader';
+// import { GlobalHeader } from '@/components/ui/GlobalHeader'; 
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { RatingSummary } from '@/components/reviews/RatingSummary';
 import { ReviewFilters } from '@/components/reviews/ReviewFilters';
 import { ReviewItem } from '@/components/reviews/ReviewItem';
 import { Pressable, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { api } from '@/services/apiClient';
 import { Product, ProductReview } from '@/types/schema';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+// Skeleton Component
+function ReviewsSkeleton() {
+    return (
+        <View style={{ padding: 20 }}>
+            {/* Summary Skeleton */}
+            <View style={{ flexDirection: 'row', gap: 20, marginBottom: 30 }}>
+                <View style={{ width: 100, height: 100, borderRadius: 12, backgroundColor: '#F1F5F9' }} />
+                <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <View key={i} style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                    ))}
+                </View>
+            </View>
+
+            {/* Filters Skeleton */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 30 }}>
+                {[1, 2, 3].map(i => (
+                    <View key={i} style={{ width: 80, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9' }} />
+                ))}
+            </View>
+
+            {/* Reviews List Skeleton */}
+            {[1, 2, 3].map(i => (
+                <View key={i} style={{ marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F1F5F9' }} />
+                            <View style={{ gap: 6 }}>
+                                <View style={{ width: 120, height: 14, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                                <View style={{ width: 80, height: 12, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                            </View>
+                        </View>
+                        <View style={{ width: 60, height: 12, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                    </View>
+                    <View style={{ gap: 8 }}>
+                        <View style={{ width: '100%', height: 14, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                        <View style={{ width: '80%', height: 14, borderRadius: 4, backgroundColor: '#F1F5F9' }} />
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+}
 
 export default function ProductReviewsScreen() {
     const { id } = useLocalSearchParams();
+    const router = useRouter();
     const insets = useSafeAreaInsets();
     const { openDrawer } = useDrawer();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const [product, setProduct] = React.useState<Product | null>(null);
     const [loading, setLoading] = React.useState(true);
 
@@ -63,46 +112,72 @@ export default function ProductReviewsScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Standard Header */}
-            <GlobalHeader title="REVIEWS" showBack />
-
-            <ScrollView contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}>
-                {product && (
-                    <Text style={styles.productSubtitle} numberOfLines={1}>
-                        {product.name_en || product.name}
-                    </Text>
-                )}
-
-                <RatingSummary
-                    rating={stats.average}
-                    reviewCount={stats.count}
-                    distribution={stats.distribution as any}
-                />
-
-                <View style={{ height: 24 }} />
-                {/* Filters might arguably be fake for now if API doesn't support them */}
-                <ReviewFilters />
-
-                <View style={styles.list}>
-                    {loading ? (
-                        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>Loading reviews...</Text>
-                    ) : (product?.reviews?.length || 0) === 0 ? (
-                        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>No reviews yet.</Text>
-                    ) : (
-                        product!.reviews!.map((r) => (
-                            <ReviewItem
-                                key={r.id}
-                                author={r.user?.name || 'Anonymous'}
-                                initials={r.user?.name ? r.user.name.substring(0, 2).toUpperCase() : 'AN'}
-                                date={formatDate(r.created_at)}
-                                rating={r.rating}
-                                text={r.review}
-                                helpfulCount={0} // Not in API yet
-                                colorClass="#DBEAFE" // Random or fixed
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTitle: product?.name_en || product?.name || '', // Empty fallback to avoid "Reviews" flicker
+                    headerShadowVisible: false,
+                    headerStyle: { backgroundColor: isDark ? '#000' : '#fff' },
+                    headerTitleStyle: { color: isDark ? '#fff' : '#000', fontSize: 16, fontWeight: '600' },
+                    headerLeft: () => (
+                        <Pressable
+                            onPress={() => router.back()}
+                            style={styles.nativeGlassWrapper}
+                        >
+                            <IconSymbol
+                                name="chevron.left"
+                                color={isDark ? '#fff' : '#000'}
+                                size={24}
+                                weight="medium"
                             />
-                        ))
-                    )}
-                </View>
+                        </Pressable>
+                    ),
+                    headerBackVisible: false, // Hide default back button
+                    // iOS Native Glass Header BG
+                    ...Platform.select({
+                        ios: {
+                            headerTransparent: true,
+                            headerBlurEffect: isDark ? 'dark' : 'regular',
+                        }
+                    })
+                }}
+            />
+
+            <ScrollView contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: 100 }}>
+                {loading ? (
+                    <ReviewsSkeleton />
+                ) : (
+                    <>
+                        <RatingSummary
+                            rating={stats.average}
+                            reviewCount={stats.count}
+                            distribution={stats.distribution as any}
+                        />
+
+                        <View style={{ height: 24 }} />
+                        {/* Filters might arguably be fake for now if API doesn't support them */}
+                        <ReviewFilters />
+
+                        <View style={styles.list}>
+                            {(product?.reviews?.length || 0) === 0 ? (
+                                <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>No reviews yet.</Text>
+                            ) : (
+                                product!.reviews!.map((r) => (
+                                    <ReviewItem
+                                        key={r.id}
+                                        author={r.user?.name || 'Anonymous'}
+                                        initials={r.user?.name ? r.user.name.substring(0, 2).toUpperCase() : 'AN'}
+                                        date={formatDate(r.created_at)}
+                                        rating={r.rating}
+                                        text={r.review}
+                                        helpfulCount={0} // Not in API yet
+                                        colorClass="#DBEAFE" // Random or fixed
+                                    />
+                                ))
+                            )}
+                        </View>
+                    </>
+                )}
             </ScrollView>
 
             {/* Write Review Footer */}
@@ -167,5 +242,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    nativeGlassWrapper: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent',
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
 });

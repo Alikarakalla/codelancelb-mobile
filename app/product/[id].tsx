@@ -1,4 +1,5 @@
 import { View, StyleSheet, Alert, ActivityIndicator, Text, Pressable, Platform, Share } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useMemo } from 'react';
@@ -31,7 +32,7 @@ export default function ProductDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
-    const { addToCart } = useCart();
+    const { addToCart, cartCount } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
     useEffect(() => {
@@ -191,6 +192,7 @@ export default function ProductDetailsScreen() {
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
 
             <Stack.Screen
                 options={{
@@ -216,17 +218,67 @@ export default function ProductDetailsScreen() {
                             ),
                             // Correct way to get circular glass share button
                             headerRight: () => (
-                                <Pressable
-                                    onPress={handleShare}
-                                    style={styles.nativeGlassWrapper}
-                                >
-                                    <IconSymbol
-                                        name="square.and.arrow.up"
-                                        color={isDark ? '#fff' : '#000'}
-                                        size={24}
-                                        weight="medium"
-                                    />
-                                </Pressable>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: -8 }}>
+                                    <Pressable
+                                        onPress={handleToggleWishlist}
+                                        style={styles.nativeGlassWrapper}
+                                    >
+                                        <IconSymbol
+                                            name={isWishlisted ? "heart.fill" : "heart"}
+                                            color={isWishlisted ? '#FF3B30' : (isDark ? '#fff' : '#000')}
+                                            size={22}
+                                            weight="medium"
+                                        />
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={handleShare}
+                                        style={styles.nativeGlassWrapper}
+                                    >
+                                        <IconSymbol
+                                            name="square.and.arrow.up"
+                                            color={isDark ? '#fff' : '#000'}
+                                            size={22}
+                                            weight="medium"
+                                        />
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => router.push('/cart')}
+                                        style={styles.nativeGlassWrapper}
+                                    >
+                                        <View>
+                                            <IconSymbol
+                                                name="bag"
+                                                color={isDark ? '#fff' : '#000'}
+                                                size={22}
+                                                weight="medium"
+                                            />
+                                            {cartCount > 0 && (
+                                                <View style={{
+                                                    position: 'absolute',
+                                                    top: -2,
+                                                    right: -2,
+                                                    backgroundColor: '#FF3B30',
+                                                    borderRadius: 10,
+                                                    minWidth: 16,
+                                                    height: 16,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderWidth: 1.5,
+                                                    borderColor: isDark ? '#000' : '#fff'
+                                                }}>
+                                                    <Text style={{
+                                                        color: '#fff',
+                                                        fontSize: 9,
+                                                        fontWeight: 'bold',
+                                                        paddingHorizontal: 2
+                                                    }}>
+                                                        {cartCount}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </Pressable>
+                                </View>
                             ),
                             // This property is required for the "Original" iOS 26 Material Look
                             unstable_nativeHeaderOptions: {
@@ -242,6 +294,45 @@ export default function ProductDetailsScreen() {
                                     <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
                                 </Pressable>
                             ),
+                            headerRight: () => (
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Pressable onPress={handleToggleWishlist} style={{ padding: 8 }}>
+                                        <IconSymbol name={isWishlisted ? "heart.fill" : "heart"} color={isWishlisted ? '#FF3B30' : (isDark ? '#fff' : '#000')} size={24} />
+                                    </Pressable>
+                                    <Pressable onPress={handleShare} style={{ padding: 8 }}>
+                                        <IconSymbol name="square.and.arrow.up" color={isDark ? '#fff' : '#000'} size={24} />
+                                    </Pressable>
+                                    <Pressable onPress={() => router.push('/cart')} style={{ padding: 8 }}>
+                                        <View>
+                                            <IconSymbol name="bag" color={isDark ? '#fff' : '#000'} size={24} />
+                                            {cartCount > 0 && (
+                                                <View style={{
+                                                    position: 'absolute',
+                                                    top: -2,
+                                                    right: -2,
+                                                    backgroundColor: '#FF3B30',
+                                                    borderRadius: 10,
+                                                    minWidth: 16,
+                                                    height: 16,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderWidth: 1.5,
+                                                    borderColor: isDark ? '#000' : '#fff'
+                                                }}>
+                                                    <Text style={{
+                                                        color: '#fff',
+                                                        fontSize: 9,
+                                                        fontWeight: 'bold',
+                                                        paddingHorizontal: 2
+                                                    }}>
+                                                        {cartCount}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </Pressable>
+                                </View>
+                            )
                         }
                     })
                 } as any}
@@ -249,7 +340,7 @@ export default function ProductDetailsScreen() {
 
             <Animated.ScrollView
                 contentContainerStyle={{
-                    paddingTop: 0,
+                    paddingTop: insets.top + (Platform.OS === 'ios' ? 44 : 56), // Start content below the header
                     paddingBottom: 120 // Space for footer
                 }}
                 showsVerticalScrollIndicator={false}
@@ -260,8 +351,9 @@ export default function ProductDetailsScreen() {
                     productId={productIdForTag}
                 />
 
-                {product ? (
+                {product && (
                     <View>
+                        {/* ... components ... */}
                         <Animated.View entering={FadeInDown.delay(300).duration(600).damping(12)}>
                             <ProductInfo
                                 brand={product.brand?.name}
@@ -275,10 +367,6 @@ export default function ProductDetailsScreen() {
                         </Animated.View>
 
                         <Animated.View entering={FadeInDown.delay(400).duration(600).damping(12)}>
-                            <ProductDescription description={product.description_en || product.description || ''} />
-                        </Animated.View>
-
-                        <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
                             <ProductSelectors
                                 options={product.options}
                                 variants={product.variants}
@@ -286,7 +374,7 @@ export default function ProductDetailsScreen() {
                             />
                         </Animated.View>
 
-                        <Animated.View entering={FadeInDown.delay(600).duration(600).damping(12)}>
+                        <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
                             <AddToCartFooter
                                 onAddToCart={handleAddToCart}
                                 onToggleWishlist={handleToggleWishlist}
@@ -297,14 +385,14 @@ export default function ProductDetailsScreen() {
                             />
                         </Animated.View>
 
+                        <Animated.View entering={FadeInDown.delay(600).duration(600).damping(12)}>
+                            <ProductDescription description={product.description_en || product.description || ''} />
+                        </Animated.View>
+
                         <Animated.View entering={FadeInDown.delay(800).duration(600).damping(12)}>
                             <RelatedProducts currentProductId={product.id} />
                         </Animated.View>
                     </View>
-                ) : (
-                    <Animated.View entering={FadeIn.delay(300).duration(600)} style={{ padding: 20, alignItems: 'center' }}>
-                        <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
-                    </Animated.View>
                 )}
             </Animated.ScrollView>
         </View>
@@ -335,8 +423,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     nativeGlassWrapper: {
-        width: 20,
-        height: 20,
+        width: 32, // Slightly larger touch target
+        height: 32,
         borderRadius: 50,
         backgroundColor: 'transparent', // Important: Let the system provide the glass
         justifyContent: 'center',
@@ -346,11 +434,11 @@ const styles = StyleSheet.create({
         ...Platform.select({
             ios: {
                 shadowColor: 'transparent',
-                marginHorizontal: 8,
+                marginHorizontal: 4, // Tighter spacing for 3 buttons
             },
             android: {
                 backgroundColor: 'rgba(0,0,0,0.05)',
-                marginHorizontal: 8,
+                marginHorizontal: 4,
             }
         })
     },

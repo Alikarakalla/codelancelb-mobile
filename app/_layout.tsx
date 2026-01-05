@@ -6,7 +6,7 @@ import { WishlistProvider } from '@/hooks/use-wishlist-context';
 import { CartProvider } from '@/hooks/use-cart-context';
 import { AuthProvider } from '@/hooks/use-auth-context';
 import { CurrencyProvider } from '@/hooks/use-currency-context';
-import { WishlistAnimationProvider } from '@/components/wishlist/WishlistAnimationProvider';
+
 import { CartAnimationProvider } from '@/components/cart/CartAnimationProvider';
 import { DrawerProvider, useDrawer } from '@/hooks/use-drawer-context';
 import { SideDrawer } from '@/components/ui/SideDrawer';
@@ -63,22 +63,23 @@ export default function RootLayout() {
           <CurrencyProvider>
             <WishlistProvider>
               <CartProvider>
-                <WishlistAnimationProvider>
-                  <CartAnimationProvider>
-                    <DrawerProvider>
-                      <DrawerWrappedRoot>
-                        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                          <Stack screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                            <Stack.Screen name="product" options={{ presentation: 'card', headerShown: false }} />
-                            <Stack.Screen name="cart" options={{ presentation: 'card', headerShown: false }} />
-                            <Stack.Screen name="checkout" options={{ presentation: 'card', headerShown: false }} />
-                          </Stack>
-                        </ThemeProvider>
-                      </DrawerWrappedRoot>
-                    </DrawerProvider>
-                  </CartAnimationProvider>
-                </WishlistAnimationProvider>
+
+                <CartAnimationProvider>
+                  <DrawerProvider>
+                    <DrawerWrappedRoot>
+                      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                        <Stack screenOptions={{ headerShown: false }}>
+                          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                          <Stack.Screen name="product" options={{ presentation: 'card', headerShown: false }} />
+                          <Stack.Screen name="cart" options={{ presentation: 'card', headerShown: false }} />
+                          <Stack.Screen name="checkout" options={{ presentation: 'card', headerShown: false }} />
+                          <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                        </Stack>
+                      </ThemeProvider>
+                    </DrawerWrappedRoot>
+                  </DrawerProvider>
+                </CartAnimationProvider>
+
               </CartProvider>
             </WishlistProvider>
           </CurrencyProvider>

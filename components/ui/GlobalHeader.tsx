@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
 import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Share08Icon, FavouriteIcon, ShoppingBag01Icon, SearchCustomIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { SearchBottomSheet } from '@/components/search/SearchBottomSheet';
@@ -126,10 +127,34 @@ export function GlobalHeader({
                                     });
                                 }}
                             >
-                                <HugeiconsIcon icon={ShoppingBag01Icon} size={24} color={textColor} />
+                                <IconSymbol
+                                    name="bag"
+                                    color={textColor}
+                                    size={24}
+                                    weight="medium"
+                                />
                                 {cartCount > 0 && (
-                                    <View style={[styles.badge, isDark && { backgroundColor: '#fff', borderColor: '#000' }]}>
-                                        <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{cartCount}</Text>
+                                    <View style={{
+                                        position: 'absolute',
+                                        top: 2,
+                                        right: 2,
+                                        backgroundColor: '#FF3B30',
+                                        borderRadius: 10,
+                                        minWidth: 16,
+                                        height: 16,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderWidth: 1.5,
+                                        borderColor: isDark ? '#000' : '#fff'
+                                    }}>
+                                        <Text style={{
+                                            color: '#fff',
+                                            fontSize: 9,
+                                            fontWeight: 'bold',
+                                            paddingHorizontal: 2
+                                        }}>
+                                            {cartCount}
+                                        </Text>
                                     </View>
                                 )}
                             </Pressable>

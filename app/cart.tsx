@@ -211,7 +211,7 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F6F6F8',
+        backgroundColor: '#ffffff',
     },
     containerDark: {
         backgroundColor: '#000000',

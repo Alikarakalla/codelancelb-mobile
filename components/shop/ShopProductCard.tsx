@@ -9,7 +9,7 @@ import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
 import { Product } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCart } from '@/hooks/use-cart-context';
-import { useWishlistAnimation } from '@/components/wishlist/WishlistAnimationProvider';
+
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -25,9 +25,9 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { addToCart } = useCart();
-    const { triggerAnimation } = useWishlistAnimation();
+
     const { triggerCartAnimation } = useCartAnimation();
-    const heartIconRef = React.useRef<View>(null);
+
     const cartButtonRef = React.useRef<View>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -68,18 +68,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
         if (inWishlist) {
             removeFromWishlist(product.id);
         } else {
-            if (heartIconRef.current) {
-                requestAnimationFrame(() => {
-                    heartIconRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                        triggerAnimation(
-                            { x: pageX + width / 2, y: pageY + height / 2 },
-                            () => addToWishlist(product)
-                        );
-                    });
-                });
-            } else {
-                addToWishlist(product);
-            }
+            addToWishlist(product);
         }
     };
 
@@ -105,7 +94,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
         <Pressable onPress={handleCardPress} style={[styles.container, isDark && styles.containerDark, style]}>
             <View style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
                 <AnimatedImage
-                    source={{ uri: product.main_image || 'https://via.placeholder.com/300' }}
+                    source={{ uri: product.main_image || '' }}
                     style={styles.image}
                     contentFit="cover"
                     sharedTransitionTag={`product-image-${product.id}`}
@@ -115,7 +104,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     onPress={handleToggleWishlist}
                     style={[styles.triggerButton, isDark && { backgroundColor: 'rgba(30,30,30,0.9)' }]}
                     hitSlop={12}
-                    ref={heartIconRef}
+
                 >
                     <HugeiconsIcon
                         icon={FavouriteIcon}

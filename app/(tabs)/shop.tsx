@@ -137,8 +137,8 @@ export default function ShopScreen() {
 
     const handleProductPress = (product: Product) => {
         router.push({
-            pathname: `/product/${product.id}`,
-            params: { initialImage: product.main_image }
+            pathname: '/product/[id]',
+            params: { id: product.id, initialImage: product.main_image || '' }
         });
     };
 
@@ -204,7 +204,7 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F6F6F8',
+        backgroundColor: '#ffffff',
     },
     listHeader: {
         paddingVertical: 12,

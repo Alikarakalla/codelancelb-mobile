@@ -55,7 +55,7 @@ export function SearchBottomSheet({ isOpen, onClose }: SearchBottomSheetProps) {
     const loadTrendingSearches = async () => {
         try {
             // TODO: Implement trending searches API endpoint
-            setTrendingSearches(['Winter Collection', 'Designer Bags', 'Sneakers', 'Watches']);
+            setTrendingSearches([]);
         } catch (error) {
             console.error('Error loading trending searches:', error);
         }
@@ -246,8 +246,19 @@ export function SearchBottomSheet({ isOpen, onClose }: SearchBottomSheetProps) {
                     {searchQuery.length > 2 && (
                         <>
                             {isSearching ? (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="large" color="#000" />
+                                <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <View key={i} style={{ flexDirection: 'row', padding: 12, gap: 12, marginBottom: 8 }}>
+                                            {/* Image Skeleton */}
+                                            <View style={{ width: 60, height: 60, borderRadius: 8, backgroundColor: isDark ? '#2C2C2E' : '#f3f4f6' }} />
+                                            {/* Text Skeleton */}
+                                            <View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
+                                                <View style={{ width: '40%', height: 12, borderRadius: 4, backgroundColor: isDark ? '#2C2C2E' : '#f3f4f6' }} />
+                                                <View style={{ width: '80%', height: 14, borderRadius: 4, backgroundColor: isDark ? '#2C2C2E' : '#f3f4f6' }} />
+                                                <View style={{ width: '30%', height: 14, borderRadius: 4, backgroundColor: isDark ? '#2C2C2E' : '#f3f4f6' }} />
+                                            </View>
+                                        </View>
+                                    ))}
                                 </View>
                             ) : hasResults ? (
                                 <>

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/apiClient';
 import { LoyaltyLog } from '@/types/schema';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export function LoyaltyHistory() {
     const colorScheme = useColorScheme();
+    const router = useRouter();
     const isDark = colorScheme === 'dark';
     const [history, setHistory] = useState<LoyaltyLog[]>([]);
     const [loading, setLoading] = useState(true);
@@ -18,7 +21,6 @@ export function LoyaltyHistory() {
     const loadHistory = async () => {
         try {
             const data = await api.getLoyaltyHistory();
-            // Paginated response usually { data: [...], ...meta }
             const list = Array.isArray(data) ? data : (data.data || []);
             setHistory(list);
         } catch (error) {
@@ -28,90 +30,121 @@ export function LoyaltyHistory() {
         }
     };
 
-    if (loading) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator size="small" color="#1152d4" />
-            </View>
-        );
-    }
-
-    if (history.length === 0) {
-        return null;
-    }
+    const displayedHistory = history.slice(0, 2);
 
     return (
         <View style={styles.container}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Points History</Text>
+            {/* Header Row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Points History</Text>
 
-            <View style={[styles.list, { backgroundColor: isDark ? '#1a2230' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb' }]}>
-                {history.map((log, index) => (
-                    <View
-                        key={log.id}
-                        style={[
-                            styles.item,
-                            index !== history.length - 1 && { borderBottomWidth: 1, borderBottomColor: isDark ? '#374151' : '#f3f4f6' }
-                        ]}
-                    >
-                        <View style={styles.iconBox}>
-                            <MaterialIcons
-                                name={log.points > 0 ? "add-circle" : "remove-circle"}
-                                size={24}
-                                color={log.points > 0 ? "#10b981" : "#ef4444"}
-                            />
-                        </View>
-
-                        <View style={styles.itemContent}>
-                            <Text style={[styles.itemDesc, { color: isDark ? '#fff' : '#111318' }]}>
-                                {log.description || (log.points > 0 ? 'Points Earned' : 'Points Redeemed')}
-                            </Text>
-                            <Text style={[styles.itemDate, { color: isDark ? '#9ca3af' : '#616f89' }]}>
-                                {new Date(log.created_at).toLocaleDateString()}
-                            </Text>
-                        </View>
-
-                        <Text style={[
-                            styles.pointsValue,
-                            { color: log.points > 0 ? '#10b981' : isDark ? '#fff' : '#111318' }
-                        ]}>
-                            {log.points > 0 ? '+' : ''}{log.points}
-                        </Text>
-                    </View>
-                ))}
+                <Pressable
+                    onPress={() => router.push('/modal/points-history')}
+                    style={styles.nativeGlassWrapper}
+                >
+                    <IconSymbol
+                        name="chevron.right"
+                        color={isDark ? '#fff' : '#000'}
+                        size={22}
+                        weight="medium"
+                    />
+                </Pressable>
             </View>
+
+            {loading ? (
+                <View style={{ gap: 12 }}>
+                    {[1, 2].map((i) => (
+                        <View key={i} style={[styles.card, { height: 72, backgroundColor: isDark ? '#1C1C1E' : '#f0f0f0' }]} />
+                    ))}
+                </View>
+            ) : displayedHistory.length === 0 ? (
+                <Text style={{ color: '#888', fontStyle: 'italic', paddingHorizontal: 4 }}>No history available.</Text>
+            ) : (
+                <View style={{ gap: 12 }}>
+                    {displayedHistory.map((log) => (
+                        <View
+                            key={log.id}
+                            style={[
+                                styles.card,
+                                { backgroundColor: isDark ? '#1C1C1E' : '#fff' }
+                            ]}
+                        >
+                            <View style={[styles.iconBox, { backgroundColor: log.points > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }]}>
+                                <MaterialIcons
+                                    name={log.points > 0 ? "add-circle" : "remove-circle"}
+                                    size={24}
+                                    color={log.points > 0 ? "#10b981" : "#ef4444"}
+                                />
+                            </View>
+
+                            <View style={styles.itemContent}>
+                                <Text style={[styles.itemDesc, { color: isDark ? '#fff' : '#111318' }]} numberOfLines={1}>
+                                    {log.description || (log.points > 0 ? 'Points Earned' : 'Points Redeemed')}
+                                </Text>
+                                <Text style={[styles.itemDate, { color: isDark ? '#9ca3af' : '#616f89' }]}>
+                                    {new Date(log.created_at).toLocaleDateString()}
+                                </Text>
+                            </View>
+
+                            <Text style={[
+                                styles.pointsValue,
+                                { color: log.points > 0 ? '#10b981' : isDark ? '#fff' : '#111318' }
+                            ]}>
+                                {log.points > 0 ? '+' : ''}{log.points} pts
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        gap: 16,
-    },
-    center: {
-        alignItems: 'center',
-        padding: 20,
+        marginTop: 24,
+        paddingHorizontal: 4,
     },
     title: {
         fontSize: 18,
         fontWeight: '700',
-        paddingHorizontal: 4,
     },
-    list: {
-        borderRadius: 16,
-        borderWidth: 1,
-        overflow: 'hidden',
+    nativeGlassWrapper: {
+        width: 36,
+        height: 36,
+        borderRadius: 50,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 4,
+            }
+        })
     },
-    item: {
+    card: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 16,
+        borderRadius: 16,
         gap: 12,
+        // Card Shadow
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     iconBox: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.03)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -119,12 +152,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     itemDesc: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
         marginBottom: 4,
     },
     itemDate: {
-        fontSize: 12,
+        fontSize: 13,
     },
     pointsValue: {
         fontSize: 16,

@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Platform, Image as RNImage } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { api } from '@/services/apiClient';
 import { LoyaltyReward } from '@/types/schema';
-import { useAuth } from '@/hooks/use-auth-context';
+import { Image } from 'expo-image';
 
 export function LoyaltyRewards() {
     const colorScheme = useColorScheme();
+    const router = useRouter();
     const isDark = colorScheme === 'dark';
-    const { reloadUser } = useAuth();
     const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
     const [loading, setLoading] = useState(true);
-    const [redeemingId, setRedeemingId] = useState<number | null>(null);
 
     useEffect(() => {
         loadRewards();
@@ -22,122 +21,84 @@ export function LoyaltyRewards() {
     const loadRewards = async () => {
         try {
             const data = await api.getLoyaltyRewards();
-            // The API returns a list of rewards. 
-            // Depending on implementation it might be wrapped in data or direct array.
-            // apiClient.ts handleResponse generic usually returns the json body.
-            // Based on the controller, it returns the collection map directly or inside data. 
-            // We'll safe check array.
             const list = Array.isArray(data) ? data : (data.data || []);
             setRewards(list);
         } catch (error) {
-            console.error('Failed to load rewards:', error);
+            console.error('Failed to load rewards widget:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleRedeem = async (reward: LoyaltyReward) => {
-        Alert.alert(
-            'Redeem Reward',
-            `Are you sure you want to redeem "${reward.name}" for ${reward.points_required} points?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Redeem',
-                    onPress: async () => {
-                        setRedeemingId(reward.id);
-                        try {
-                            const res = await api.redeemLoyaltyReward(reward.id);
-                            Alert.alert('Success', 'Reward redeemed successfully!');
-
-                            // Reload rewards list
-                            loadRewards();
-
-                            // Refresh user data (points balance)
-                            if (reloadUser) {
-                                await reloadUser();
-                            }
-                        } catch (error: any) {
-                            const msg = error.message.includes('422')
-                                ? 'Insufficient points or conditions not met.'
-                                : 'Failed to redeem reward. Please try again.';
-                            Alert.alert('Redemption Failed', msg);
-                        } finally {
-                            setRedeemingId(null);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator size="small" color="#1152d4" />
-            </View>
-        );
-    }
-
-    if (rewards.length === 0) {
-        return null;
-    }
+    const displayedRewards = rewards.slice(0, 2);
 
     return (
         <View style={styles.container}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Available Rewards</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Rewards</Text>
 
-            <View style={styles.grid}>
-                {rewards.map((reward) => (
-                    <View
-                        key={reward.id}
-                        style={[
-                            styles.card,
-                            {
-                                backgroundColor: isDark ? '#1a2230' : '#ffffff',
-                                borderColor: isDark ? '#374151' : '#e5e7eb'
-                            }
-                        ]}
-                    >
-                        {reward.image && (
-                            <Image source={{ uri: reward.image }} style={styles.image} contentFit="cover" />
-                        )}
+                <Pressable
+                    onPress={() => router.push('/modal/available-rewards')}
+                    style={styles.nativeGlassWrapper}
+                >
+                    <IconSymbol
+                        name="chevron.right"
+                        color={isDark ? '#fff' : '#000'}
+                        size={22}
+                        weight="medium"
+                    />
+                </Pressable>
+            </View>
 
-                        <View style={styles.cardContent}>
-                            <View style={styles.rewardHeader}>
-                                <Text style={[styles.rewardName, { color: isDark ? '#fff' : '#111318' }]}>
-                                    {reward.name}
-                                </Text>
-                                <View style={styles.pointsBadge}>
-                                    <Text style={styles.pointsText}>{reward.points_required} pts</Text>
-                                </View>
+            {/* Rewards List */}
+            <View style={{ gap: 12 }}>
+                {loading ? (
+                    // Simple Skeleton
+                    [1, 2].map((i) => (
+                        <View key={i} style={[styles.card, { height: 80, backgroundColor: isDark ? '#1C1C1E' : '#f0f0f0' }]} />
+                    ))
+                ) : displayedRewards.length > 0 ? (
+                    displayedRewards.map((reward) => (
+                        <Pressable
+                            key={reward.id}
+                            style={[
+                                styles.card,
+                                { backgroundColor: isDark ? '#1C1C1E' : '#fff' }
+                            ]}
+                            onPress={() => router.push('/modal/available-rewards')}
+                        >
+                            {/* Image Placeholder or Actual Image */}
+                            <View style={[styles.rewardImage, { backgroundColor: isDark ? '#2C2C2E' : '#F1F5F9' }]}>
+                                {reward.image ? (
+                                    <Image source={{ uri: reward.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                                ) : (
+                                    <IconSymbol name="gift.fill" color={isDark ? '#6366f1' : '#4f46e5'} size={24} />
+                                )}
                             </View>
 
-                            {reward.description && (
-                                <Text style={[styles.description, { color: isDark ? '#9ca3af' : '#616f89' }]} numberOfLines={2}>
-                                    {reward.description}
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.rewardName, { color: isDark ? '#fff' : '#000' }]} numberOfLines={1}>
+                                    {reward.name}
                                 </Text>
-                            )}
+                                <Text style={{ color: '#6366f1', fontSize: 13, fontWeight: '600', marginTop: 4 }}>
+                                    {reward.points_required} pts
+                                </Text>
+                            </View>
 
-                            <Pressable
-                                style={[
-                                    styles.redeemButton,
-                                    !reward.can_redeem && styles.redeemButtonDisabled
-                                ]}
-                                onPress={() => reward.can_redeem && handleRedeem(reward)}
-                                disabled={!reward.can_redeem || redeemingId === reward.id}
-                            >
-                                {redeemingId === reward.id ? (
-                                    <ActivityIndicator size="small" color="#fff" />
-                                ) : (
-                                    <Text style={styles.redeemButtonText}>
-                                        {reward.can_redeem ? 'Redeem Now' : 'Not Enough Points'}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </View>
-                ))}
+                            {/* Unlock Status */}
+                            <View style={[
+                                styles.statusBadge,
+                                { backgroundColor: reward.can_redeem ? 'rgba(99,102,241,0.1)' : 'rgba(0,0,0,0.05)' }
+                            ]}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: reward.can_redeem ? '#6366f1' : isDark ? '#888' : '#999' }}>
+                                    {reward.can_redeem ? 'Claim' : 'Locked'}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    ))
+                ) : (
+                    <Text style={{ color: '#888', fontStyle: 'italic' }}>No rewards available.</Text>
+                )}
             </View>
         </View>
     );
@@ -145,74 +106,60 @@ export function LoyaltyRewards() {
 
 const styles = StyleSheet.create({
     container: {
-        gap: 16,
-    },
-    center: {
-        alignItems: 'center',
-        padding: 20,
+        marginTop: 24,
+        paddingHorizontal: 4,
     },
     title: {
         fontSize: 18,
         fontWeight: '700',
-        paddingHorizontal: 4,
     },
-    grid: {
-        gap: 12,
+    nativeGlassWrapper: {
+        width: 36,
+        height: 36,
+        borderRadius: 50,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 4,
+            }
+        })
     },
     card: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
         borderRadius: 16,
-        borderWidth: 1,
+        gap: 12,
+        // Card Shadow
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    rewardImage: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
         overflow: 'hidden',
     },
-    image: {
-        width: '100%',
-        height: 120,
-        backgroundColor: 'rgba(0,0,0,0.05)',
-    },
-    cardContent: {
-        padding: 16,
-        gap: 12,
-    },
-    rewardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 12,
-    },
     rewardName: {
-        flex: 1,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
     },
-    pointsBadge: {
-        backgroundColor: 'rgba(17, 82, 212, 0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    pointsText: {
-        color: '#1152d4',
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    description: {
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    redeemButton: {
-        backgroundColor: '#1152d4',
-        height: 44,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    redeemButtonDisabled: {
-        backgroundColor: '#94a3b8',
-        opacity: 0.5,
-    },
-    redeemButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '600',
+    statusBadge: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 100,
     },
 });
