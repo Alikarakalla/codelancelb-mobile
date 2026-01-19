@@ -114,6 +114,7 @@ export function SideDrawer({ isOpen, onClose, children }: SideDrawerProps) {
                     <View style={[styles.divider, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]} />
 
                     <NavItem icon="settings" label="Settings" />
+                    <NavItem icon="vpn-key" label="API Keys" />
                     <NavItem icon="help" label="Help Center" />
                 </ScrollView>
 

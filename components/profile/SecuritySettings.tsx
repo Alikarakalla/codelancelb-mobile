@@ -200,12 +200,12 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 4,
     },
     card: {
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderRadius: 16,
         padding: 16,
         gap: 16,
         borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#f3f4f6',
+        borderColor: isDark ? '#334155' : '#f3f4f6',
     },
     inputGroup: {
         gap: 8,
@@ -224,8 +224,8 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         height: 48,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#e5e7eb',
-        backgroundColor: isDark ? '#111827' : '#ffffff',
+        borderColor: isDark ? '#334155' : '#e5e7eb',
+        backgroundColor: isDark ? '#0f172a' : '#ffffff',
         color: isDark ? '#fff' : '#111318',
         paddingHorizontal: 16,
         paddingRight: 48,
@@ -238,7 +238,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     },
     divider: {
         height: 1,
-        backgroundColor: isDark ? '#374151' : '#f3f4f6',
+        backgroundColor: isDark ? '#334155' : '#f3f4f6',
     },
     updateButton: {
         height: 48,

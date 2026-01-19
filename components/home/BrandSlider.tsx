@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { SharedValue } from 'react-native-reanimated';
 import { Brand } from '@/types/schema';
-import { MOCK_BRANDS } from '@/constants/mockData';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.42;
@@ -17,7 +17,7 @@ export function BrandSlider({ scrollY, brands }: Props) {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const displayBrands = (brands && brands.length > 0) ? brands : (MOCK_BRANDS as Brand[]);
+    const displayBrands = brands || [];
 
     const handlePress = (brandId: number) => {
         router.push({ pathname: '/shop', params: { brand_id: brandId } });

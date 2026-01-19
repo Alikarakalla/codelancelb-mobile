@@ -15,7 +15,7 @@ export function ProfileTabs({ activeTab, onTabChange }: ProfileTabsProps) {
     const scrollViewRef = useRef<ScrollView>(null);
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#1a2230' : '#ffffff', borderBottomColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff', borderBottomColor: isDark ? '#334155' : '#f3f4f6' }]}>
             <ScrollView
                 ref={scrollViewRef}
                 horizontal

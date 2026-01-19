@@ -42,7 +42,7 @@ export default function WishlistScreen() {
                 ) : (
                     <View style={styles.emptyState}>
                         <Text style={[styles.emptyTitle, isDark && styles.textLight]}>Your Wishlist is Empty</Text>
-                        <Text style={styles.emptySubtitle}>Tap the heart icon on any product to save it here.</Text>
+                        <Text style={[styles.emptySubtitle, isDark && styles.textDim]}>Tap the heart icon on any product to save it here.</Text>
                         <Pressable onPress={() => router.push('/(tabs)/shop')} style={styles.shopBtn}>
                             <Text style={styles.shopBtnText}>Start Shopping</Text>
                         </Pressable>
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
     },
     containerDark: {
-        backgroundColor: '#101622',
+        backgroundColor: '#000000',
     },
     grid: {
         flexDirection: 'row',
@@ -90,6 +90,9 @@ const styles = StyleSheet.create({
     },
     textLight: {
         color: '#fff',
+    },
+    textDim: {
+        color: '#94a3b8',
     },
     shopBtn: {
         backgroundColor: '#1152d4',

@@ -233,6 +233,13 @@ export function SearchBottomSheet({ isOpen, onClose }: SearchBottomSheetProps) {
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         returnKeyType="search"
+                        onSubmitEditing={() => {
+                            if (searchQuery.trim().length > 0) {
+                                onClose();
+                                router.push(`/(tabs)/shop?search=${encodeURIComponent(searchQuery)}`);
+                                saveRecentSearch(searchQuery);
+                            }
+                        }}
                     />
                     {searchQuery.length > 0 && (
                         <Pressable onPress={() => setSearchQuery('')} style={styles.clearButton}>

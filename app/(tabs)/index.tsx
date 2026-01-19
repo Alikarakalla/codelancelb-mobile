@@ -14,7 +14,6 @@ import { PromoBanner } from '@/components/home/PromoBanner';
 import { BrandSlider } from '@/components/home/BrandSlider';
 import { StorefrontBanner } from '@/components/home/StorefrontBanner';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
-import { MOCK_PRODUCTS } from '@/constants/mockData';
 import { Product, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature } from '@/types/schema';
 import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import Animated, {
@@ -26,30 +25,7 @@ import { useDrawer } from '@/hooks/use-drawer-context';
 import { api } from '@/services/apiClient';
 
 // Mock slides for initial render / API fallback
-const MOCK_SLIDES: CarouselSlide[] = [
-  {
-    id: 1,
-    title_en: 'ELEGANCE IN\nEVERY DETAIL',
-    title_ar: 'الأناقة في كل التفاصيل',
-    subtitle_en: 'LIMITED EDITION',
-    image_desktop: 'https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=1000&auto=format&fit=crop',
-    image_mobile: 'https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=1000&auto=format&fit=crop',
-    cta_text_en: 'EXPLORE NOW',
-    is_active: true,
-    sort_order: 1
-  },
-  {
-    id: 2,
-    title_en: 'MODERN CLASSICS\nREIMAGINED',
-    title_ar: 'كلاسيكيات حديثة',
-    subtitle_en: 'SUMMER ESSENTIALS',
-    image_desktop: 'https://images.unsplash.com/photo-1590736704728-f4730bb30770?q=80&w=1000&auto=format&fit=crop',
-    image_mobile: 'https://images.unsplash.com/photo-1590736704728-f4730bb30770?q=80&w=1000&auto=format&fit=crop',
-    cta_text_en: 'VIEW ALL',
-    is_active: true,
-    sort_order: 2
-  }
-];
+
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -60,7 +36,7 @@ export default function HomeScreen() {
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const { openDrawer } = useDrawer();
-  const [slides, setSlides] = useState<CarouselSlide[]>(MOCK_SLIDES);
+  const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [highlights, setHighlights] = useState<HighlightSection[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -74,7 +50,7 @@ export default function HomeScreen() {
     const loadData = async () => {
       try {
         const [apiSlides, apiCategories, apiHighlights, apiBrands, apiBanners, apiFeatures, apiFeatured, apiLatest] = await Promise.all([
-          api.getCarouselSlides().catch(() => MOCK_SLIDES),
+          api.getCarouselSlides(),
           api.getCategories(),
           api.getHighlightSections(),
           api.getBrands(),
@@ -99,14 +75,13 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  // Fallback to mock data if API results are empty (using MOCK_PRODUCTS for now until API is connected)
-  const displayFeatured = featuredProducts.length > 0 ? featuredProducts : MOCK_PRODUCTS.filter(p => p.is_featured);
-  const displayLatest = latestProducts.length > 0 ? latestProducts : [...MOCK_PRODUCTS].reverse().slice(0, 4);
+  const displayFeatured = featuredProducts;
+  const displayLatest = latestProducts;
 
   const handleProductPress = (product: Product) => {
     router.push({
-      pathname: `/product/${product.id}`,
-      params: { initialImage: product.main_image }
+      pathname: '/product/[id]',
+      params: { id: product.id, initialImage: product.main_image || '' }
     });
   };
 

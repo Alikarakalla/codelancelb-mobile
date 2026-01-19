@@ -1,5 +1,6 @@
 import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency } from '@/types/schema';
-import { MOCK_PRODUCTS, MOCK_CATEGORIES, MOCK_BRANDS, MOCK_BANNERS, MOCK_HIGHLIGHTS, MOCK_FEATURES } from '@/constants/mockData';
+import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
+
 
 // 1. CHANGE THIS in your .env file
 const ENV_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -26,6 +27,7 @@ function getHeaders(extraHeaders: Record<string, string> = {}) {
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         ...extraHeaders,
+        'X-API-Key': 'sk_kiTY7EJfsNncJ4UNJowb5jkfibZXiK7iDtXVMdRDw5ROvE03'.trim(),
     };
     if (apiToken) {
         headers['Authorization'] = `Bearer ${apiToken}`;
@@ -34,17 +36,25 @@ function getHeaders(extraHeaders: Record<string, string> = {}) {
 }
 
 // Helper to timeout fetch requests
+// Helper to timeout fetch requests
+// Helper to timeout fetch requests
 async function fetchWithTimeout(resource: string, options: RequestInit = {}) {
-    const { timeout = 15000 } = options as any; // Default 15s timeout
+    // ... comments ...
 
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    const response = await fetch(resource, {
-        ...options,
-        signal: controller.signal
-    });
-    clearTimeout(id);
-    return response;
+    console.log(`[API] Fetching: ${resource}`);
+    // console.log(`[API] Headers:`, JSON.stringify(options.headers || 'No Headers'));
+
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            // ...
+        });
+        return response;
+    } catch (error: any) {
+        // ...
+        console.error(`[API] Fetch Error for ${resource}:`, error.message);
+        throw error;
+    }
 }
 
 // Helper to handle response
@@ -76,6 +86,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // Helper to fix image URL
 const fixUrl = (url?: string | null) =>
     (url && !url.startsWith('http')) ? `https://sadekabdelsater.com/storage/${url}` : url;
+
+// Helper to calculate price with discount
+function calculateFinalPrice(price: number, discountAmount?: number | null, discountType?: string | null): number {
+    if (!price) return 0;
+    if (!discountAmount) return price;
+
+    let finalPrice = price;
+    if (discountType === 'percent') {
+        finalPrice = price * (1 - (discountAmount / 100));
+    } else {
+        // Assume fixed
+        finalPrice = price - discountAmount;
+    }
+    return Math.max(0, finalPrice);
+}
 
 // Helper to transform product data (fix images, convert prices)
 function transformProduct(p: any): Product {
@@ -174,7 +199,7 @@ export const api = {
     async getProduct(id: number | string): Promise<Product> {
         try {
             // 1. Fetch Main Product
-            const productRes = await fetchWithTimeout(`${BASE_URL}/products/${id}`);
+            const productRes = await fetchWithTimeout(`${BASE_URL}/products/${id}`, { headers: getHeaders() });
             const product = await handleResponse<any>(productRes);
 
             // 2. Conditionally Fetch details if missing from main response
@@ -183,17 +208,17 @@ export const api = {
 
             // If variants missing, fetch them
             if (!product.variants || !Array.isArray(product.variants)) {
-                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/variants`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/variants`, { headers: getHeaders() }));
                 keys.push('variants');
             }
             // If options missing, fetch them (The main API example lacked options)
             if (!product.options || !Array.isArray(product.options)) {
-                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/options`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/options`, { headers: getHeaders() }));
                 keys.push('options');
             }
             // If images missing or empty (Example showed empty images array, might need fetch)
             if (!product.images || product.images.length === 0) {
-                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/images`));
+                fetches.push(fetchWithTimeout(`${BASE_URL}/products/${id}/images`, { headers: getHeaders() }));
                 keys.push('images');
             }
 
@@ -217,8 +242,10 @@ export const api = {
         } catch (err) {
             console.error(`Error fetching product ${id}:`, err);
             if (IS_DEV) {
-                const mock = MOCK_PRODUCTS.find(p => p.id.toString() === id.toString());
-                if (mock) return mock;
+                // Return generic dev fallback or throw
+                // const mock = MOCK_PRODUCTS.find(p => p.id.toString() === id.toString());
+                // if (mock) return mock;
+                throw err;
             }
             throw err;
         }
@@ -227,7 +254,7 @@ export const api = {
     async getRelatedProducts(productId: number | string): Promise<Product[]> {
         try {
             // 1. Try Dedicated Related Products Endpoint
-            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/related`);
+            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/related`, { headers: getHeaders() });
             if (res.status === 200) {
                 const responseData = await handleResponse<any>(res);
                 const related = Array.isArray(responseData) ? responseData : (responseData.data || []);
@@ -254,7 +281,7 @@ export const api = {
 
     async getProductReviews(productId: number | string): Promise<ProductReview[]> {
         try {
-            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/reviews`);
+            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/reviews`, { headers: getHeaders() });
             if (res.status === 404) return [];
             const responseData = await handleResponse<any>(res);
             // Handle both raw array and { data: [...] }
@@ -263,10 +290,7 @@ export const api = {
             console.warn(`Error fetching reviews for ${productId} (using fallback):`, err);
             if (IS_DEV) {
                 // Return dummy reviews if API fails
-                return [
-                    { id: 1, product_id: Number(productId), user_id: 101, rating: 5, review: 'Absolutely love this! The quality is outstanding.', created_at: '2 days ago' },
-                    { id: 2, product_id: Number(productId), user_id: 102, rating: 4, review: 'Great value for money. Fits perfectly.', created_at: '1 week ago' }
-                ] as ProductReview[];
+                return [];
             }
             return [];
         }
@@ -274,11 +298,13 @@ export const api = {
 
     // --- Content ---
     async getCarouselSlides(): Promise<CarouselSlide[]> {
-        const res = await fetchWithTimeout(`${BASE_URL}/carousel`);
+        if ((global as any).cachedSlides) return (global as any).cachedSlides;
+
+        const res = await fetchWithTimeout(`${BASE_URL}/carousel`, { headers: getHeaders() });
         const slides = await handleResponse<CarouselSlide[]>(res);
 
         // Transform image URLs
-        return slides.map(slide => ({
+        const transformedData = slides.map(slide => ({
             ...slide,
             image_desktop: slide.image_desktop?.startsWith('http')
                 ? slide.image_desktop
@@ -287,12 +313,15 @@ export const api = {
                 ? slide.image_mobile
                 : `https://sadekabdelsater.com/storage/${slide.image_mobile}`
         }));
+
+        (global as any).cachedSlides = transformedData;
+        return transformedData;
     },
 
     // --- Categories ---
     async getCategories(): Promise<Category[]> {
         try {
-            const res = await fetchWithTimeout(`${BASE_URL}/categories`);
+            const res = await fetchWithTimeout(`${BASE_URL}/categories?limit=100`, { headers: getHeaders() });
             const responseData = await handleResponse<any>(res);
             const categories: Category[] = Array.isArray(responseData) ? responseData : (responseData.data || []);
 
@@ -306,7 +335,7 @@ export const api = {
             return categories.map(transformCat);
         } catch (err) {
             console.error('Error fetching categories:', err);
-            if (IS_DEV) return MOCK_CATEGORIES as any;
+            // if (IS_DEV) return MOCK_CATEGORIES as any;
             throw err;
         }
     },
@@ -315,7 +344,7 @@ export const api = {
     async getHighlightSections(): Promise<HighlightSection[]> {
         try {
             // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetchWithTimeout(`${BASE_URL}/highlights`);
+            const res = await fetchWithTimeout(`${BASE_URL}/highlights`, { headers: getHeaders() });
             const highlights = await handleResponse<HighlightSection[]>(res);
             return highlights.map(h => ({
                 ...h,
@@ -323,7 +352,7 @@ export const api = {
             }));
         } catch (err) {
             console.error('Error fetching highlights:', err);
-            if (IS_DEV) return MOCK_HIGHLIGHTS as any;
+            // if (IS_DEV) return MOCK_HIGHLIGHTS as any;
             throw err;
         }
     },
@@ -331,7 +360,7 @@ export const api = {
     // --- Brands ---
     async getBrands(): Promise<Brand[]> {
         try {
-            const res = await fetchWithTimeout(`${BASE_URL}/brands`);
+            const res = await fetchWithTimeout(`${BASE_URL}/brands`, { headers: getHeaders() });
             if (res.status === 404) return [];
             const brands = await handleResponse<Brand[]>(res);
             return brands.map(b => ({
@@ -340,7 +369,7 @@ export const api = {
             }));
         } catch (err) {
             console.warn('Error fetching brands (using fallback):');
-            if (IS_DEV) return MOCK_BRANDS as any;
+            // if (IS_DEV) return MOCK_BRANDS as any;
             return [];
         }
     },
@@ -349,7 +378,7 @@ export const api = {
     async getBanners(): Promise<Banner[]> {
         try {
             // if (IS_PLACEHOLDER) throw new Error('Using placeholder data');
-            const res = await fetchWithTimeout(`${BASE_URL}/banners`);
+            const res = await fetchWithTimeout(`${BASE_URL}/banners`, { headers: getHeaders() });
             const banners = await handleResponse<Banner[]>(res);
             return banners.map(b => ({
                 ...b,
@@ -358,7 +387,7 @@ export const api = {
             }));
         } catch (err) {
             console.error('Error fetching banners:', err);
-            if (IS_DEV) return MOCK_BANNERS as any;
+            // if (IS_DEV) return MOCK_BANNERS as any;
             throw err;
         }
     },
@@ -366,7 +395,7 @@ export const api = {
     // --- CMS Features ---
     async getCMSFeatures(): Promise<CMSFeature[]> {
         try {
-            const res = await fetchWithTimeout(`${BASE_URL}/features`);
+            const res = await fetchWithTimeout(`${BASE_URL}/features`, { headers: getHeaders() });
             if (res.status === 404) return [];
             const features = await handleResponse<CMSFeature[]>(res);
             return features.map(f => ({
@@ -377,49 +406,262 @@ export const api = {
             }));
         } catch (err) {
             console.warn('Error fetching features (using fallback):');
-            if (IS_DEV) return MOCK_FEATURES as any;
+            // if (IS_DEV) return MOCK_FEATURES as any;
             return [];
         }
     },
 
+
+
     // --- Products ---
-    async getProducts(params: { category_id?: number, brand_id?: number, category_ids?: number[], brand_ids?: number[], search?: string, limit?: number } = {}): Promise<Product[]> {
+    async getProducts(params: {
+        category_id?: number,
+        brand_id?: number,
+        category_ids?: number[],
+        sub_category_ids?: number[],
+        sub_sub_category_ids?: number[],
+        brand_ids?: number[],
+        search?: string,
+        limit?: number,
+        page?: number,
+        is_featured?: boolean,
+        color?: string,
+        size?: string,
+        min_price?: number,
+        max_price?: number,
+        sort_by?: string,
+        sort_order?: string
+    } = {}): Promise<Product[]> {
         try {
             const url = new URL(`${BASE_URL}/products`);
             if (params.category_id) url.searchParams.append('category_id', params.category_id.toString());
             if (params.brand_id) url.searchParams.append('brand_id', params.brand_id.toString());
 
+            // Use singular key with array syntax for strict filtering
             if (params.category_ids?.length) {
-                params.category_ids.forEach(id => url.searchParams.append('category_ids[]', id.toString()));
+                params.category_ids.forEach(id => url.searchParams.append('category_id[]', id.toString()));
             }
+            if (params.sub_category_ids?.length) {
+                params.sub_category_ids.forEach(id => url.searchParams.append('sub_category_id[]', id.toString()));
+            }
+            if (params.sub_sub_category_ids?.length) {
+                params.sub_sub_category_ids.forEach(id => url.searchParams.append('sub_sub_category_id[]', id.toString()));
+            }
+
             if (params.brand_ids?.length) {
-                params.brand_ids.forEach(id => url.searchParams.append('brand_ids[]', id.toString()));
+                params.brand_ids.forEach(id => url.searchParams.append('brand_id[]', id.toString()));
             }
 
             if (params.search) url.searchParams.append('search', params.search);
-            if (params.limit) url.searchParams.append('limit', params.limit.toString());
+
+            // SPECIAL HANDLING FOR COMPLEX QUERIES (Price Filtering, Sorting, Brand, Color, Size)
+            // Since the backend logic might be limited or inconsistent, we fetch ALL products for these cases
+            // to ensure accurate client-side filtering and sorting.
+            const isComplexQuery =
+                params.min_price !== undefined ||
+                params.max_price !== undefined ||
+                params.sort_by !== undefined ||
+                (params.brand_ids && params.brand_ids.length > 0) ||
+                params.color ||
+                params.size;
+
+            let requestPage = params.page || 1;
+            let requestLimit = params.limit || 10;
+
+            if (isComplexQuery) {
+                // Fetch valid large amount to ensure we get everything suitable for filtering/sorting
+                url.searchParams.append('per_page', '1000');
+                // Do NOT append 'page' here, default to 1 (all)
+            } else {
+                // Normal Server-Side Pagination
+                url.searchParams.append('per_page', requestLimit.toString());
+                url.searchParams.append('page', requestPage.toString());
+            }
+
+            if (params.is_featured) url.searchParams.append('is_featured', '1');
+            if (params.color) url.searchParams.append('color', params.color);
+            if (params.size) url.searchParams.append('size', params.size);
+
+            // We do NOT send min_price/max_price to server as it ignores them anyway, 
+            // but keeping them in params object for our logic below.
 
             const res = await fetchWithTimeout(url.toString(), {
                 headers: getHeaders()
             });
             const responseData = await handleResponse<any>(res);
-            // Products endpoint also usually wraps in { data: [] }
-            const products = Array.isArray(responseData) ? responseData : (responseData.data || []);
-            return products.map(transformProduct);
+            let products = Array.isArray(responseData) ? responseData : (responseData.data || []);
+            products = products.map(transformProduct);
+
+            // Client-side Processing
+            if (isComplexQuery) {
+                const min = params.min_price || 0;
+                const max = params.max_price || Infinity;
+
+                // 1. Filter
+                products = products.filter((p: Product) => {
+                    // Price Filter
+                    if (params.min_price !== undefined || params.max_price !== undefined) {
+                        const price = calculateFinalPrice(p.price || 0, p.discount_amount, p.discount_type);
+                        if (price < min || price > max) return false;
+                    }
+
+                    // Brand Filter
+                    if (params.brand_ids && params.brand_ids.length > 0) {
+                        if (!p.brand_id || !params.brand_ids.includes(p.brand_id)) return false;
+                        // Note: If brand_id is null/undefined, it fails the check, which is correct (must belong to selected brands)
+                    }
+
+                    // Color Filter
+                    if (params.color) {
+                        // Check if ANY variant matches the color
+                        const hasColor = p.variants?.some(v => v.color?.toLowerCase() === params.color!.toLowerCase());
+                        if (!hasColor) return false;
+                    }
+
+                    // Size Filter
+                    if (params.size) {
+                        // Check if ANY variant matches the size
+                        const hasSize = p.variants?.some(v => v.size?.toLowerCase() === params.size!.toLowerCase());
+                        if (!hasSize) return false;
+                    }
+
+                    return true;
+                });
+
+                // 2. Sort
+                if (params.sort_by) {
+                    products.sort((a: Product, b: Product) => {
+                        let valA: any = a[params.sort_by as keyof Product];
+                        let valB: any = b[params.sort_by as keyof Product];
+
+                        // Special handling for price to use discounted price
+                        if (params.sort_by === 'price') {
+                            valA = calculateFinalPrice(a.price || 0, a.discount_amount, a.discount_type);
+                            valB = calculateFinalPrice(b.price || 0, b.discount_amount, b.discount_type);
+                        }
+
+                        // Handle dates
+                        if (params.sort_by === 'created_at') {
+                            valA = new Date(valA).getTime();
+                            valB = new Date(valB).getTime();
+                        }
+
+                        if (typeof valA === 'string') valA = valA.toLowerCase();
+                        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                        if (valA < valB) return params.sort_order === 'desc' ? 1 : -1;
+                        if (valA > valB) return params.sort_order === 'desc' ? -1 : 1;
+                        return 0;
+                    });
+                }
+
+                // 3. Paginate Locally
+                const startIndex = (requestPage - 1) * requestLimit;
+                const endIndex = startIndex + requestLimit;
+                products = products.slice(startIndex, endIndex);
+            }
+            return products;
         } catch (err) {
             console.error('Error fetching products:', err);
             if (IS_DEV) {
-                let filtered = [...MOCK_PRODUCTS];
-                // Mock filtering logic...
-                if (params?.category_id) filtered = filtered.filter(p => p.category_id === params.category_id);
-                if (params?.brand_id) filtered = filtered.filter(p => p.brand_id === params.brand_id);
-                if (params?.category_ids?.length) filtered = filtered.filter(p => p.category_id && params.category_ids?.includes(p.category_id));
-                if (params?.brand_ids?.length) filtered = filtered.filter(p => p.brand_id && params.brand_ids?.includes(p.brand_id));
-                if (params?.search) filtered = filtered.filter(p => p.name.toLowerCase().includes(params.search!.toLowerCase()));
-                if (params?.limit) filtered = filtered.slice(0, params.limit);
-                return filtered;
+                // let filtered = [...MOCK_PRODUCTS]; - Removed
+                return [];
             }
             return [];
+        }
+    },
+
+    /**
+     * Get filter metadata: available colors, sizes, and price range
+     * This extracts unique values from all product variants
+     */
+    async getFilterMetadata(): Promise<{ colors: ColorOption[], sizes: string[], minPrice: number, maxPrice: number }> {
+        try {
+            // Fetch multiple pages or large limit to get good metadata range
+            const products = await this.getProducts({ limit: 500 }); // Increase limit for better accuracy
+
+            const colorsMap = new Map<string, string>(); // name -> hex
+            const sizesSet = new Set<string>();
+            let minPrice = Infinity;
+            let maxPrice = 0;
+
+            products.forEach(product => {
+                // Extract price range using Final Price (Discounted)
+                if (product.price) {
+                    const price = calculateFinalPrice(
+                        typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+                        product.discount_amount,
+                        product.discount_type
+                    );
+
+                    if (price < minPrice) minPrice = price;
+                    if (price > maxPrice) maxPrice = price;
+                }
+
+                // Extract colors and sizes from variants
+                if (product.variants && Array.isArray(product.variants)) {
+                    product.variants.forEach(variant => {
+                        // Check for color in variant
+                        if (variant.color) {
+                            const colorOption = parseColorValue(variant.color);
+                            if (colorOption && !colorsMap.has(colorOption.name)) {
+                                colorsMap.set(colorOption.name, colorOption.hex);
+                            }
+                        }
+                        // Check for size in variant options
+                        if (variant.size) {
+                            sizesSet.add(variant.size);
+                        }
+                        // Also check variant price
+                        if (variant.price) {
+                            const vPrice = calculateFinalPrice(
+                                typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price,
+                                variant.discount_amount,
+                                variant.discount_type
+                            );
+                            if (vPrice < minPrice) minPrice = vPrice;
+                            if (vPrice > maxPrice) maxPrice = vPrice;
+                        }
+                    });
+                }
+
+                // Also check product options for color/size values
+                if (product.options && Array.isArray(product.options)) {
+                    product.options.forEach(option => {
+                        const optionName = option.name?.toLowerCase();
+                        if (optionName === 'color' || optionName === 'colour') {
+                            if (Array.isArray(option.values)) {
+                                option.values.forEach((v: any) => {
+                                    const colorOption = parseColorValue(v);
+                                    if (colorOption && !colorsMap.has(colorOption.name)) {
+                                        colorsMap.set(colorOption.name, colorOption.hex);
+                                    }
+                                });
+                            }
+                        }
+                        if (optionName === 'size') {
+                            if (Array.isArray(option.values)) {
+                                option.values.forEach((v: string) => sizesSet.add(v));
+                            }
+                        }
+                    });
+                }
+            });
+
+            return {
+                colors: Array.from(colorsMap.entries()).map(([name, hex]) => ({ name, hex })).sort((a, b) => a.name.localeCompare(b.name)),
+                sizes: Array.from(sizesSet).sort(),
+                minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
+                maxPrice: maxPrice === 0 ? 1000 : Math.ceil(maxPrice)
+            };
+        } catch (err) {
+            console.error('Error fetching filter metadata:', err);
+            return {
+                colors: [],
+                sizes: [],
+                minPrice: 0,
+                maxPrice: 1000
+            };
         }
     },
 
@@ -519,31 +761,48 @@ export const api = {
 
     // --- Loyalty ---
     async getLoyaltyTiers() {
-        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/tiers`, {
-            headers: getHeaders()
-        });
-        return handleResponse<any[]>(res);
+        try {
+            const res = await fetchWithTimeout(`${BASE_URL}/loyalty/tiers`, {
+                headers: getHeaders()
+            });
+            return handleResponse<any[]>(res);
+        } catch (error) {
+            console.warn('Loyalty Tiers requires auth or failed:', error);
+            return [];
+        }
     },
 
     async getLoyaltyInfo() {
-        const res = await fetchWithTimeout(`${BASE_URL}/loyalty`, {
-            headers: getHeaders()
-        });
-        return handleResponse<any>(res);
+        try {
+            const res = await fetchWithTimeout(`${BASE_URL}/loyalty`, {
+                headers: getHeaders()
+            });
+            return handleResponse<any>(res);
+        } catch (error) {
+            return null;
+        }
     },
 
     async getLoyaltyHistory() {
-        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/history`, {
-            headers: getHeaders()
-        });
-        return handleResponse<any>(res);
+        try {
+            const res = await fetchWithTimeout(`${BASE_URL}/loyalty/history`, {
+                headers: getHeaders()
+            });
+            return handleResponse<any>(res);
+        } catch (error) {
+            return [];
+        }
     },
 
     async getLoyaltyRewards() {
-        const res = await fetchWithTimeout(`${BASE_URL}/loyalty/rewards`, {
-            headers: getHeaders()
-        });
-        return handleResponse<any>(res);
+        try {
+            const res = await fetchWithTimeout(`${BASE_URL}/loyalty/rewards`, {
+                headers: getHeaders()
+            });
+            return handleResponse<any>(res);
+        } catch (error) {
+            return [];
+        }
     },
 
     async redeemLoyaltyReward(rewardId: number) {

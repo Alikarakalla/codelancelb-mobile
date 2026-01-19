@@ -246,12 +246,12 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         gap: 12,
     },
     card: {
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderRadius: 16,
         padding: 16,
         gap: 12,
         borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#f3f4f6',
+        borderColor: isDark ? '#334155' : '#f3f4f6',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -267,7 +267,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 12,
-        backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
+        backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -292,7 +292,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     },
     divider: {
         height: 1,
-        backgroundColor: isDark ? '#374151' : '#f3f4f6',
+        backgroundColor: isDark ? '#334155' : '#f3f4f6',
     },
     cardFooter: {
         flexDirection: 'row',
@@ -320,6 +320,6 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
+        backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
     },
 });

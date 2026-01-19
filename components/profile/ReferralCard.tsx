@@ -56,7 +56,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 4,
     },
     card: {
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderRadius: 16,
         padding: 24,
         alignItems: 'center',
@@ -95,12 +95,12 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     codeBox: {
         flex: 1,
         height: 40,
-        backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
+        backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#e5e7eb',
+        borderColor: isDark ? '#334155' : '#e5e7eb',
     },
     codeText: {
         fontSize: 16,

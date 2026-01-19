@@ -40,10 +40,16 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
             <Text style={[styles.brand, isDark && { color: '#94A3B8' }]}>{brand}</Text>
             <Text style={[styles.title, isDark && { color: '#fff' }]}>{title}</Text>
             <View style={styles.priceContainer}>
-                <Text style={[styles.price, isDark && { color: '#fff' }]}>$ {price.toFixed(2)}</Text>
-                {originalPrice && (
+                <Text style={[
+                    styles.price,
+                    isDark && { color: '#fff' },
+                    (originalPrice && originalPrice > price) ? { color: '#ef4444' } : undefined
+                ]}>
+                    $ {price.toFixed(2)}
+                </Text>
+                {originalPrice && originalPrice > price ? (
                     <Text style={styles.originalPrice}>$ {originalPrice.toFixed(2)}</Text>
-                )}
+                ) : null}
             </View>
 
             {reviewCount > 0 && productId ? (

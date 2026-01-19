@@ -6,7 +6,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 export interface FilterChip {
     id: string;
     label: string;
-    type: 'category' | 'color' | 'price' | 'brand' | 'size';
+    type: 'category' | 'color' | 'price' | 'brand' | 'size' | 'search' | 'sort';
 }
 
 interface ShopFilterBarProps {
@@ -27,17 +27,14 @@ export function ShopFilterBar({
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#111', borderBottomColor: '#222' }]}>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* Tune / Filter Button */}
+            {/* Top Row: Filter and Sort Buttons */}
+            <View style={styles.buttonRow}>
                 <Pressable
-                    style={[styles.filterButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
+                    style={[styles.actionButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
                     onPress={onFilterPress}
                 >
-                    <MaterialIcons name="tune" size={20} color={isDark ? '#fff' : '#1152d4'} />
+                    <MaterialIcons name="tune" size={20} color={isDark ? '#fff' : '#000'} />
+                    <Text style={[styles.buttonText, isDark && { color: '#fff' }]}>FILTER</Text>
                     {activeFilters.length > 0 && (
                         <View style={[styles.badge, isDark && { backgroundColor: '#fff' }]}>
                             <Text style={[styles.badgeText, isDark && { color: '#000' }]}>{activeFilters.length}</Text>
@@ -45,28 +42,36 @@ export function ShopFilterBar({
                     )}
                 </Pressable>
 
-                <View style={[styles.divider, isDark && { backgroundColor: '#333' }]} />
-
-                {/* Active Filter Chips */}
-                {activeFilters.map((filter) => (
-                    <Pressable
-                        key={filter.id}
-                        style={[styles.chip, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
-                        onPress={() => onRemoveFilter(filter.id)}
-                    >
-                        <Text style={[styles.chipText, isDark && { color: '#e5e5e5' }]}>{filter.label}</Text>
-                        <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#94a3b8'} />
-                    </Pressable>
-                ))}
-
-                {/* Sort Button at the end of scroll if there's space, 
-                    OR we can make it sticky at the end if preferred.
-                    The HTML has it at the end of the scroll but with 'ml-auto'.
-                */}
-                <Pressable style={[styles.sortButton, isDark && { backgroundColor: '#222' }]} onPress={onSortPress}>
-                    <MaterialIcons name="swap-vert" size={22} color={isDark ? '#e5e5e5' : '#64748b'} />
+                <Pressable
+                    style={[styles.actionButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
+                    onPress={onSortPress}
+                >
+                    <MaterialIcons name="swap-vert" size={20} color={isDark ? '#fff' : '#000'} />
+                    <Text style={[styles.buttonText, isDark && { color: '#fff' }]}>SORT</Text>
                 </Pressable>
-            </ScrollView>
+            </View>
+
+            {/* Bottom Row: Active Filter Chips */}
+            {activeFilters.length > 0 && (
+                <View style={styles.chipRow}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                    >
+                        {activeFilters.map((filter) => (
+                            <Pressable
+                                key={filter.id}
+                                style={[styles.chip, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
+                                onPress={() => onRemoveFilter(filter.id)}
+                            >
+                                <Text style={[styles.chipText, isDark && { color: '#e5e5e5' }]}>{filter.label}</Text>
+                                <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#94a3b8'} />
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
         </View>
     );
 }
@@ -76,27 +81,42 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9',
-        height: 60,
+        paddingVertical: 12,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        gap: 16, // 1rem gap (approx 16px)
+        width: '100%',
+    },
+    actionButton: {
+        flex: 1, // 50% width each (after gap)
+        height: 44,
+        borderRadius: 8,
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'center',
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    buttonText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#000',
+        letterSpacing: 1,
+    },
+    chipRow: {
+        marginTop: 12,
     },
     scrollContent: {
         alignItems: 'center',
         paddingHorizontal: 16,
         gap: 8,
     },
-    filterButton: {
-        height: 36,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: 'rgba(17, 82, 212, 0.1)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(17, 82, 212, 0.2)',
-    },
     badge: {
-        backgroundColor: '#1152d4',
+        backgroundColor: '#000',
         width: 18,
         height: 18,
         borderRadius: 9,
@@ -107,12 +127,6 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 10,
         fontWeight: '700',
-    },
-    divider: {
-        width: 1,
-        height: 20,
-        backgroundColor: '#e2e8f0',
-        marginHorizontal: 4,
     },
     chip: {
         height: 32,
@@ -125,7 +139,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        // Shadow for premium look
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -137,13 +150,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#334155',
     },
-    sortButton: {
-        height: 36,
-        width: 36,
-        borderRadius: 8,
-        backgroundColor: '#f8fafc',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 8,
-    }
 });

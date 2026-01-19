@@ -41,7 +41,7 @@ export function OrderSummary({ subtotal, shipping, tax, discount, total }: Order
                 </Text>
             </View>
 
-            {discount && (
+            {!!discount && (
                 <View style={styles.row}>
                     <Text style={styles.discountLabel}>Discount (PROMO20)</Text>
                     <Text style={styles.discountValue}>-{String(formatPrice(discount) || `$${discount.toFixed(2)}`)}</Text>

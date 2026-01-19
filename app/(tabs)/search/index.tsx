@@ -117,8 +117,10 @@ export default function SearchIndex() {
             );
             setCategoryResults(filteredCategories.slice(0, 5));
 
-            // Save to recent searches
-            saveRecentSearch(query);
+            // Save to recent searches only if query is meaningful
+            if (query.trim().length > 2) {
+                saveRecentSearch(query);
+            }
         } catch (error) {
             console.error('Search error:', error);
             setSearchResults([]);
@@ -132,8 +134,11 @@ export default function SearchIndex() {
     const saveRecentSearch = async (query: string) => {
         try {
             // TODO: Save to AsyncStorage
-            const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10);
-            setRecentSearches(updated);
+            // Only update if the query is not already at the top
+            if (recentSearches[0] !== query) {
+                const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10);
+                setRecentSearches(updated);
+            }
         } catch (error) {
             console.error('Error saving recent search:', error);
         }

@@ -25,7 +25,15 @@ export default function OrderDetailsModal() {
 
     const loadOrderDetails = async () => {
         try {
-            const orderId = Array.isArray(id) ? parseInt(id[0]) : parseInt(id);
+            const rawId = Array.isArray(id) ? id[0] : id;
+            const orderId = parseInt(rawId);
+
+            if (isNaN(orderId)) {
+                console.error('Invalid order ID:', id);
+                setLoading(false);
+                return;
+            }
+
             const data = await api.getOrderDetails(orderId);
             setOrder(data);
         } catch (error) {
@@ -67,43 +75,11 @@ export default function OrderDetailsModal() {
         }
     };
 
-    // Generic header for loading/error
-    const renderHeader = (title = 'Order Details') => (
-        <Stack.Screen
-            options={{
-                headerShown: true,
-                headerTitle: title,
-                headerShadowVisible: false,
-                headerStyle: { backgroundColor: isDark ? '#000' : '#ffffff' },
-                headerTitleStyle: { color: isDark ? '#fff' : '#000', fontSize: 16, fontWeight: '600' },
-                headerLeft: () => (
-                    <Pressable
-                        onPress={() => router.back()}
-                        style={styles.nativeGlassWrapper}
-                    >
-                        <IconSymbol
-                            name="chevron.left"
-                            color={isDark ? '#fff' : '#000'}
-                            size={24}
-                            weight="medium"
-                        />
-                    </Pressable>
-                ),
-                headerBackVisible: false,
-                ...Platform.select({
-                    ios: {
-                        headerTransparent: true,
-                        headerBlurEffect: isDark ? 'dark' : 'regular',
-                    }
-                })
-            }}
-        />
-    );
 
     if (loading) {
         return (
             <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
-                {renderHeader()}
+                <Stack.Screen options={{ headerTitle: 'Loading Order...' }} />
                 <View style={[styles.loadingContainer, isDark && { backgroundColor: '#000' }]}>
                     <ActivityIndicator size="large" color="#1152d4" />
                 </View>
@@ -114,7 +90,7 @@ export default function OrderDetailsModal() {
     if (!order) {
         return (
             <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
-                {renderHeader()}
+                <Stack.Screen options={{ headerTitle: 'Error' }} />
                 <View style={styles.errorContainer}>
                     <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
                     <Text style={[styles.errorText, isDark && { color: '#fff' }]}>Failed to load order details</Text>
@@ -124,125 +100,165 @@ export default function OrderDetailsModal() {
         );
     }
 
-    const statusInfo = getStatusColor(order.status);
-    const shippingAddress = order.shipping_address || order.address;
+    const statusInfo = order ? getStatusColor(order.status) : null;
+    const shippingAddress = order?.shipping_address || order?.address;
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <StatusBar style={isDark ? 'light' : 'dark'} />
-            {renderHeader(`Order #${order.id}`)}
 
-            <ScrollView contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: 100, paddingHorizontal: 20 }}>
-                {/* Status Card */}
-                <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
-                    <View style={styles.statusHeader}>
-                        <View style={[styles.iconBox, { backgroundColor: isDark ? '#222' : statusInfo.bg }]}>
-                            <MaterialIcons name={statusInfo.icon as any} size={24} color={statusInfo.text} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.statusTitle, isDark && { color: '#fff' }]}>Order {order.status}</Text>
-                            <Text style={styles.statusDate}>{formatDate(order.created_at)}</Text>
-                        </View>
-                    </View>
-                </View>
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTitle: order ? `Order #${order.id}` : 'Order Details',
+                    headerShadowVisible: false,
+                    headerStyle: { backgroundColor: isDark ? '#000' : '#ffffff' },
+                    headerTitleStyle: { color: isDark ? '#fff' : '#000', fontSize: 16, fontWeight: '600' },
+                    headerLeft: () => (
+                        <Pressable
+                            onPress={() => router.back()}
+                            style={styles.nativeGlassWrapper}
+                        >
+                            <IconSymbol
+                                name="chevron.left"
+                                color={isDark ? '#fff' : '#000'}
+                                size={24}
+                                weight="medium"
+                            />
+                        </Pressable>
+                    ),
+                    headerBackVisible: false,
+                    ...Platform.select({
+                        ios: {
+                            headerTransparent: true,
+                            headerBlurEffect: isDark ? 'dark' : 'regular',
+                        }
+                    })
+                }}
+            />
 
-                {/* Items */}
-                <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Items</Text>
-                <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }, { padding: 0 }]}>
-                    {order.items?.map((item: any, index: number) => {
-                        const imageUrl = fixUrl(item.product?.main_image || item.image);
-                        return (
-                            <View key={index} style={[styles.itemRow, index !== order.items.length - 1 && styles.borderBottom, isDark && { borderColor: '#333' }]}>
-                                <View style={styles.itemImageContainer}>
-                                    {imageUrl ? (
-                                        <Image
-                                            source={{ uri: imageUrl }}
-                                            style={styles.itemImage}
-                                        />
-                                    ) : (
-                                        <View style={[styles.itemImage, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
-                                            <Ionicons name="image-outline" size={20} color="#9ca3af" />
-                                        </View>
-                                    )}
-                                </View>
-                                <View style={{ flex: 1, gap: 4 }}>
-                                    <Text style={[styles.itemName, isDark && { color: '#fff' }]} numberOfLines={2}>
-                                        {item.product_name || item.name || 'Product'}
-                                    </Text>
-                                    <Text style={styles.itemVariant}>
-                                        Qty: {item.quantity} {item.options ? `• ${Object.values(item.options).join(', ')}` : ''}
-                                    </Text>
-                                    <Text style={[styles.itemPrice, isDark && { color: '#fff' }]}>
-                                        ${parseFloat(item.price).toFixed(2)}
-                                    </Text>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {/* Summary */}
-                <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Order Summary</Text>
-                <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
-                    <View style={styles.summaryRow}>
-                        <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Subtotal</Text>
-                        <Text style={[styles.summaryValue, isDark && { color: '#fff' }]}>${parseFloat(order.subtotal || order.total_amount).toFixed(2)}</Text>
-                    </View>
-                    {order.discount_amount > 0 && (
-                        <View style={styles.summaryRow}>
-                            <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Discount</Text>
-                            <Text style={[styles.summaryValue, { color: '#ef4444' }]}>-${parseFloat(order.discount_amount).toFixed(2)}</Text>
-                        </View>
-                    )}
-                    <View style={styles.summaryRow}>
-                        <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Shipping</Text>
-                        <Text style={[styles.summaryValue, isDark && { color: '#fff' }]}>
-                            {parseFloat(order.shipping_cost) > 0 ? `$${parseFloat(order.shipping_cost).toFixed(2)}` : 'Free'}
-                        </Text>
-                    </View>
-                    <View style={[styles.divider, isDark && { backgroundColor: '#333' }]} />
-                    <View style={styles.summaryRow}>
-                        <Text style={[styles.totalLabel, isDark && { color: '#fff' }]}>Total</Text>
-                        <Text style={[styles.totalValue, isDark && { color: '#fff' }]}>${parseFloat(order.total_amount).toFixed(2)}</Text>
-                    </View>
-                </View>
-
-                {/* Shipping Address */}
-                {shippingAddress ? (
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                    paddingTop: Platform.OS === 'ios' ? insets.top + (order ? 60 : 100) : 80,
+                    paddingBottom: 100,
+                    paddingHorizontal: 20
+                }}
+                showsVerticalScrollIndicator={false}
+            >
+                {order && (
                     <>
-                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Shipping Address</Text>
+                        {/* Status Card */}
                         <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <Ionicons name="location-outline" size={24} color={isDark ? '#9ca3af' : '#6b7280'} />
+                            <View style={styles.statusHeader}>
+                                <View style={[styles.iconBox, { backgroundColor: isDark ? '#222' : statusInfo?.bg }]}>
+                                    <MaterialIcons name={statusInfo?.icon as any} size={24} color={statusInfo?.text} />
+                                </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[styles.addressName, isDark && { color: '#fff' }]}>
-                                        {shippingAddress.first_name} {shippingAddress.last_name}
-                                    </Text>
-                                    <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                        {shippingAddress.address_line_1}
-                                    </Text>
-                                    {shippingAddress.address_line_2 && (
-                                        <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                            {shippingAddress.address_line_2}
-                                        </Text>
-                                    )}
-                                    <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                        {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}
-                                    </Text>
-                                    <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                        {shippingAddress.phone}
-                                    </Text>
+                                    <Text style={[styles.statusTitle, isDark && { color: '#fff' }]}>Order {order.status}</Text>
+                                    <Text style={styles.statusDate}>{formatDate(order.created_at)}</Text>
                                 </View>
                             </View>
                         </View>
-                    </>
-                ) : (
-                    // Fallback if no address but user asked to see it
-                    <>
-                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Shipping Address</Text>
-                        <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
-                            <Text style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No shipping address provided.</Text>
+
+                        {/* Items */}
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Items</Text>
+                        <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }, { padding: 0 }]}>
+                            {order.items?.map((item: any, index: number) => {
+                                const imageUrl = fixUrl(item.product?.main_image || item.image);
+                                return (
+                                    <View key={index} style={[styles.itemRow, index !== order.items.length - 1 && styles.borderBottom, isDark && { borderColor: '#333' }]}>
+                                        <View style={styles.itemImageContainer}>
+                                            {imageUrl ? (
+                                                <Image
+                                                    source={{ uri: imageUrl }}
+                                                    style={styles.itemImage}
+                                                />
+                                            ) : (
+                                                <View style={[styles.itemImage, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
+                                                    <Ionicons name="image-outline" size={20} color="#9ca3af" />
+                                                </View>
+                                            )}
+                                        </View>
+                                        <View style={{ flex: 1, gap: 4 }}>
+                                            <Text style={[styles.itemName, isDark && { color: '#fff' }]} numberOfLines={2}>
+                                                {item.product_name || item.name || 'Product'}
+                                            </Text>
+                                            <Text style={styles.itemVariant}>
+                                                Qty: {item.quantity} {item.options ? `• ${Object.values(item.options).join(', ')}` : ''}
+                                            </Text>
+                                            <Text style={[styles.itemPrice, isDark && { color: '#fff' }]}>
+                                                ${parseFloat(item.price).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
+
+                        {/* Summary */}
+                        <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Order Summary</Text>
+                        <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
+                            <View style={styles.summaryRow}>
+                                <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Subtotal</Text>
+                                <Text style={[styles.summaryValue, isDark && { color: '#fff' }]}>${parseFloat(order.subtotal || order.total_amount).toFixed(2)}</Text>
+                            </View>
+                            {order.discount_amount > 0 && (
+                                <View style={styles.summaryRow}>
+                                    <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Discount</Text>
+                                    <Text style={[styles.summaryValue, { color: '#ef4444' }]}>-${parseFloat(order.discount_amount).toFixed(2)}</Text>
+                                </View>
+                            )}
+                            <View style={styles.summaryRow}>
+                                <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Shipping</Text>
+                                <Text style={[styles.summaryValue, isDark && { color: '#fff' }]}>
+                                    {parseFloat(order.shipping_cost) > 0 ? `$${parseFloat(order.shipping_cost).toFixed(2)}` : 'Free'}
+                                </Text>
+                            </View>
+                            <View style={[styles.divider, isDark && { backgroundColor: '#333' }]} />
+                            <View style={styles.summaryRow}>
+                                <Text style={[styles.totalLabel, isDark && { color: '#fff' }]}>Total</Text>
+                                <Text style={[styles.totalValue, isDark && { color: '#fff' }]}>${parseFloat(order.total_amount).toFixed(2)}</Text>
+                            </View>
+                        </View>
+
+                        {/* Shipping Address */}
+                        {shippingAddress ? (
+                            <>
+                                <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Shipping Address</Text>
+                                <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
+                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                        <Ionicons name="location-outline" size={24} color={isDark ? '#9ca3af' : '#6b7280'} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.addressName, isDark && { color: '#fff' }]}>
+                                                {shippingAddress.first_name} {shippingAddress.last_name}
+                                            </Text>
+                                            <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
+                                                {shippingAddress.address_line_1}
+                                            </Text>
+                                            {shippingAddress.address_line_2 && (
+                                                <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
+                                                    {shippingAddress.address_line_2}
+                                                </Text>
+                                            )}
+                                            <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
+                                                {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}
+                                            </Text>
+                                            <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
+                                                {shippingAddress.phone}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Shipping Address</Text>
+                                <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }]}>
+                                    <Text style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No shipping address provided.</Text>
+                                </View>
+                            </>
+                        )}
                     </>
                 )}
             </ScrollView>

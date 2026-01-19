@@ -25,14 +25,14 @@ export function WishlistItem({ product, onRemove }: WishlistItemProps) {
 
     return (
         <Pressable onPress={handlePress} style={[styles.container, isDark && styles.containerDark]}>
-            <View style={styles.imageContainer}>
+            <View style={[styles.imageContainer, isDark && styles.imageContainerDark]}>
                 <Image source={{ uri: product.main_image || '' }} style={styles.image} contentFit="cover" />
                 <Pressable onPress={() => onRemove(product.id)} style={styles.removeBtn}>
                     <HugeiconsIcon icon={FavouriteIcon} size={20} color="#ef4444" fill="#ef4444" />
                 </Pressable>
             </View>
             <View style={styles.content}>
-                <Text numberOfLines={1} style={[styles.brand, isDark && styles.textLight]}>{product.brand?.name || 'Brand'}</Text>
+                <Text numberOfLines={1} style={[styles.brand, isDark && styles.textDim]}>{product.brand?.name || 'Brand'}</Text>
                 <Text numberOfLines={1} style={[styles.name, isDark && styles.textLight]}>{product.name_en || product.name}</Text>
                 <View style={styles.priceRow}>
                     <Text style={[styles.price, isDark && styles.textLight]}>${product.price ? product.price.toFixed(2) : '0.00'}</Text>
@@ -61,6 +61,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#f1f5f9',
         overflow: 'hidden',
         position: 'relative',
+    },
+    imageContainerDark: {
+        backgroundColor: '#1e293b',
     },
     image: {
         width: '100%',
@@ -114,5 +117,8 @@ const styles = StyleSheet.create({
     },
     textLight: {
         color: '#fff',
+    },
+    textDim: {
+        color: '#94a3b8',
     },
 });

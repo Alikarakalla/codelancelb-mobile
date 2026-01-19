@@ -55,7 +55,7 @@ export function LoyaltyRewards() {
                 {loading ? (
                     // Simple Skeleton
                     [1, 2].map((i) => (
-                        <View key={i} style={[styles.card, { height: 80, backgroundColor: isDark ? '#1C1C1E' : '#f0f0f0' }]} />
+                        <View key={i} style={[styles.card, { height: 80, backgroundColor: isDark ? '#1e293b' : '#f0f0f0' }]} />
                     ))
                 ) : displayedRewards.length > 0 ? (
                     displayedRewards.map((reward) => (
@@ -63,12 +63,12 @@ export function LoyaltyRewards() {
                             key={reward.id}
                             style={[
                                 styles.card,
-                                { backgroundColor: isDark ? '#1C1C1E' : '#fff' }
+                                { backgroundColor: isDark ? '#1e293b' : '#fff' }
                             ]}
                             onPress={() => router.push('/modal/available-rewards')}
                         >
                             {/* Image Placeholder or Actual Image */}
-                            <View style={[styles.rewardImage, { backgroundColor: isDark ? '#2C2C2E' : '#F1F5F9' }]}>
+                            <View style={[styles.rewardImage, { backgroundColor: isDark ? '#0f172a' : '#F1F5F9' }]}>
                                 {reward.image ? (
                                     <Image source={{ uri: reward.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                                 ) : (

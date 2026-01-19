@@ -5,8 +5,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useRouter } from 'expo-router';
 import { api } from '@/services/apiClient';
-import { AddAddressModal } from '@/components/profile/address/AddAddressModal';
+
 import { AddressSkeleton } from '@/components/profile/skeletons/AddressSkeleton';
+
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 export function SavedAddresses() {
     const colorScheme = useColorScheme();
@@ -16,16 +19,15 @@ export function SavedAddresses() {
     const router = useRouter();
     const [addresses, setAddresses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingAddress, setEditingAddress] = useState<any>(null);
 
-    useEffect(() => {
-        if (isAuthenticated) {
-            loadAddresses();
-        } else {
-            setLoading(false);
-        }
-    }, [isAuthenticated]);
+    // Reload when screen comes into focus (e.g. back from add/edit modal)
+    useFocusEffect(
+        useCallback(() => {
+            if (isAuthenticated) {
+                loadAddresses();
+            }
+        }, [isAuthenticated])
+    );
 
     const loadAddresses = async () => {
         try {
@@ -38,25 +40,11 @@ export function SavedAddresses() {
         }
     };
 
-    const handleSaveAddress = async (address: any) => {
-        try {
-            if (editingAddress) {
-                await api.updateAddress(editingAddress.id, address);
-            } else {
-                await api.createAddress(address);
-            }
-            await loadAddresses();
-            setIsModalOpen(false);
-            setEditingAddress(null);
-        } catch (error: any) {
-            Alert.alert('Error', 'Failed to save address. Please try again.');
-            console.error('Save address error:', error);
-        }
-    };
-
     const handleEditAddress = (address: any) => {
-        setEditingAddress(address);
-        setIsModalOpen(true);
+        router.push({
+            pathname: '/modal/address',
+            params: { data: JSON.stringify(address) }
+        });
     };
 
     const handleDeleteAddress = (addressId: number) => {
@@ -173,10 +161,7 @@ export function SavedAddresses() {
             <View style={styles.header}>
                 <Text style={styles.title}>Addresses</Text>
                 <Pressable
-                    onPress={() => {
-                        setEditingAddress(null);
-                        setIsModalOpen(true);
-                    }}
+                    onPress={() => router.push('/modal/address')}
                     style={styles.addButton}
                 >
                     <MaterialIcons name="add" size={18} color="#1152d4" />
@@ -191,7 +176,7 @@ export function SavedAddresses() {
                         <Text style={[styles.address, { marginTop: 16, textAlign: 'center' }]}>No saved addresses yet</Text>
                         <Pressable
                             style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }]}
-                            onPress={() => setIsModalOpen(true)}
+                            onPress={() => router.push('/modal/address')}
                         >
                             <MaterialIcons name="add" size={18} color="#fff" />
                             <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>Add Address</Text>
@@ -207,16 +192,6 @@ export function SavedAddresses() {
                     contentContainerStyle={styles.list}
                 />
             )}
-
-            <AddAddressModal
-                visible={isModalOpen}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    setEditingAddress(null);
-                }}
-                onSave={handleSaveAddress}
-                initialData={editingAddress}
-            />
         </View>
     );
 }
@@ -250,14 +225,14 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         gap: 12,
     },
     card: {
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
         borderRadius: 16,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
         borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#f3f4f6',
+        borderColor: isDark ? '#334155' : '#f3f4f6',
     },
     iconBox: {
         width: 40,

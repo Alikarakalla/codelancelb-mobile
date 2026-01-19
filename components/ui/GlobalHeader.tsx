@@ -136,16 +136,16 @@ export function GlobalHeader({
                                 {cartCount > 0 && (
                                     <View style={{
                                         position: 'absolute',
-                                        top: 2,
-                                        right: 2,
-                                        backgroundColor: '#FF3B30',
+                                        top: 0,
+                                        right: 0,
+                                        backgroundColor: '#000',
                                         borderRadius: 10,
                                         minWidth: 16,
                                         height: 16,
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        borderWidth: 1.5,
-                                        borderColor: isDark ? '#000' : '#fff'
+                                        borderWidth: 1,
+                                        borderColor: '#fff'
                                     }}>
                                         <Text style={{
                                             color: '#fff',

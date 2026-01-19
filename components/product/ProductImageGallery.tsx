@@ -24,6 +24,19 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+    const thumbListRef = useRef<FlatList>(null);
+
+    // Sync thumbnails with active index
+    React.useEffect(() => {
+        if (images.length > 0 && activeIndex >= 0 && activeIndex < images.length) {
+            thumbListRef.current?.scrollToIndex({
+                index: activeIndex,
+                animated: true,
+                viewPosition: 0.5
+            });
+        }
+    }, [activeIndex, images.length]);
+
     const formattedImages = images.map(img => ({ uri: img }));
 
     // Scroll to selected image when it updates
@@ -36,9 +49,11 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
         }
     }, [selectedImage, images]);
 
+    const isManualScrolling = useRef(false);
+
     // Handle scroll for pagination
     const onViewRef = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-        if (viewableItems.length > 0) {
+        if (viewableItems.length > 0 && !isManualScrolling.current) {
             setActiveIndex(viewableItems[0].index || 0);
         }
     });
@@ -46,8 +61,14 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
 
     const scrollToIndex = (index: number) => {
         if (index >= 0 && index < images.length) {
+            isManualScrolling.current = true;
             flatListRef.current?.scrollToIndex({ index, animated: true });
             setActiveIndex(index);
+
+            // Safety timeout to reset in case scroll doesn't fire momentum events (e.g. adjacent item)
+            setTimeout(() => {
+                isManualScrolling.current = false;
+            }, 600);
         }
     };
 
@@ -71,12 +92,18 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                         offset: width * index,
                         index,
                     })}
-                    onScrollToIndexFailed={(info) => {
-                        const wait = new Promise(resolve => setTimeout(resolve, 500));
-                        wait.then(() => {
-                            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
-                        });
+                    onMomentumScrollEnd={() => {
+                        isManualScrolling.current = false;
                     }}
+                    onScrollToIndexFailed={(info) => {
+                        // Retry once
+                        setTimeout(() => {
+                            if (flatListRef.current) {
+                                flatListRef.current.scrollToIndex({ index: info.index, animated: false });
+                            }
+                        }, 100);
+                    }}
+
                     renderItem={({ item, index }) => (
                         <View style={styles.slide}>
                             <AnimatedImage
@@ -114,6 +141,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
             {images.length > 1 && (
                 <View style={styles.thumbnailsContainer}>
                     <FlatList
+                        ref={thumbListRef}
                         data={images}
                         horizontal
                         showsHorizontalScrollIndicator={false}

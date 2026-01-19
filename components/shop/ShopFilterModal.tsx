@@ -25,6 +25,8 @@ import Animated, {
     Extrapolate
 } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { api } from '@/services/apiClient';
+import { ColorOption } from '@/utils/colorHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -181,6 +183,34 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+    // Filter metadata state
+    const [availableColors, setAvailableColors] = useState<ColorOption[]>([]);
+    const [availableSizes, setAvailableSizes] = useState<string[]>([]);
+    const [priceMin, setPriceMin] = useState(0);
+    const [priceMax, setPriceMax] = useState(1000);
+    const [loadingMetadata, setLoadingMetadata] = useState(true);
+
+    // Load filter metadata
+    useEffect(() => {
+        const loadFilterMetadata = async () => {
+            try {
+                setLoadingMetadata(true);
+                const metadata = await api.getFilterMetadata();
+                setAvailableColors(metadata.colors);
+                setAvailableSizes(metadata.sizes);
+                setPriceMin(metadata.minPrice);
+                setPriceMax(metadata.maxPrice);
+                // Initialize price range to full range
+                setPriceRange([metadata.minPrice, metadata.maxPrice]);
+            } catch (error) {
+                console.error('Error loading filter metadata:', error);
+            } finally {
+                setLoadingMetadata(false);
+            }
+        };
+        loadFilterMetadata();
+    }, []);
+
     useEffect(() => {
         if (visible) {
             bottomSheetModalRef.current?.present();
@@ -266,15 +296,17 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
     );
 
     const categoriesList = ['T-Shirts & Tops', 'Jeans & Denim', 'Jackets'];
-    const colorsList = [
-        { name: 'White', value: '#FFFFFF', border: '#E2E8F0' },
-        { name: 'Black', value: '#000000', border: isDark ? '#333' : undefined },
-        { name: 'Blue', value: '#2563EB' },
-        { name: 'Red', value: '#EF4444' },
-        { name: 'Beige', value: '#F5F5DC', border: '#E2E8F0' },
-        { name: 'Green', value: '#16A34A' },
-    ];
-    const sizesList = ['XS', 'S', 'M', 'L', 'XL'];
+
+    // Colors already have hex values from database, just add border for light colors
+    const colorsList = availableColors.map(color => ({
+        name: color.name,
+        value: color.hex,
+        border: (color.hex === '#FFFFFF' || color.name.toLowerCase() === 'white' || color.name.toLowerCase() === 'beige')
+            ? '#E2E8F0'
+            : (color.hex === '#000000' && isDark) ? '#333' : undefined
+    }));
+
+    const sizesList = availableSizes;
 
     return (
         <BottomSheetModal
@@ -348,8 +380,8 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
                                     values={[priceRange[0], priceRange[1]]}
                                     sliderLength={SCREEN_WIDTH - 80}
                                     onValuesChange={setPriceRange}
-                                    min={0}
-                                    max={500}
+                                    min={priceMin}
+                                    max={priceMax}
                                     step={1}
                                     allowOverlap={false}
                                     snapped
@@ -475,42 +507,41 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
 const styles = StyleSheet.create({
     sheetBackground: {
         backgroundColor: '#fff',
-        borderTopLeftRadius: 36,
-        borderTopRightRadius: 36,
+        borderTopLeftRadius: 24, // rounded-t-3xl
+        borderTopRightRadius: 24,
     },
     handleIndicator: {
-        backgroundColor: '#cbd5e1',
-        width: 60,
+        backgroundColor: '#cbd5e1', // gray-300
+        width: 48,
         height: 6,
-        marginTop: 8,
+        marginTop: 12,
+        borderRadius: 3,
     },
     header: {
-        height: 72,
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 24,
+        paddingHorizontal: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: '#f3f4f6', // gray-100
         backgroundColor: '#fff',
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
+        fontSize: 20, // text-xl
+        fontWeight: '700', // font-bold
+        color: '#111827', // gray-900
     },
     closeButton: {
-        padding: 8,
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
+        padding: 4,
     },
     scrollContent: {
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        paddingBottom: 150,
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 100,
     },
     section: {
-        marginBottom: 8,
+        marginBottom: 16, // space-y-4 implies ~16px
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -520,41 +551,16 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#1e293b',
+        fontWeight: '700', // font-bold
+        color: '#111827', // gray-900
     },
     sectionContent: {
         paddingTop: 8,
-        paddingBottom: 12,
+        paddingBottom: 8,
     },
-    categoryHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        marginBottom: 20,
-    },
-    categoryHeaderText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1152d4',
-    },
-    subCategoryList: {
-        paddingLeft: 20,
-        borderLeftWidth: 1.5,
-        borderLeftColor: '#f1f5f9',
-        marginLeft: 8,
-        marginTop: 4,
-        gap: 4,
-    },
-    checkboxWrapper: {
-        paddingRight: 12,
-        paddingVertical: 10,
-    },
-    checkboxItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 14,
-        flex: 1,
+    // Categories
+    nestedCategory: {
+        marginTop: 8,
     },
     categoryRow: {
         flexDirection: 'row',
@@ -562,18 +568,16 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 4,
     },
-    expandTrigger: {
-        padding: 8,
-    },
-    nestedCategory: {
-        marginTop: 4,
+    checkboxWrapper: {
+        paddingRight: 10,
+        paddingVertical: 6,
     },
     checkbox: {
-        width: 22,
-        height: 22,
-        borderRadius: 8,
-        borderWidth: 2.5,
-        borderColor: '#e2e8f0',
+        width: 16, // h-4 w-4
+        height: 16,
+        borderRadius: 4, // rounded
+        borderWidth: 1,
+        borderColor: '#d1d5db', // gray-300
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -582,42 +586,53 @@ const styles = StyleSheet.create({
         borderColor: '#1152d4',
     },
     checkboxLabel: {
-        fontSize: 14,
-        color: '#64748b',
+        fontSize: 14, // text-sm
+        color: '#4b5563', // text-gray-600
     },
     checkboxLabelActive: {
-        color: '#0f172a',
-        fontWeight: '500',
+        color: '#111827', // text-gray-900
+        fontWeight: '500', // font-medium
+    },
+    expandTrigger: {
+        padding: 4,
+    },
+    subCategoryList: {
+        paddingLeft: 28, // pl-7
+        borderLeftWidth: 2,
+        borderLeftColor: '#f3f4f6', // border-gray-100
+        marginLeft: 8,
+        marginTop: 4,
+        gap: 8, // space-y-2
     },
     divider: {
         height: 1,
-        backgroundColor: '#f1f5f9',
-        marginVertical: 6,
+        backgroundColor: '#f3f4f6', // border-gray-100
+        marginVertical: 12,
     },
+    // Slider
     sliderWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 32,
+        paddingVertical: 20,
         paddingHorizontal: 10,
     },
     sliderThumb: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 20, // h-5
+        height: 20,
+        borderRadius: 10,
         backgroundColor: '#fff',
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: '#1152d4',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 5,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
     },
     sliderThumbPressed: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        transform: [{ scale: 1.1 }],
+        width: 24,
+        height: 24,
+        borderRadius: 12,
     },
     priceInputs: {
         flexDirection: 'row',
@@ -626,151 +641,154 @@ const styles = StyleSheet.create({
     },
     priceInputGroup: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: '#f9fafb', // bg-gray-50
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        padding: 12,
+        borderColor: '#e5e7eb', // border-gray-200
+        borderRadius: 8, // rounded-lg
+        paddingHorizontal: 12,
+        paddingVertical: 8,
     },
     inputLabel: {
-        fontSize: 11,
-        color: '#94a3b8',
-        marginBottom: 6,
-        textTransform: 'uppercase',
-        fontWeight: '700',
-        letterSpacing: 0.5,
+        fontSize: 12, // text-xs
+        color: '#6b7280', // text-gray-500
+        marginBottom: 2,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
     },
     currencySymbol: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#0f172a',
+        fontSize: 14, // text-sm
+        fontWeight: '700', // font-bold
+        color: '#111827', // text-gray-900
     },
     textInput: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#0f172a',
+        fontSize: 14, // text-sm
+        fontWeight: '700', // font-bold
+        color: '#111827', // text-gray-900
         padding: 0,
         flex: 1,
     },
     rangeDivider: {
-        color: '#cbd5e1',
-        fontWeight: 'bold',
+        color: '#9ca3af', // text-gray-400
         fontSize: 18,
     },
+    // Colors
     rowWrap: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 16,
+        gap: 12, // gap-3
     },
     colorDot: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 32, // h-8 w-8
+        height: 32,
+        borderRadius: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
-        shadowRadius: 3,
+        shadowRadius: 2,
         elevation: 1,
     },
     colorSelected: {
-        borderWidth: 4,
-        borderColor: '#1152d4',
+        // HTML uses ring-2 ring-primary ring-offset-2
+        // We can simulate with border
+        borderWidth: 2,
+        borderColor: '#fff',
         transform: [{ scale: 1.1 }],
     },
+    // Sizes
     sizeBox: {
-        height: 48,
-        minWidth: 52,
-        paddingHorizontal: 20,
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: '#e2e8f0',
+        height: 40, // h-10
+        minWidth: 40, // min-w-[40px]
+        paddingHorizontal: 12, // px-3
+        borderRadius: 8, // rounded-lg
+        borderWidth: 1,
+        borderColor: '#e5e7eb', // border-gray-200
+        backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
     },
+
     sizeBoxActive: {
         backgroundColor: '#1152d4',
         borderColor: '#1152d4',
         shadowColor: '#1152d4',
-        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3, // shadow-primary/30
         shadowRadius: 6,
         elevation: 4,
     },
     sizeText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1e293b',
+        fontSize: 14, // text-sm
+        fontWeight: '500', // font-medium
+        color: '#111827', // text-gray-900
     },
     sizeTextActive: {
+        color: '#fff',
+        fontWeight: '700', // font-bold
+    },
+    // Footer
+    footer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        padding: 20,
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#f3f4f6', // border-gray-100
+        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    },
+    clearButton: {
+        flex: 1,
+        height: 54, // py-3.5 ~ 14px * 2 + lineheight ~ 24 = 52px. Fixed height ensures clickability
+        borderRadius: 12, // rounded-xl
+        borderWidth: 1,
+        borderColor: '#e5e7eb', // border-gray-200
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    clearButtonText: {
+        fontSize: 14, // text-sm
+        fontWeight: '700', // font-bold
+        color: '#111827', // text-gray-900
+    },
+    applyButton: {
+        flex: 1,
+        height: 54,
+        borderRadius: 12, // rounded-xl
+        backgroundColor: '#1152d4',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#1152d4',
+        shadowOffset: { width: 0, height: 4 }, // shadow-lg-ish
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    applyButtonText: {
+        fontSize: 14, // text-sm
+        fontWeight: '700', // font-bold
         color: '#fff',
     },
     brandPreview: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
         opacity: 0.8,
-        paddingBottom: 24,
     },
     previewTag: {
-        backgroundColor: '#f1f5f9',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        backgroundColor: '#f3f4f6', // bg-gray-100
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4, // rounded
     },
     previewTagText: {
-        fontSize: 13,
-        color: '#475569',
-        fontWeight: '600',
+        fontSize: 12, // text-xs
+        color: '#6b7280', // text-gray-500
     },
     moreText: {
-        fontSize: 13,
-        color: '#94a3b8',
-    },
-    footer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-        paddingHorizontal: 28,
-        paddingVertical: 24,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-        paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    },
-    clearButton: {
-        flex: 1,
-        height: 60,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderColor: '#e2e8f0',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    clearButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#0f172a',
-    },
-    applyButton: {
-        flex: 2,
-        height: 60,
-        borderRadius: 20,
-        backgroundColor: '#1152d4',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#1152d4',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 8,
-    },
-    applyButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#fff',
+        fontSize: 12, // text-xs
+        color: '#9ca3af', // text-gray-400
     }
 });

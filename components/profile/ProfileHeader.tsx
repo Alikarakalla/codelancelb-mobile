@@ -161,7 +161,7 @@ export function ProfileHeader() {
     const avatarSource = getUserAvatarSource();
 
     return (
-        <View style={[styles.header, { backgroundColor: isDark ? '#1a2230' : '#ffffff' }]}>
+        <View style={[styles.header, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
             <View style={styles.avatarContainer}>
                 {avatarSource ? (
                     <Image source={avatarSource} style={styles.avatar} contentFit="cover" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -6,7 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
-import { Product } from '@/types/schema';
+import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCart } from '@/hooks/use-cart-context';
 
@@ -22,6 +22,12 @@ interface ShopProductCardProps {
 }
 
 export function ShopProductCard({ product, style, onQuickView }: ShopProductCardProps) {
+    const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+
+    useEffect(() => {
+        setSelectedVariant(null);
+    }, [product.id]);
+
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { addToCart } = useCart();
@@ -32,8 +38,78 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+
+
+    // Find variant with highest discount percentage
+    // Helper to calculate discount details
+    const getVariantDetails = (item: any) => {
+        if (!item) return { price: 0, originalPrice: 0, percent: 0 };
+
+        const rawPrice = Number(item.price) || 0;
+        let finalPrice = rawPrice;
+        let originalPrice = 0;
+        let percent = 0;
+
+        // Check explicit discount fields first
+        if (item.discount_amount && Number(item.discount_amount) > 0) {
+            const discountAmount = Number(item.discount_amount);
+            originalPrice = rawPrice; // The DB price is the 'Old' price
+
+            if (item.discount_type === 'percentage') {
+                percent = discountAmount / 100;
+                finalPrice = rawPrice - (rawPrice * percent);
+            } else {
+                // fixed
+                finalPrice = rawPrice - discountAmount;
+                percent = discountAmount / rawPrice;
+            }
+        } else if (item.compare_at_price && Number(item.compare_at_price) > rawPrice) {
+            // Standard: price is selling, compare_at is original
+            finalPrice = rawPrice;
+            originalPrice = Number(item.compare_at_price);
+            percent = (originalPrice - finalPrice) / originalPrice;
+        }
+
+        return { price: finalPrice, originalPrice, percent };
+    };
+
+    // Find variant with highest discount percentage
+    const maxDiscountVariant = React.useMemo(() => {
+        if (!product.variants) return null;
+        let maxVariant = null;
+        let maxPercent = 0;
+
+        // Check main product baseline
+        const productDetails = getVariantDetails(product);
+        if (productDetails.percent > 0) {
+            maxPercent = productDetails.percent;
+        }
+
+        product.variants.forEach(v => {
+            const details = getVariantDetails(v);
+            if (details.percent > maxPercent) {
+                maxPercent = details.percent;
+                maxVariant = v;
+            }
+        });
+        return maxVariant;
+    }, [product]);
+
+    // Derived state based on selection or defaults
+    const displayItem = selectedVariant || maxDiscountVariant || product;
+    const { price: currentPrice, originalPrice: currentComparePrice } = getVariantDetails(displayItem);
+
+    // Only switch image if user explicitly selected a variant
+    const currentImage = selectedVariant?.image_path || product.main_image || '';
+
     const inWishlist = isInWishlist(product.id);
-    const hasDiscount = product.compare_at_price && product.compare_at_price > (product.price || 0);
+    const hasDiscount = currentComparePrice > currentPrice;
+
+    // Calculate discount percentage
+    let discountPercentage = 0;
+    if (hasDiscount && currentComparePrice) {
+        discountPercentage = Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100);
+    }
 
     let badge = null;
     if (product.created_at && new Date(product.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
@@ -45,15 +121,39 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     } else if (hasDiscount) {
         badge = (
             <View style={[styles.badgeContainer, { backgroundColor: '#ef4444' }]}>
-                <Text style={styles.badgeTextSale}>SALE</Text>
+                <Text style={styles.badgeTextSale}>{discountPercentage > 0 ? `-${discountPercentage}%` : 'SALE'}</Text>
             </View>
         );
     }
 
+    const getValidColor = (color: string | null | undefined) => {
+        if (!color || typeof color !== 'string') return '#e5e7eb'; // Fallback
+        const c = color.trim();
+        if (c.startsWith('#')) return c;
+        // Check for hex without hash
+        if (/^[0-9A-F]{3}$/i.test(c) || /^[0-9A-F]{6}$/i.test(c)) {
+            return `#${c}`;
+        }
+        // Handle CSS names with spaces (e.g. "Dark Blue" -> "darkblue")
+        return c.replace(/\s+/g, '').toLowerCase();
+    };
+
+    // Get unique color variants
+    const colorVariants = React.useMemo(() => {
+        if (!product.variants) return [];
+        const uniqueColors = new Map();
+        product.variants.forEach(v => {
+            if (v.color && !uniqueColors.has(v.color.toLowerCase())) {
+                uniqueColors.set(v.color.toLowerCase(), v);
+            }
+        });
+        return Array.from(uniqueColors.values());
+    }, [product.variants]);
+
     const handleCardPress = () => {
         router.push({
             pathname: `/product/${product.id}`,
-            params: { initialImage: product.main_image }
+            params: { initialImage: currentImage }
         });
     };
 
@@ -74,27 +174,29 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
 
     const handleAddToCart = (e?: any) => {
         e?.stopPropagation && e.stopPropagation();
+        const productToAdd = selectedVariant ? { ...product, price: selectedVariant.price, image: selectedVariant.image_path } : product;
+
         if (cartButtonRef.current) {
             requestAnimationFrame(() => {
                 cartButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
                     triggerCartAnimation(
                         { x: pageX + width / 2, y: pageY + height / 2 },
-                        () => addToCart(product)
+                        () => addToCart(productToAdd as Product) // Casting for now, ensuring compatibility
                     );
                 });
             });
         } else {
-            addToCart(product);
+            addToCart(productToAdd as Product);
         }
     };
 
     const menuIconColor = isDark ? '#fff' : '#1f2937';
 
     return (
-        <Pressable onPress={handleCardPress} style={[styles.container, isDark && styles.containerDark, style]}>
-            <View style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
+        <View style={[styles.container, isDark && styles.containerDark, style]}>
+            <Pressable onPress={handleCardPress} style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
                 <AnimatedImage
-                    source={{ uri: product.main_image || '' }}
+                    source={{ uri: currentImage }}
                     style={styles.image}
                     contentFit="cover"
                     sharedTransitionTag={`product-image-${product.id}`}
@@ -113,7 +215,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     />
                 </Pressable>
                 {badge}
-            </View>
+            </Pressable>
 
             <View style={styles.details}>
                 <Text style={[styles.brand, isDark && { color: '#94A3B8' }]}>{product.brand?.name || 'Brand'}</Text>
@@ -121,15 +223,43 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     {product.name_en || product.name}
                 </Text>
 
+                {colorVariants.length > 0 && (
+                    <View style={styles.colorContainer}>
+                        {colorVariants.map((variant) => {
+                            // Cast to any to access the 'code' field which holds the hex
+                            const v = variant as any;
+                            // Prioritize 'code' found in option_values (nested) as per logs, then other fallbacks
+                            const rawColor = v.option_values?.color?.code || v.code || v.hex || v.hex_color || v.color_hex || variant.color;
+                            const validColor = getValidColor(rawColor);
+
+                            return (
+                                <Pressable
+                                    key={variant.id}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedVariant(variant);
+                                    }}
+                                    style={[
+                                        styles.colorDot,
+                                        { backgroundColor: validColor },
+                                        selectedVariant?.id === variant.id && styles.colorDotSelected,
+                                        selectedVariant?.id === variant.id && isDark && styles.colorDotSelectedDark
+                                    ]}
+                                />
+                            );
+                        })}
+                    </View>
+                )}
+
                 <View style={styles.footer}>
                     <View>
                         {hasDiscount && (
                             <Text style={styles.originalPrice}>
-                                ${product.compare_at_price?.toFixed(2)}
+                                ${currentComparePrice?.toFixed(2)}
                             </Text>
                         )}
                         <Text style={[styles.price, hasDiscount ? styles.priceDiscount : undefined, isDark && !hasDiscount && { color: '#fff' }]}>
-                            ${product.price?.toFixed(2)}
+                            ${currentPrice.toFixed(2)}
                         </Text>
                     </View>
 
@@ -142,7 +272,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     </Pressable>
                 </View>
             </View>
-        </Pressable>
+        </View>
     );
 }
 
@@ -217,6 +347,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
         paddingHorizontal: 4,
         gap: 4,
+        flex: 1,
     },
     brand: {
         fontSize: 10,
@@ -232,16 +363,42 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         minHeight: 36,
     },
+    colorContainer: {
+        flexDirection: 'row',
+        gap: 6,
+        marginVertical: 4,
+        flexWrap: 'wrap',
+    },
+    colorDot: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+    },
+    colorDotSelected: {
+        transform: [{ scale: 1.3 }],
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.41,
+        elevation: 2,
+        borderWidth: 0, // Remove border for selected
+    },
+    colorDotSelectedDark: {
+        borderColor: '#fff',
+    },
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 4,
+        marginTop: 'auto',
+        paddingTop: 8,
     },
     price: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1152d4',
+        color: '#000',
     },
     priceDiscount: {
         color: '#ef4444',

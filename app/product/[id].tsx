@@ -64,19 +64,31 @@ export default function ProductDetailsScreen() {
         if (!product) {
             return initialImage ? [initialImage as string] : [];
         }
-        const baseImages = product.images?.map(i => i.path) || [];
-        const variantImages = product.variants?.map(v => v.image_path).filter(Boolean) as string[] || [];
 
-        // If a variant is selected, maybe we want to prioritize or include its specific gallery
-        let currentVariantGallery: string[] = [];
-        if (selectedVariant?.gallery) {
-            currentVariantGallery = selectedVariant.gallery;
-        }
+        // Ensure we properly fix URLs for all sources
+        const fixUrl = (url: string | undefined | null) => {
+            if (!url) return null;
+            if (url.startsWith('http')) return url;
+            return `https://sadekabdelsater.com/storage/${url}`;
+        };
 
-        const combined = Array.from(new Set([...baseImages, ...variantImages, ...currentVariantGallery]));
+        const baseImages = product.images?.map(i => fixUrl(i.path)).filter(Boolean) as string[] || [];
+        const variantImages = product.variants?.map(v => fixUrl(v.image_path)).filter(Boolean) as string[] || [];
+
+        // Collect ALL gallery images from ALL variants
+        const allVariantsGalleries = product.variants?.reduce((acc: string[], v) => {
+            if (v.gallery && Array.isArray(v.gallery)) {
+                const fixedGallery = v.gallery.map(img => fixUrl(img)).filter(Boolean) as string[];
+                return [...acc, ...fixedGallery];
+            }
+            return acc;
+        }, []) || [];
+
+        // Base images -> Variant Main Images -> All Variant Gallery Images
+        const combined = Array.from(new Set([...baseImages, ...variantImages, ...allVariantsGalleries]));
 
         if (combined.length === 0 && product.main_image) {
-            return [product.main_image];
+            return [fixUrl(product.main_image) as string];
         }
 
         if (combined.length === 0 && initialImage) {
@@ -84,7 +96,7 @@ export default function ProductDetailsScreen() {
         }
 
         return combined;
-    }, [product, selectedVariant, initialImage]);
+    }, [product, initialImage]);
 
     const isWishlisted = product ? isInWishlist(product.id) : false;
 
@@ -104,21 +116,25 @@ export default function ProductDetailsScreen() {
         const target = selectedVariant || product;
         if (!target) return { price: 0, originalPrice: undefined };
 
-        let finalPrice = target.price || 0;
-        let originalPrice = target.compare_at_price || undefined;
+        const rawPrice = Number(target.price) || 0;
+        let finalPrice = rawPrice;
+        let originalPrice = undefined;
 
         // Apply discount if present
-        if (target.discount_amount && target.discount_amount > 0) {
-            // If we have a discount, the current 'price' is implicitly the Original Price unless compare_at is set?
-            // Usually in APIs: Price is the selling price. But if discount is active, usually generated on the fly.
-            // Let's assume 'price' is the Base Price, and we calculate the discounted one.
-            originalPrice = finalPrice; // The base price becomes the "was" price
+        if (target.discount_amount && Number(target.discount_amount) > 0) {
+            const discountAmount = Number(target.discount_amount);
+            originalPrice = rawPrice; // Base price is the 'Original' price
 
-            if (target.discount_type === 'percent') {
-                finalPrice = finalPrice * (1 - target.discount_amount / 100);
-            } else if (target.discount_type === 'fixed') {
-                finalPrice = Math.max(0, finalPrice - target.discount_amount);
+            if ((target.discount_type as string) === 'percent' || (target.discount_type as string) === 'percentage') {
+                const percent = discountAmount / 100;
+                finalPrice = rawPrice - (rawPrice * percent);
+            } else {
+                // fixed
+                finalPrice = Math.max(0, rawPrice - discountAmount);
             }
+        } else if (target.compare_at_price && Number(target.compare_at_price) > rawPrice) {
+            finalPrice = rawPrice;
+            originalPrice = Number(target.compare_at_price);
         }
 
         // Return rounded for display
@@ -255,16 +271,16 @@ export default function ProductDetailsScreen() {
                                             {cartCount > 0 && (
                                                 <View style={{
                                                     position: 'absolute',
-                                                    top: -2,
+                                                    top: -6,
                                                     right: -2,
-                                                    backgroundColor: '#FF3B30',
+                                                    backgroundColor: '#000',
                                                     borderRadius: 10,
                                                     minWidth: 16,
                                                     height: 16,
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    borderWidth: 1.5,
-                                                    borderColor: isDark ? '#000' : '#fff'
+                                                    borderWidth: 1,
+                                                    borderColor: '#fff'
                                                 }}>
                                                     <Text style={{
                                                         color: '#fff',
