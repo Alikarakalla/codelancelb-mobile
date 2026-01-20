@@ -2,7 +2,6 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // import { GlobalHeader } from '@/components/ui/GlobalHeader'; 
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { RatingSummary } from '@/components/reviews/RatingSummary';
 import { ReviewFilters } from '@/components/reviews/ReviewFilters';
 import { ReviewItem } from '@/components/reviews/ReviewItem';
@@ -62,7 +61,6 @@ export default function ProductReviewsScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { openDrawer } = useDrawer();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const [product, setProduct] = React.useState<Product | null>(null);

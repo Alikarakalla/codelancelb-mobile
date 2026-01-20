@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
 
 export function SignOutButton() {
     const colorScheme = useColorScheme();
@@ -23,7 +22,7 @@ export function SignOutButton() {
                     style: 'destructive',
                     onPress: async () => {
                         await logout();
-                        router.replace('/login');
+                        router.replace('/');
                     }
                 }
             ]

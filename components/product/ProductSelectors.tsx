@@ -15,7 +15,7 @@ export function ProductSelectors({ options = [], variants = [], onVariantChange 
     const isDark = colorScheme === 'dark';
 
     // Find options dynamically
-    const colorOption = options.find(o => o.name.toLowerCase() === 'color');
+    const colorOption = options.find(o => o.name.toLowerCase() === 'color' || o.name.toLowerCase() === 'colour');
     const sizeOption = options.find(o => o.name.toLowerCase() === 'size' || o.name.toLowerCase() === 'shade'); // Added 'shade' just in case
 
     // Fallback: If no explicit size/color, pick the first non-color option as "secondary"

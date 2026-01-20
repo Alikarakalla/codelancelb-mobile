@@ -147,6 +147,16 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.thumbnailsContent}
                         keyExtractor={(_, index) => index.toString()}
+                        onScrollToIndexFailed={(info) => {
+                            // Wait for layout
+                            setTimeout(() => {
+                                thumbListRef.current?.scrollToIndex({
+                                    index: info.index,
+                                    animated: true,
+                                    viewPosition: 0.5
+                                });
+                            }, 500);
+                        }}
                         renderItem={({ item, index }) => (
                             <Pressable
                                 onPress={() => scrollToIndex(index)}

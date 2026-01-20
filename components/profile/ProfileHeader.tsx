@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useRouter } from 'expo-router';
@@ -16,12 +17,18 @@ export function ProfileHeader() {
 
     const [tier, setTier] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
+    const [imageError, setImageError] = useState(false);
 
     useEffect(() => {
         if (isAuthenticated && user) {
             fetchTier();
         }
     }, [isAuthenticated, user?.loyalty_points_balance]);
+
+    // Reset error when avatar changes
+    useEffect(() => {
+        setImageError(false);
+    }, [user?.avatar]);
 
     const fetchTier = async () => {
         try {
@@ -119,11 +126,6 @@ export function ProfileHeader() {
         }
     };
 
-    // Calculate display values
-    const tierName = tier?.name || (user?.loyaltyTier as any)?.name || (user as any)?.loyalty_tier?.name || 'Member';
-    const tierIcon = tier?.icon || (user?.loyaltyTier as any)?.icon || (user as any)?.loyalty_tier?.icon || 'verified';
-    const tierColor = tier?.color || (user?.loyaltyTier as any)?.color || (user as any)?.loyalty_tier?.color || '#f59e0b';
-
     const getInitials = (name?: string) => {
         if (!name) return 'U';
         const parts = name.trim().split(' ');
@@ -133,13 +135,37 @@ export function ProfileHeader() {
         return name.slice(0, 2).toUpperCase();
     };
 
+    const getSafeIconName = (iconName: string) => {
+        const map: Record<string, any> = {
+            'award': 'workspace-premium',
+            'trophy': 'emoji-events',
+            'star': 'star',
+            'shield': 'security',
+            'crown': 'emoji-events'
+        };
+        // If the icon exists in map, return it. Otherwise return the original if it might be valid, or verified as fallback
+        return map[iconName] || iconName || 'verified';
+    };
+
     const getUserAvatarSource = () => {
-        if (user?.avatar) {
+        if (user?.avatar &&
+            typeof user.avatar === 'string' &&
+            user.avatar !== 'null' &&
+            user.avatar !== 'undefined' &&
+            user.avatar.trim() !== '' &&
+            !user.avatar.includes('default.png') &&
+            !user.avatar.includes('placeholder')
+        ) {
             if (user.avatar.startsWith('http')) return { uri: user.avatar };
             return { uri: `https://codelanclb.com/storage/${user.avatar}` };
         }
         return null;
     };
+
+    const rawIcon = tier?.icon || (user?.loyaltyTier as any)?.icon || (user as any)?.loyalty_tier?.icon || 'verified';
+    const tierIcon = getSafeIconName(rawIcon);
+    const tierName = tier?.name || (user?.loyaltyTier as any)?.name || (user as any)?.loyalty_tier?.name || 'Member';
+    const tierColor = tier?.color || (user?.loyaltyTier as any)?.color || (user as any)?.loyalty_tier?.color || '#f59e0b';
 
     if (!isAuthenticated || !user) {
         return (
@@ -163,12 +189,22 @@ export function ProfileHeader() {
     return (
         <View style={[styles.header, { backgroundColor: isDark ? '#1e293b' : '#ffffff' }]}>
             <View style={styles.avatarContainer}>
-                {avatarSource ? (
-                    <Image source={avatarSource} style={styles.avatar} contentFit="cover" />
+                {(avatarSource && !imageError) ? (
+                    <Image
+                        source={avatarSource}
+                        style={styles.avatar}
+                        contentFit="cover"
+                        onError={() => setImageError(true)}
+                    />
                 ) : (
-                    <View style={[styles.avatarPlaceholder, { backgroundColor: '#1152d4' }]}>
+                    <LinearGradient
+                        colors={['#18181b', '#000000']}
+                        style={styles.avatarPlaceholder}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
                         <Text style={styles.initialsText}>{getInitials(user.name)}</Text>
-                    </View>
+                    </LinearGradient>
                 )}
 
                 {uploading && (
@@ -179,7 +215,7 @@ export function ProfileHeader() {
 
                 <Pressable
                     style={[styles.cameraButton, {
-                        backgroundColor: '#1152d4',
+                        backgroundColor: '#18181b',
                         borderColor: isDark ? '#1a2230' : '#ffffff',
                     }]}
                     onPress={handleAvatarPress}

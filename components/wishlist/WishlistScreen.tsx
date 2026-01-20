@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
-import { WishlistItem } from './WishlistItem';
+import { ShopProductCard } from '@/components/shop/ShopProductCard';
+import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useRouter } from 'expo-router';
-import { useDrawer } from '@/hooks/use-drawer-context';
+import { Product } from '@/types/schema';
 
 export default function WishlistScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const router = useRouter();
+    const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
-    const { wishlist, removeFromWishlist } = useWishlist();
-    const { openDrawer } = useDrawer();
+    const { wishlist } = useWishlist();
+
+    const handleProductPress = (product: Product) => {
+        router.push({
+            pathname: '/product/[id]',
+            params: { id: product.id, initialImage: product.main_image || '' }
+        });
+    };
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
@@ -24,7 +32,7 @@ export default function WishlistScreen() {
             <ScrollView
                 contentContainerStyle={{
                     paddingTop: 60 + insets.top,
-                    paddingBottom: 100, // Space for tab bar
+                    paddingBottom: 100,
                     paddingHorizontal: 16,
                 }}
                 showsVerticalScrollIndicator={false}
@@ -32,10 +40,11 @@ export default function WishlistScreen() {
                 {wishlist.length > 0 ? (
                     <View style={styles.grid}>
                         {wishlist.map((item) => (
-                            <WishlistItem
+                            <ShopProductCard
                                 key={item.id}
                                 product={item}
-                                onRemove={removeFromWishlist}
+                                style={{ width: '48%' }}
+                                onQuickView={() => setQuickViewProduct(item)}
                             />
                         ))}
                     </View>
@@ -49,6 +58,14 @@ export default function WishlistScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            <ProductQuickViewModal
+                visible={!!quickViewProduct}
+                product={quickViewProduct}
+                onClose={() => setQuickViewProduct(null)}
+                onAddToCart={(params) => console.log('Add to cart:', params)}
+                onViewDetails={handleProductPress}
+            />
         </View>
     );
 }

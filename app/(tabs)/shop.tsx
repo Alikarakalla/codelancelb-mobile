@@ -10,7 +10,6 @@ import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 
 import { Product, Category, Brand } from '@/types/schema';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { api } from '@/services/apiClient';
 
 import { useFilters } from '@/context/FilterContext';
@@ -21,7 +20,6 @@ export default function ShopScreen() {
     const isDark = colorScheme === 'dark';
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { openDrawer } = useDrawer();
     const { filters, updateFilter, setFilters } = useFilters();
 
     const [activeFilters, setActiveFilters] = React.useState<FilterChip[]>([]);

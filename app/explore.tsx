@@ -10,10 +10,8 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Fonts } from '@/constants/theme';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
-import { useDrawer } from '@/hooks/use-drawer-context';
 
 export default function TabTwoScreen() {
-  const { openDrawer } = useDrawer();
 
   return (
     <View style={{ flex: 1 }}>

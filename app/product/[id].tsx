@@ -8,13 +8,13 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductInfo } from '@/components/product/ProductInfo';
 import { ProductDescription } from '@/components/product/ProductDescription';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { AddToCartFooter } from '@/components/product/AddToCartFooter';
+import { BundleContents } from '@/components/product/BundleContents';
 
 import { api } from '@/services/apiClient';
 import { Product, ProductVariant } from '@/types/schema';
@@ -27,11 +27,12 @@ export default function ProductDetailsScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const { openDrawer } = useDrawer();
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+    const [bundleSelections, setBundleSelections] = useState<Record<number, ProductVariant | null>>({});
+
     const { addToCart, cartCount } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
@@ -42,12 +43,30 @@ export default function ProductDetailsScreen() {
                 try {
                     const productId = Array.isArray(id) ? id[0] : id;
                     const data = await api.getProduct(productId);
+                    console.log('Product Data:', JSON.stringify(data, null, 2));
                     setProduct(data);
+
                     // Set default variant if exists
                     if (data.variants?.length) {
                         const defaultVariant = data.variants.find(v => v.is_default) || data.variants[0];
                         setSelectedVariant(defaultVariant);
                     }
+
+                    // Initialize bundle selections if bundle
+                    if (data.type === 'bundle' && data.bundle_items) {
+                        const initialSelections: Record<number, ProductVariant | null> = {};
+                        data.bundle_items.forEach(item => {
+                            if (item.has_variants && item.variants?.length) {
+                                // Try to find a default variant or first one
+                                const def = item.variants.find(v => v.is_default) || item.variants[0];
+                                initialSelections[item.id] = def || null;
+                            } else {
+                                initialSelections[item.id] = null;
+                            }
+                        });
+                        setBundleSelections(initialSelections);
+                    }
+
                 } catch (err) {
                     setError('Failed to load product. Please try again later.');
                     console.error('Error fetching product:', err);
@@ -72,6 +91,7 @@ export default function ProductDetailsScreen() {
             return `https://sadekabdelsater.com/storage/${url}`;
         };
 
+        const mainImage = fixUrl(product.main_image);
         const baseImages = product.images?.map(i => fixUrl(i.path)).filter(Boolean) as string[] || [];
         const variantImages = product.variants?.map(v => fixUrl(v.image_path)).filter(Boolean) as string[] || [];
 
@@ -84,12 +104,12 @@ export default function ProductDetailsScreen() {
             return acc;
         }, []) || [];
 
-        // Base images -> Variant Main Images -> All Variant Gallery Images
-        const combined = Array.from(new Set([...baseImages, ...variantImages, ...allVariantsGalleries]));
+        // Main Image -> Base Images -> Variant Main Images -> All Variant Gallery Images
+        let list: string[] = [];
+        if (mainImage) list.push(mainImage);
+        list = [...list, ...baseImages, ...variantImages, ...allVariantsGalleries];
 
-        if (combined.length === 0 && product.main_image) {
-            return [fixUrl(product.main_image) as string];
-        }
+        const combined = Array.from(new Set(list));
 
         if (combined.length === 0 && initialImage) {
             return [initialImage as string];
@@ -103,6 +123,10 @@ export default function ProductDetailsScreen() {
     // Determine if add to cart should be disabled
     const isOutOfStock = useMemo(() => {
         if (!product) return true;
+
+        // Bundle Logic: check if any required item is out of stock (less critical since usually bundle keeps own stock, but if dynamic...)
+        // For now, respect main bundle stock primarily.
+
         if (!product.track_inventory) return false;
         if (product.has_variants) {
             if (!selectedVariant) return true; // Must select a variant
@@ -146,6 +170,23 @@ export default function ProductDetailsScreen() {
 
     const handleAddToCart = () => {
         if (!product) return;
+
+        if (product.type === 'bundle') {
+            // Validate Bundle Selections
+            if (product.bundle_items) {
+                for (const item of product.bundle_items) {
+                    if (item.has_variants && !bundleSelections[item.id]) {
+                        Alert.alert('Selection Required', `Please select options for ${item.name_en || item.name}`);
+                        return;
+                    }
+                }
+            }
+            // Pass selections. API likely expects { bundle_selections: { [itemId]: variantId } }
+            // We'll pass the whole map for the Context to handle or pass to API
+            addToCart(product, null, 1, { bundle_selections: bundleSelections });
+            return;
+        }
+
         if (product.has_variants && !selectedVariant) {
             Alert.alert('Selection Required', 'Please select your options before adding to cart.');
             return;
@@ -369,7 +410,6 @@ export default function ProductDetailsScreen() {
 
                 {product && (
                     <View>
-                        {/* ... components ... */}
                         <Animated.View entering={FadeInDown.delay(300).duration(600).damping(12)}>
                             <ProductInfo
                                 brand={product.brand?.name}
@@ -400,6 +440,17 @@ export default function ProductDetailsScreen() {
                                 originalPrice={priceData.originalPrice}
                             />
                         </Animated.View>
+
+
+                        {product.type === 'bundle' && product.bundle_items && (
+                            <Animated.View entering={FadeInDown.delay(700).duration(600).damping(12)}>
+                                <BundleContents
+                                    items={product.bundle_items}
+                                    selections={bundleSelections}
+                                    onSelectionChange={(itemId, variant) => setBundleSelections(prev => ({ ...prev, [itemId]: variant }))}
+                                />
+                            </Animated.View>
+                        )}
 
                         <Animated.View entering={FadeInDown.delay(600).duration(600).damping(12)}>
                             <ProductDescription description={product.description_en || product.description || ''} />

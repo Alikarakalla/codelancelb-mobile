@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet, SafeAreaView, Switch, Platform, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { api } from '@/services/apiClient';
+import PhoneInput from 'react-native-phone-input';
+import { parsePhoneNumber } from 'libphonenumber-js';
 
 export default function CheckoutScreen() {
     const router = useRouter();
@@ -21,14 +23,16 @@ export default function CheckoutScreen() {
     const { user, isAuthenticated } = useAuth();
     const { formatPrice, currency } = useCurrency();
 
-    const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery'>('cash_on_delivery');
+    const [paymentMethod, setPaymentMethod] = useState<'cod'>('cod');
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isUsingSavedAddress, setIsUsingSavedAddress] = useState(true);
     const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+    const phoneRef = useRef<PhoneInput>(null);
 
     // User Data
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+    const [phoneCountry, setPhoneCountry] = useState<any>();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
 
@@ -239,42 +243,53 @@ export default function CheckoutScreen() {
             return;
         }
 
+        if (phoneRef.current && !phoneRef.current.isValidNumber()) {
+            Alert.alert('Error', 'Please enter a valid phone number');
+            return;
+        }
+
         setPlacingOrder(true);
         try {
             const selectedAddr = addresses.find(a => a.id === selectedAddressId);
 
+            // Ensure we have valid address data
+            if (!selectedAddr && isUsingSavedAddress) {
+                Alert.alert('Error', 'Please select a valid shipping address');
+                return;
+            }
+
             // Append reward info to notes
-            let finalNotes = notes;
+            let finalNotes = notes || '';
             if (appliedReward) {
                 const rewardName = appliedReward.reward_data?.name || 'Loyalty Reward';
                 finalNotes += ` [Redeemed Reward Applied: ${rewardName} (ID: ${appliedReward.id})]`;
             }
 
             const orderData = {
-                first_name: firstName,
-                last_name: lastName,
-                email: email,
-                phone: phone,
+                first_name: firstName || 'Guest',
+                last_name: lastName || 'User',
+                email: email || 'guest@example.com',
+                phone: phone || '',
 
                 // Shipping address fields (flat structure for backend)
-                shipping_address: selectedAddr?.address_line_1 || '',
+                shipping_address: selectedAddr?.address_line_1 || 'N/A',
                 shipping_address_2: selectedAddr?.address_line_2 || '',
-                shipping_city: selectedAddr?.city || '',
-                shipping_state: selectedAddr?.state || '',
-                shipping_zip: selectedAddr?.postal_code || '',
-                shipping_country: selectedAddr?.country || '',
+                shipping_city: selectedAddr?.city || 'N/A',
+                shipping_state: selectedAddr?.state || 'N/A',
+                shipping_zip: selectedAddr?.postal_code || '00000',
+                shipping_country: selectedAddr?.country || 'N/A',
 
                 // Billing address (same as shipping for now)
-                billing_address: selectedAddr?.address_line_1 || '',
+                billing_address: selectedAddr?.address_line_1 || 'N/A',
                 billing_address_2: selectedAddr?.address_line_2 || '',
-                billing_city: selectedAddr?.city || '',
-                billing_state: selectedAddr?.state || '',
-                billing_zip: selectedAddr?.postal_code || '',
-                billing_country: selectedAddr?.country || '',
+                billing_city: selectedAddr?.city || 'N/A',
+                billing_state: selectedAddr?.state || 'N/A',
+                billing_zip: selectedAddr?.postal_code || '00000',
+                billing_country: selectedAddr?.country || 'N/A',
 
-                // Also send IDs for reference
-                billing_address_id: selectedAddressId,
-                shipping_address_id: selectedAddressId,
+                // Also send IDs for reference (can be null if new address)
+                billing_address_id: selectedAddressId || null,
+                shipping_address_id: selectedAddressId || null,
 
                 items: items.map(item => {
                     // Find the variant by slug to get its numeric ID
@@ -294,26 +309,56 @@ export default function CheckoutScreen() {
                         }
                     }
 
+                    // Simplify options - especially for bundle products
+                    let simplifiedOptions: Record<string, any> | null = null;
+                    if (item.options) {
+                        // Check if this is a bundle product with bundle_selections
+                        if (item.options.bundle_selections) {
+                            // Convert full variant objects to just IDs
+                            const bundleSelections: Record<string, number> = {};
+                            Object.entries(item.options.bundle_selections).forEach(([productId, variantData]: [string, any]) => {
+                                // Extract just the variant ID
+                                bundleSelections[productId] = variantData.id || variantData;
+                            });
+                            simplifiedOptions = { bundle_selections: bundleSelections };
+                        } else {
+                            // For regular products, keep color/size options but simplify them
+                            simplifiedOptions = {};
+                            Object.entries(item.options).forEach(([key, value]: [string, any]) => {
+                                if (value && typeof value === 'object' && 'id' in value) {
+                                    // Convert {id: 123, name: "Red", ...} to just "Red" or id
+                                    simplifiedOptions![key] = value.name || value.id;
+                                } else {
+                                    simplifiedOptions![key] = value;
+                                }
+                            });
+                        }
+                    }
+
                     return {
                         product_id: item.product_id || item.id,
                         variant_id: variant?.id || null,
                         quantity: item.qty,
-                        price: parseFloat(itemPrice.toFixed(2)),  // Send DISCOUNTED price
-                        options: item.options || null,
+                        price: parseFloat(itemPrice.toFixed(2)),
+                        options: simplifiedOptions,
                     };
                 }),
                 subtotal: parseFloat(subtotal.toFixed(2)),
                 tax_amount: parseFloat(taxes.toFixed(2)),
                 shipping_amount: parseFloat(shippingCost.toFixed(2)),
                 discount_amount: parseFloat((discountAmount + rewardDiscount).toFixed(2)),
-                total_amount: parseFloat(total.toFixed(2)),  // Fix floating point precision
-                payment_method: paymentMethod,
+                total_amount: parseFloat(total.toFixed(2)),
+                payment_method: 'cod',  // Changed from paymentMethod to 'cod' for backend compatibility
                 notes: finalNotes,
                 coupon_code: appliedCoupon?.code || null,
-                currency_code: 'USD',  // TEMP: Testing if LBP causes backend error
+                currency_code: 'USD',
             };
 
+            console.log('📦 Order Data Being Sent:', JSON.stringify(orderData, null, 2));
+
             const response = await api.placeOrder(orderData);
+
+            console.log('📬 Backend Response:', JSON.stringify(response, null, 2));
 
             if (response.success) {
                 clearCart();
@@ -326,11 +371,30 @@ export default function CheckoutScreen() {
                     }]
                 );
             } else {
+                console.error('❌ Backend rejected order:', response);
                 Alert.alert('Error', response.message || 'Failed to place order');
             }
         } catch (error: any) {
-            console.error('Place order error:', error);
-            Alert.alert('Error', error.message || 'Failed to place order. Please try again.');
+            console.error('❌ Place order error:', error);
+            console.error('Error details:', {
+                message: error.message,
+                status: error.status,
+                response: error.response
+            });
+
+            // More detailed error message
+            let errorMsg = 'Failed to place order. ';
+            if (error.message?.includes('500')) {
+                errorMsg += 'Server error - please contact support.';
+            } else if (error.message?.includes('401')) {
+                errorMsg += 'Please log in again.';
+            } else if (error.message?.includes('400')) {
+                errorMsg += 'Invalid order data.';
+            } else {
+                errorMsg += error.message || 'Please try again.';
+            }
+
+            Alert.alert('Error', errorMsg);
         } finally {
             setPlacingOrder(false);
         }
@@ -651,13 +715,27 @@ export default function CheckoutScreen() {
                     </View>
                     <View style={styles.inputGroup}>
                         <Text style={[styles.label, isDark && styles.labelDark]}>Phone</Text>
-                        <TextInput
-                            style={[styles.input, isDark && styles.inputDark]}
-                            placeholder="+1 (555) 555-5555"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                        <PhoneInput
+                            ref={phoneRef}
+                            initialCountry="lb"
+                            onChangePhoneNumber={(number) => setPhone(number)}
+                            style={{
+                                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                borderWidth: 1,
+                                borderColor: isDark ? '#334155' : '#e5e7eb',
+                                borderRadius: 12,
+                                height: 56,
+                                paddingHorizontal: 16,
+                            }}
+                            textStyle={{
+                                color: isDark ? '#fff' : '#111318',
+                                fontSize: 15,
+                            }}
+                            flagStyle={{
+                                width: 30,
+                                height: 20,
+                                borderWidth: 0,
+                            }}
                         />
                     </View>
                 </View>
@@ -828,11 +906,11 @@ export default function CheckoutScreen() {
                         {/* COD (Cash on Delivery) - ONLY OPTION */}
                         <Pressable
                             style={[styles.radioItem, styles.radioActive]}
-                            onPress={() => setPaymentMethod('cash_on_delivery')}
+                            onPress={() => setPaymentMethod('cod')}
                         >
                             <View style={styles.radioRow}>
                                 <View style={styles.flexRow}>
-                                    <View style={[styles.radioCircle, paymentMethod === 'cash_on_delivery' && styles.radioCircleSelected]} />
+                                    <View style={[styles.radioCircle, paymentMethod === 'cod' && styles.radioCircleSelected]} />
                                     <Text style={[styles.radioLabel, isDark && styles.textDark]}>Cash on Delivery (COD)</Text>
                                 </View>
                                 <Text style={[styles.radioSubLabel, isDark && styles.textGrayDark, { fontSize: 12 }]}>Pay when you receive</Text>

@@ -101,7 +101,7 @@ export function RecentOrders() {
                         <MaterialIcons name="receipt-long" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
                         <Text style={[styles.title, { marginTop: 16, textAlign: 'center' }]}>Sign in to view your orders</Text>
                         <Pressable
-                            style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }}
+                            style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#18181b', borderRadius: 12 }}
                             onPress={() => router.push('/login')}
                         >
                             <Text style={{ color: '#fff', fontWeight: '700' }}>Sign In</Text>
@@ -151,7 +151,7 @@ export function RecentOrders() {
         return (
             <Pressable
                 style={styles.card}
-                onPress={() => router.push({ pathname: '/modal/order-details', params: { id: item.id } })}
+                onPress={() => router.push({ pathname: '/orders/[id]', params: { id: item.id } })}
             >
                 <View style={styles.cardHeader}>
                     <View style={styles.orderInfo}>
@@ -240,7 +240,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     viewAll: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1152d4',
+        color: '#18181b',
     },
     list: {
         gap: 12,

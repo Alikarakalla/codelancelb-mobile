@@ -7,8 +7,9 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { api } from '@/services/apiClient';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ProductGridItem } from '@/components/product/ProductGridItem';
 
-export default function OrderDetailsModal() {
+export default function OrderDetailsPage() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -100,8 +101,54 @@ export default function OrderDetailsModal() {
         );
     }
 
+    const resolveAddress = (o: any) => {
+        let addr = o.shipping_address || o.address || o.billing_address;
+
+        // Fix: Parse if it's a JSON string
+        if (typeof addr === 'string') {
+            try {
+                addr = JSON.parse(addr);
+            } catch (e) {
+                console.warn('Failed to parse address JSON', e);
+                // Return as an object with just one field if plain string
+                return { address: addr };
+            }
+        }
+        return addr;
+    };
+
+    const getShippingCost = (o: any) => {
+        const val = o.shipping_amount || o.shipping_cost || o.shipping_fee || o.delivery_fee || 0;
+        return parseFloat(String(val));
+    };
+
+    const shippingAddress = order ? resolveAddress(order) : null;
+    const shippingCost = order ? getShippingCost(order) : 0;
+    const orderItems = order?.items || order?.order_items || [];
     const statusInfo = order ? getStatusColor(order.status) : null;
-    const shippingAddress = order?.shipping_address || order?.address;
+
+    // Helper to safely get address fields
+    const getAddrField = (addr: any, ...keys: string[]) => {
+        if (!addr) return '';
+        for (const key of keys) {
+            if (addr[key]) return addr[key];
+        }
+        return '';
+    };
+
+    // Updated Mapping based on JSON: address, city, state, zip, country
+    const addrName = shippingAddress ? (
+        shippingAddress.first_name
+            ? `${getAddrField(shippingAddress, 'first_name')} ${getAddrField(shippingAddress, 'last_name')}`
+            : order.user?.name || order.email // Fallback to user name/email if address name is missing
+    ) : '';
+
+    const addrLine1 = getAddrField(shippingAddress, 'address', 'address_line_1', 'street');
+    const addrLine2 = getAddrField(shippingAddress, 'address_line_2', 'address2', 'apartment');
+    const addrCity = getAddrField(shippingAddress, 'city');
+    const addrState = getAddrField(shippingAddress, 'state', 'province');
+    const addrZip = getAddrField(shippingAddress, 'zip', 'postal_code', 'zip_code');
+    const addrPhone = getAddrField(shippingAddress, 'phone') || order.phone; // Fallback to order phone
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
@@ -110,39 +157,37 @@ export default function OrderDetailsModal() {
             <Stack.Screen
                 options={{
                     headerShown: true,
-                    headerTitle: order ? `Order #${order.id}` : 'Order Details',
+
+                    headerTitle: order ? `Order #${order.order_number || order.id}` : 'Order Details',
                     headerShadowVisible: false,
-                    headerStyle: { backgroundColor: isDark ? '#000' : '#ffffff' },
+                    headerTransparent: true,
+                    headerStyle: { backgroundColor: isDark ? 'transparent' : 'transparent' },
                     headerTitleStyle: { color: isDark ? '#fff' : '#000', fontSize: 16, fontWeight: '600' },
                     headerLeft: () => (
                         <Pressable
                             onPress={() => router.back()}
-                            style={styles.nativeGlassWrapper}
+                            style={{ padding: 4 }}
                         >
                             <IconSymbol
                                 name="chevron.left"
                                 color={isDark ? '#fff' : '#000'}
-                                size={24}
+                                size={28}
                                 weight="medium"
                             />
                         </Pressable>
                     ),
                     headerBackVisible: false,
-                    ...Platform.select({
-                        ios: {
-                            headerTransparent: true,
-                            headerBlurEffect: isDark ? 'dark' : 'regular',
-                        }
-                    })
+                    headerBlurEffect: isDark ? 'dark' : 'regular', // Added blur effect for premium look with transparent header
                 }}
             />
 
             <ScrollView
-                style={{ flex: 1 }}
+                style={{ flex: 1, backgroundColor: isDark ? '#000' : '#fff' }}
                 contentContainerStyle={{
-                    paddingTop: Platform.OS === 'ios' ? insets.top + (order ? 60 : 100) : 80,
+                    flexGrow: 1,
+                    padding: 20,
+                    paddingTop: Platform.OS === 'ios' ? 120 : 100, // Add padding to clear transparent header
                     paddingBottom: 100,
-                    paddingHorizontal: 20
                 }}
                 showsVerticalScrollIndicator={false}
             >
@@ -163,38 +208,74 @@ export default function OrderDetailsModal() {
 
                         {/* Items */}
                         <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Items</Text>
-                        <View style={[styles.card, isDark && { backgroundColor: '#111', borderColor: '#333' }, { padding: 0 }]}>
-                            {order.items?.map((item: any, index: number) => {
-                                const imageUrl = fixUrl(item.product?.main_image || item.image);
-                                return (
-                                    <View key={index} style={[styles.itemRow, index !== order.items.length - 1 && styles.borderBottom, isDark && { borderColor: '#333' }]}>
-                                        <View style={styles.itemImageContainer}>
-                                            {imageUrl ? (
-                                                <Image
-                                                    source={{ uri: imageUrl }}
-                                                    style={styles.itemImage}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                            style={{ marginHorizontal: -20, marginBottom: 24 }}
+                        >
+                            {orderItems.length > 0 ? (
+                                orderItems.map((item: any, index: number) => {
+
+                                    // Logic to find variant info
+                                    let variantInfo = [];
+
+                                    // 1. Check direct fields on item
+                                    if (item.size) variantInfo.push(`Size: ${item.size}`);
+                                    if (item.color) variantInfo.push(`Color: ${item.color}`);
+
+                                    // 2. Check options object (if parsed)
+                                    if (item.product_options) {
+                                        try {
+                                            const opts = typeof item.product_options === 'string' ? JSON.parse(item.product_options) : item.product_options;
+                                            Object.values(opts).forEach(v => { if (v) variantInfo.push(String(v)) });
+                                        } catch (e) { }
+                                    }
+
+                                    // 3. Smart Fallback: If product has only ONE variant, assume that's it
+                                    if (variantInfo.length === 0 && item.product?.variants?.length === 1) {
+                                        const v = item.product.variants[0];
+                                        if (v.size) variantInfo.push(`Size: ${v.size}`);
+                                        if (v.color) variantInfo.push(`Color: ${v.color}`);
+                                    }
+
+                                    const fixedProduct = item.product ? {
+                                        ...item.product,
+                                        main_image: fixUrl(item.product.main_image)
+                                    } : null;
+
+                                    return (
+                                        <View key={index} style={{ marginBottom: 16 }}>
+                                            {fixedProduct ? (
+                                                <ProductGridItem
+                                                    product={fixedProduct}
+                                                    onPress={() => router.push(`/(tabs)/shop/product/${item.product.id}` as any)}
+                                                    hideActions={true}
                                                 />
                                             ) : (
-                                                <View style={[styles.itemImage, { backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }]}>
-                                                    <Ionicons name="image-outline" size={20} color="#9ca3af" />
+                                                <View style={{ width: 160, height: 200, backgroundColor: '#f0f0f0', borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                                    <Text>Product Unavailable</Text>
                                                 </View>
                                             )}
+
+                                            {/* Order Specific Info Below Card */}
+                                            <View style={{ marginTop: 4, width: 165, paddingHorizontal: 4 }}>
+                                                <Text style={{ fontSize: 13, color: isDark ? '#ccc' : '#666', fontWeight: '500' }}>
+                                                    Qty: {item.quantity} {variantInfo.length > 0 ? `• ${variantInfo.join(' • ')}` : ''}
+                                                </Text>
+                                                <Text style={{ fontSize: 13, color: isDark ? '#fff' : '#000', fontWeight: '700', marginTop: 2 }}>
+                                                    Paid: ${parseFloat(item.price || 0).toFixed(2)}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={{ flex: 1, gap: 4 }}>
-                                            <Text style={[styles.itemName, isDark && { color: '#fff' }]} numberOfLines={2}>
-                                                {item.product_name || item.name || 'Product'}
-                                            </Text>
-                                            <Text style={styles.itemVariant}>
-                                                Qty: {item.quantity} {item.options ? `• ${Object.values(item.options).join(', ')}` : ''}
-                                            </Text>
-                                            <Text style={[styles.itemPrice, isDark && { color: '#fff' }]}>
-                                                ${parseFloat(item.price).toFixed(2)}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                );
-                            })}
-                        </View>
+                                    );
+                                })
+                            ) : (
+                                <View style={{ padding: 16, width: 300 }}>
+                                    <Text style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No items found in this order.</Text>
+                                </View>
+                            )}
+                        </ScrollView>
 
                         {/* Summary */}
                         <Text style={[styles.sectionTitle, isDark && { color: '#fff' }]}>Order Summary</Text>
@@ -212,7 +293,7 @@ export default function OrderDetailsModal() {
                             <View style={styles.summaryRow}>
                                 <Text style={[styles.summaryLabel, isDark && { color: '#9ca3af' }]}>Shipping</Text>
                                 <Text style={[styles.summaryValue, isDark && { color: '#fff' }]}>
-                                    {parseFloat(order.shipping_cost) > 0 ? `$${parseFloat(order.shipping_cost).toFixed(2)}` : 'Free'}
+                                    {shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Free'}
                                 </Text>
                             </View>
                             <View style={[styles.divider, isDark && { backgroundColor: '#333' }]} />
@@ -231,22 +312,24 @@ export default function OrderDetailsModal() {
                                         <Ionicons name="location-outline" size={24} color={isDark ? '#9ca3af' : '#6b7280'} />
                                         <View style={{ flex: 1 }}>
                                             <Text style={[styles.addressName, isDark && { color: '#fff' }]}>
-                                                {shippingAddress.first_name} {shippingAddress.last_name}
+                                                {addrName}
                                             </Text>
                                             <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                                {shippingAddress.address_line_1}
+                                                {addrLine1}
                                             </Text>
-                                            {shippingAddress.address_line_2 && (
+                                            {addrLine2 ? (
                                                 <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                                    {shippingAddress.address_line_2}
+                                                    {addrLine2}
                                                 </Text>
-                                            )}
+                                            ) : null}
                                             <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                                {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}
+                                                {addrCity}{addrState ? `, ${addrState}` : ''} {addrZip}
                                             </Text>
-                                            <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
-                                                {shippingAddress.phone}
-                                            </Text>
+                                            {addrPhone ? (
+                                                <Text style={[styles.addressText, isDark && { color: '#9ca3af' }]}>
+                                                    {addrPhone}
+                                                </Text>
+                                            ) : null}
                                         </View>
                                     </View>
                                 </View>
@@ -331,44 +414,6 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingHorizontal: 4,
     },
-    itemRow: {
-        flexDirection: 'row',
-        padding: 16,
-        gap: 12,
-    },
-    borderBottom: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-    },
-    itemImageContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#f3f4f6',
-        backgroundColor: '#f9fafb',
-    },
-    itemImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    itemName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#111827',
-    },
-    itemVariant: {
-        fontSize: 13,
-        color: '#6b7280',
-    },
-    itemPrice: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#111827',
-        marginTop: 4,
-    },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -408,23 +453,5 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6b7280',
         lineHeight: 20,
-    },
-    nativeGlassWrapper: {
-        width: 20,
-        height: 20,
-        borderRadius: 50,
-        backgroundColor: 'transparent',
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: 'transparent',
-                marginHorizontal: 8,
-            },
-            android: {
-                backgroundColor: 'rgba(0,0,0,0.05)',
-                marginHorizontal: 8,
-            }
-        })
     },
 });

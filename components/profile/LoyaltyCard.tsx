@@ -111,10 +111,23 @@ export function LoyaltyCard() {
         nextTier = loyaltyData?.nextTier || loyaltyData?.next_tier;
     }
 
+    // Helper to map invalid icon names
+    const getSafeIconName = (iconName: string) => {
+        const map: Record<string, any> = {
+            'award': 'workspace-premium',
+            'trophy': 'emoji-events',
+            'star': 'star',
+            'shield': 'security',
+            'crown': 'emoji-events'
+        };
+        return map[iconName] || iconName || 'verified';
+    };
+
     // Tier Attributes
     const tierName = currentTier?.name || user.loyaltyTier?.name || 'Member';
     const tierColor = currentTier?.color || '#1152d4';
-    const tierIcon = currentTier?.icon || 'stars'; // fallback icon
+    const rawIcon = currentTier?.icon || 'stars';
+    const tierIcon = getSafeIconName(rawIcon);
     const multiplier = currentTier?.points_multiplier ? parseFloat(currentTier.points_multiplier) : 1;
     const hasFreeShipping = currentTier?.free_shipping;
 

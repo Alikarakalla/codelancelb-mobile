@@ -17,6 +17,7 @@ interface ProductGridItemProps {
     onAddToCart?: () => void;
     onToggleWishlist?: () => void;
     onQuickView?: () => void;
+    hideActions?: boolean;
 }
 
 export const ProductGridItem = ({
@@ -25,7 +26,8 @@ export const ProductGridItem = ({
     onPress,
     onAddToCart,
     onToggleWishlist,
-    onQuickView
+    onQuickView,
+    hideActions = false
 }: ProductGridItemProps) => {
 
     const { triggerCartAnimation } = useCartAnimation();
@@ -61,39 +63,41 @@ export const ProductGridItem = ({
                     </View>
                 )}
 
-                {/* Top Right: Grouped Actions (Site uses + at top right) */}
-                <View style={styles.actionGroup}>
-                    <Pressable
-                        style={styles.fab}
-                        onPress={() => {
-                            if (cartButtonRef.current) {
-                                requestAnimationFrame(() => {
-                                    cartButtonRef.current?.measure((x, y, w, h, px, py) => {
-                                        triggerCartAnimation(
-                                            { x: px + w / 2, y: py + h / 2 },
-                                            () => onAddToCart?.()
-                                        );
+                {/* Top Right: Grouped Actions */}
+                {!hideActions && (
+                    <View style={styles.actionGroup}>
+                        <Pressable
+                            style={styles.fab}
+                            onPress={() => {
+                                if (cartButtonRef.current) {
+                                    requestAnimationFrame(() => {
+                                        cartButtonRef.current?.measure((x, y, w, h, px, py) => {
+                                            triggerCartAnimation(
+                                                { x: px + w / 2, y: py + h / 2 },
+                                                () => onAddToCart?.()
+                                            );
+                                        });
                                     });
-                                });
-                            } else {
-                                onAddToCart?.();
-                            }
-                        }}
-                        ref={cartButtonRef}
-                    >
-                        <MaterialIcons name="add" size={20} color="#fff" />
-                    </Pressable>
-                    <Pressable
-                        style={[styles.miniFab, { marginTop: 8 }]}
-                        onPress={() => onToggleWishlist?.()}
-                    >
-                        <MaterialIcons
-                            name={isWishlisted ? "favorite" : "favorite-border"}
-                            size={16}
-                            color={isWishlisted ? "#ef4444" : "#475569"}
-                        />
-                    </Pressable>
-                </View>
+                                } else {
+                                    onAddToCart?.();
+                                }
+                            }}
+                            ref={cartButtonRef}
+                        >
+                            <MaterialIcons name="add" size={20} color="#fff" />
+                        </Pressable>
+                        <Pressable
+                            style={[styles.miniFab, { marginTop: 8 }]}
+                            onPress={() => onToggleWishlist?.()}
+                        >
+                            <MaterialIcons
+                                name={isWishlisted ? "favorite" : "favorite-border"}
+                                size={16}
+                                color={isWishlisted ? "#ef4444" : "#475569"}
+                            />
+                        </Pressable>
+                    </View>
+                )}
             </View>
 
             <View style={styles.infoContainer}>

@@ -75,7 +75,7 @@ export function SavedAddresses() {
                 return { icon: 'payment', color: '#10b981' };
             case 'shipping':
             default:
-                return { icon: 'local-shipping', color: '#1152d4' };
+                return { icon: 'local-shipping', color: '#18181b' };
         }
     };
 
@@ -87,7 +87,7 @@ export function SavedAddresses() {
                         <MaterialIcons name="location-on" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
                         <Text style={[styles.title, { marginTop: 16, textAlign: 'center' }]}>Sign in to manage your addresses</Text>
                         <Pressable
-                            style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }]}
+                            style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#18181b', borderRadius: 12 }]}
                             onPress={() => router.push('/login')}
                         >
                             <Text style={{ color: '#fff', fontWeight: '700' }}>Sign In</Text>
@@ -164,7 +164,7 @@ export function SavedAddresses() {
                     onPress={() => router.push('/modal/address')}
                     style={styles.addButton}
                 >
-                    <MaterialIcons name="add" size={18} color="#1152d4" />
+                    <MaterialIcons name="add" size={18} color="#18181b" />
                     <Text style={styles.addText}>Add New</Text>
                 </Pressable>
             </View>
@@ -175,7 +175,7 @@ export function SavedAddresses() {
                         <MaterialIcons name="location-off" size={48} color={isDark ? '#9ca3af' : '#616f89'} />
                         <Text style={[styles.address, { marginTop: 16, textAlign: 'center' }]}>No saved addresses yet</Text>
                         <Pressable
-                            style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#1152d4', borderRadius: 12 }]}
+                            style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#18181b', borderRadius: 12 }]}
                             onPress={() => router.push('/modal/address')}
                         >
                             <MaterialIcons name="add" size={18} color="#fff" />
@@ -219,7 +219,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     addText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1152d4',
+        color: '#18181b',
     },
     list: {
         gap: 12,

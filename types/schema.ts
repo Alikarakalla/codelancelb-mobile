@@ -41,6 +41,8 @@ export interface Product {
     reviews?: ProductReview[];
     brand?: Brand;
     category?: Category;
+    type?: 'standard' | 'bundle';
+    bundle_items?: Product[];
 }
 
 export interface ProductVariant {

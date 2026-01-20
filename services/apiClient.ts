@@ -115,7 +115,9 @@ function transformProduct(p: any): Product {
         variants: Array.isArray(p.variants) ? p.variants.map(transformVariant) : [],
         images: Array.isArray(p.images) ? p.images.map(transformImage) : [],
         // Brand logo if loaded
-        brand: p.brand ? { ...p.brand, logo: fixUrl(p.brand.logo) } : p.brand
+        brand: p.brand ? { ...p.brand, logo: fixUrl(p.brand.logo) } : p.brand,
+        // Transform Bundle Items if present
+        bundle_items: Array.isArray(p.bundle_items) ? p.bundle_items.map(transformProduct) : []
     };
 
     // Ensure options values are parsed if they come as strings (sometimes API returns json-stringified columns)
@@ -882,6 +884,14 @@ export const api = {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
+        });
+        return handleResponse<any>(res);
+    },
+
+    // Get checkout summary with calculated totals
+    async getCheckoutSummary() {
+        const res = await fetchWithTimeout(`${BASE_URL}/checkout/summary`, {
+            headers: getHeaders()
         });
         return handleResponse<any>(res);
     },

@@ -21,7 +21,6 @@ import Animated, {
   useAnimatedScrollHandler
 } from 'react-native-reanimated';
 import { RevealingSection } from '@/components/home/RevealingSection';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { api } from '@/services/apiClient';
 
 // Mock slides for initial render / API fallback
@@ -35,7 +34,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
-  const { openDrawer } = useDrawer();
+
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [highlights, setHighlights] = useState<HighlightSection[]>([]);

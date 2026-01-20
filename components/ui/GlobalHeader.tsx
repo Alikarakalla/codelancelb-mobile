@@ -6,13 +6,14 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
-import { useDrawer } from '@/hooks/use-drawer-context';
+import { useAuth } from '@/hooks/use-auth-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Share08Icon, FavouriteIcon, ShoppingBag01Icon, SearchCustomIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { SearchBottomSheet } from '@/components/search/SearchBottomSheet';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface GlobalHeaderProps {
     title?: string;
@@ -39,16 +40,51 @@ export function GlobalHeader({
     const colorScheme = useColorScheme();
     const router = useRouter();
     const { cartCount } = useCart();
-    const { openDrawer } = useDrawer();
+    const { user, isAuthenticated } = useAuth();
     const { setCartTargetPoint } = useCartAnimation();
     const cartIconRef = React.useRef<View>(null);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+    const [imageError, setImageError] = React.useState(false);
+
+    // Reset error when avatar changes
+    React.useEffect(() => {
+        setImageError(false);
+    }, [user?.avatar]);
 
     const isDark = colorScheme === 'dark';
     const textColor = isDark ? '#fff' : '#18181B';
 
     // If back button is enabled, we assume a "Product/Detail" header style
     const isDetailMode = showBack;
+
+    const getInitials = (name?: string) => {
+        if (!name) return 'U';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return name.slice(0, 2).toUpperCase();
+    };
+
+    const avatarSource = React.useMemo(() => {
+        if (user?.avatar &&
+            typeof user.avatar === 'string' &&
+            user.avatar.length > 4 &&
+            !user.avatar.includes('default') &&
+            !user.avatar.includes('placeholder') &&
+            user.avatar !== 'null'
+        ) {
+            if (user.avatar.startsWith('http')) return { uri: user.avatar };
+            return { uri: `https://codelanclb.com/storage/${user.avatar}` };
+        }
+        return null;
+    }, [user?.avatar]);
+
+    const handleProfilePress = () => {
+        if (isAuthenticated) {
+            router.push('/(tabs)/profile');
+        } else {
+            router.push('/login');
+        }
+    };
 
     return (
         <>
@@ -65,8 +101,31 @@ export function GlobalHeader({
                                 <Feather name="chevron-left" size={28} color={textColor} />
                             </Pressable>
                         ) : (
-                            <Pressable onPress={openDrawer} style={styles.iconButton}>
-                                <Feather name="menu" size={24} color={textColor} />
+                            <Pressable
+                                onPress={handleProfilePress}
+                                style={[styles.iconButton, { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }]}
+                            >
+                                {isAuthenticated ? (
+                                    (!imageError && avatarSource) ? (
+                                        <Image
+                                            source={avatarSource}
+                                            style={{ width: 32, height: 32, borderRadius: 16 }}
+                                            contentFit="cover"
+                                            onError={() => setImageError(true)}
+                                        />
+                                    ) : (
+                                        <LinearGradient
+                                            colors={['#18181b', '#000000']}
+                                            style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{getInitials(user?.name)}</Text>
+                                        </LinearGradient>
+                                    )
+                                ) : (
+                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Feather name="user" size={18} color={textColor} />
+                                    </View>
+                                )}
                             </Pressable>
                         )}
                     </View>

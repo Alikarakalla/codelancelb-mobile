@@ -9,7 +9,6 @@ import { CountryPicker } from 'react-native-country-codes-picker';
 import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { useAuth } from '@/hooks/use-auth-context';
 
 export default function SignUpScreen() {
@@ -18,7 +17,6 @@ export default function SignUpScreen() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
-    const { openDrawer } = useDrawer();
 
     const { control, handleSubmit, watch, formState: { errors } } = useForm({
         defaultValues: {

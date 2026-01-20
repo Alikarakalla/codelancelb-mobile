@@ -7,7 +7,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, Stack } from 'expo-router';
 import { useForm } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -17,7 +16,6 @@ export default function LoginScreen() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
-    const { openDrawer } = useDrawer();
 
     const { control, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {

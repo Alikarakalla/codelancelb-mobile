@@ -9,7 +9,7 @@ const INITIAL_CART: CartItem[] = [];
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: Product, variant?: ProductVariant | null, quantity?: number) => void;
+    addToCart: (product: Product, variant?: ProductVariant | null, quantity?: number, options?: any) => void;
     removeFromCart: (itemId: number) => void;
     updateQuantity: (itemId: number, quantity: number) => void;
     clearCart: () => void;
@@ -52,14 +52,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const cartCount = items.reduce((sum, item) => sum + item.qty, 0);
     const cartTotal = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-    const addToCart = (product: Product, variant?: ProductVariant | null, quantity: number = 1) => {
+    const addToCart = (product: Product, variant?: ProductVariant | null, quantity: number = 1, options?: any) => {
         setItems(prev => {
             // Unique key logic: ProductID + VariantSlug (if exists)
-            // Or just use variant_key if we have specific variant IDs
-            const variantKey = variant ? variant?.slug : null;
+            // For Bundle, we might need a unique key based on selections if we want to allow multiple bundles with different options.
+            // For now, let's keep it simple.
+            const variantKey = variant ? variant?.slug : (product.type === 'bundle' ? 'bundle-' + Date.now() : null);
 
-            // Check if item already exists
-            const existingIndex = prev.findIndex(item =>
+            // Check if item already exists (Skip for bundles to allow multiple configs, or implement deep compare of options)
+            const existingIndex = product.type === 'bundle' ? -1 : prev.findIndex(item =>
                 item.product_id === product.id &&
                 item.variant_key === variantKey
             );
@@ -75,7 +76,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     id: Date.now(), // Mock ID
                     product_id: product.id,
                     variant_key: variantKey || null,
-                    options: variant ? { ...variant.option_values } : null,
+                    options: options || (variant ? { ...variant.option_values } : null),
                     qty: quantity,
                     price: variant ? (variant.price || product.price || 0) : (product.price || 0),
                     product: product // Store full product for UI display

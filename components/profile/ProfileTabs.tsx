@@ -31,12 +31,12 @@ export function ProfileTabs({ activeTab, onTabChange }: ProfileTabsProps) {
                             style={[
                                 styles.tab,
                                 isActive && styles.activeTab,
-                                { borderBottomColor: isActive ? '#1152d4' : 'transparent' }
+                                { borderBottomColor: isActive ? '#18181b' : 'transparent' }
                             ]}
                         >
                             <Text style={[
                                 styles.tabText,
-                                { color: isActive ? '#1152d4' : (isDark ? '#9ca3af' : '#616f89') },
+                                { color: isActive ? '#18181b' : (isDark ? '#9ca3af' : '#616f89') },
                                 isActive && styles.activeTabText
                             ]}>
                                 {tab}

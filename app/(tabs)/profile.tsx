@@ -2,8 +2,11 @@ import React, { useRef, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { BlurView } from 'expo-blur';
+import { useAuth } from '@/hooks/use-auth-context';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Text } from 'react-native';
 
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
@@ -19,10 +22,10 @@ import { LoyaltyHistory } from '@/components/profile/LoyaltyHistory';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const { openDrawer } = useDrawer();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const [activeTab, setActiveTab] = useState('Details');
+    const { isAuthenticated } = useAuth();
     const scrollViewRef = useRef<ScrollView>(null);
 
     return (
@@ -34,38 +37,85 @@ export default function ProfileScreen() {
                 style={styles.scrollView}
                 contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
-                stickyHeaderIndices={[1]} // Keep tabs sticky if the user scrolls the header out of view
+                stickyHeaderIndices={isAuthenticated ? [1] : []}
             >
                 {/* 0: Profile Header */}
                 <ProfileHeader />
 
-                {/* 1: Sticky Tabs */}
-                <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+                {isAuthenticated && (
+                    <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+                )}
 
-                {/* Content Sections */}
-                <View style={styles.content}>
-                    {activeTab === 'Details' && <PersonalDetails />}
+                {isAuthenticated && (
+                    <View style={styles.content}>
+                        {activeTab === 'Details' && <PersonalDetails />}
 
-                    {activeTab === 'Orders' && <RecentOrders />}
+                        {activeTab === 'Orders' && <RecentOrders />}
 
-                    {activeTab === 'Addresses' && <SavedAddresses />}
+                        {activeTab === 'Addresses' && <SavedAddresses />}
 
-                    {activeTab === 'Loyalty' && (
-                        <View style={{ gap: 24 }}>
-                            <LoyaltyCard />
-                            <LoyaltyRewards />
-                            <LoyaltyHistory />
-                            <ReferralCard />
+                        {activeTab === 'Loyalty' && (
+                            <View style={{ gap: 24 }}>
+                                <LoyaltyCard />
+                                <LoyaltyRewards />
+                                <LoyaltyHistory />
+                                <ReferralCard />
+                            </View>
+                        )}
+
+                        {activeTab === 'Security' && (
+                            <View style={{ gap: 24 }}>
+                                <SecuritySettings />
+                                <SignOutButton />
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {!isAuthenticated && (
+                    <View style={{ marginTop: 16, position: 'relative' }}>
+                        <View style={{ opacity: 0.3 }}>
+                            <ProfileTabs activeTab="Details" onTabChange={() => { }} />
+                            <View style={{ padding: 16, gap: 16 }}>
+                                <View style={{ height: 50, borderRadius: 12, backgroundColor: isDark ? '#333' : '#f3f4f6', width: '100%' }} />
+                                <View style={{ height: 50, borderRadius: 12, backgroundColor: isDark ? '#333' : '#f3f4f6', width: '100%' }} />
+                                <View style={{ height: 50, borderRadius: 12, backgroundColor: isDark ? '#333' : '#f3f4f6', width: '100%' }} />
+                                <View style={{ height: 200, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f3f4f6', width: '100%' }} />
+                            </View>
                         </View>
-                    )}
 
-                    {activeTab === 'Security' && (
-                        <View style={{ gap: 24 }}>
-                            <SecuritySettings />
-                            <SignOutButton />
-                        </View>
-                    )}
-                </View>
+                        <BlurView
+                            intensity={25}
+                            style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 10 }]}
+                            tint={isDark ? 'dark' : 'light'}
+                        >
+                            <View style={{
+                                paddingHorizontal: 24,
+                                paddingVertical: 14,
+                                backgroundColor: isDark ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.8)',
+                                borderRadius: 30,
+                                alignItems: 'center',
+                                gap: 8,
+                                flexDirection: 'row',
+                                borderWidth: 1,
+                                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 12
+                            }}>
+                                <IconSymbol name="lock.fill" size={18} color={isDark ? '#fff' : '#000'} />
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontWeight: '600',
+                                    color: isDark ? '#fff' : '#000'
+                                }}>
+                                    Sign in to access profile details
+                                </Text>
+                            </View>
+                        </BlurView>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );

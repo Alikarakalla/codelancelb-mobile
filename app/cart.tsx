@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
@@ -10,23 +10,74 @@ import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 import { CartFooter } from '@/components/cart/CartFooter';
 
-import { useDrawer } from '@/hooks/use-drawer-context';
 import { useCart } from '@/hooks/use-cart-context';
+import { useAuth } from '@/hooks/use-auth-context';
+import { api } from '@/services/apiClient';
 
 export default function CartScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const { items, removeFromCart, updateQuantity, cartTotal } = useCart();
-    const { openDrawer } = useDrawer();
+    const { items, removeFromCart, updateQuantity } = useCart();
+    const { user } = useAuth();
+
+    const [storeSettings, setStoreSettings] = useState<any>(null);
+
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            const settings = await api.getStoreSettings();
+            setStoreSettings(settings);
+        } catch (e) {
+            console.log('Failed to load store settings', e);
+            setStoreSettings({
+                shipping: { free_threshold: 250, flat_fee: 15 },
+                tax: { rate_percent: 0 }
+            });
+        }
+    };
+
+    // Calculate subtotal with item discounts
+    const subtotal = items.reduce((sum, item) => {
+        const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
+        const sourceDiscount = variant || item.product;
+        const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
+        let itemPrice = item.price;
+        if (hasDiscount && sourceDiscount.discount_amount) {
+            const amount = parseFloat(String(sourceDiscount.discount_amount));
+            if (sourceDiscount.discount_type === 'percent') {
+                itemPrice = item.price * (1 - amount / 100);
+            } else if (sourceDiscount.discount_type === 'fixed') {
+                itemPrice = item.price - amount;
+            }
+        }
+        return sum + (itemPrice * item.qty);
+    }, 0);
+
+    // Shipping
+    const freeThreshold = storeSettings?.shipping?.free_threshold ?? 250;
+    const flatFee = storeSettings?.shipping?.flat_fee ?? 15;
+    let shipping = subtotal >= freeThreshold ? 0 : flatFee;
+
+    // Loyalty Benefit
+    if ((user?.loyaltyTier as any)?.free_shipping) {
+        shipping = 0;
+    }
+
+    // Tax
+    const taxRate = storeSettings?.tax?.rate_percent ?? 0;
+    const tax = subtotal * (taxRate / 100);
 
     const totals = {
-        subtotal: cartTotal,
-        shipping: 12.00,
-        tax: cartTotal * 0.05, // Mock tax
+        subtotal,
+        shipping,
+        tax,
         discount: 0.00,
-        total: cartTotal * 1.05 + 12.00
+        total: subtotal + shipping + tax
     };
 
     return (
@@ -138,10 +189,42 @@ export default function CartScreen() {
                                     if (variant.size) parts.push(`Size: ${variant.size}`);
                                     details = parts.join(' • ');
                                 } else if (item.options) {
-                                    // Fallback to options object if no variant found
-                                    details = Object.entries(item.options)
-                                        .map(([key, val]: any) => `${val.name || val}`)
-                                        .join(' • ');
+                                    // Handle bundle selections specifically to avoid [object Object]
+                                    if (item.options.bundle_selections) {
+                                        const selectionsMap = item.options.bundle_selections as Record<string, any>;
+                                        const bundleItems = item.product?.bundle_items || [];
+
+                                        const lines = Object.entries(selectionsMap).map(([pid, variant]) => {
+                                            if (!variant) return null;
+
+                                            // Find sub-product name using ID from key
+                                            const subProduct = bundleItems.find(p => p.id === Number(pid));
+                                            const subName = subProduct?.name_en || subProduct?.name || 'Item';
+                                            // Truncate long names
+                                            const truncatedName = subName.length > 18 ? subName.substring(0, 18) + '...' : subName;
+
+                                            // Format attributes
+                                            const attrs = [];
+                                            if (variant.size) attrs.push(variant.size);
+                                            if (variant.color) attrs.push(variant.color);
+
+                                            const attrStr = attrs.join(', ');
+                                            return `${truncatedName}${attrStr ? ': ' + attrStr : ''}`;
+                                        }).filter(Boolean);
+
+                                        details = lines.length > 0 ? lines.join('\n') : 'Bundle Configuration Included';
+                                    } else {
+                                        // Fallback to options object if no variant found
+                                        details = Object.entries(item.options)
+                                            .map(([key, val]: any) => {
+                                                if (typeof val === 'object' && val !== null) {
+                                                    return val.name || val.value || '';
+                                                }
+                                                return String(val);
+                                            })
+                                            .filter(Boolean)
+                                            .join(' • ');
+                                    }
                                 }
 
                                 // Calculate discount - check variant first, then product

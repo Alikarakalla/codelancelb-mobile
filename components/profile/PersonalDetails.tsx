@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useRouter } from 'expo-router';
+import PhoneInput from 'react-native-phone-input';
 
 export function PersonalDetails() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { user, isAuthenticated } = useAuth();
     const router = useRouter();
+    const phoneInputRef = useRef<PhoneInput>(null);
 
     const getFirstName = () => {
         if (user?.first_name) return user.first_name;
@@ -34,6 +36,10 @@ export function PersonalDetails() {
     const styles = getStyles(isDark);
 
     const handleSave = async () => {
+        if (phoneInputRef.current && !phoneInputRef.current.isValidNumber()) {
+            Alert.alert('Error', 'Please enter a valid phone number');
+            return;
+        }
         // TODO: Implement API call to save user profile
         console.log('Saving user profile:', form);
     };
@@ -95,11 +101,27 @@ export function PersonalDetails() {
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>PHONE</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={form.phone}
-                        keyboardType="phone-pad"
-                        onChangeText={(t) => setForm({ ...form, phone: t })}
+                    <PhoneInput
+                        ref={phoneInputRef}
+                        initialCountry="lb"
+                        onChangePhoneNumber={(text) => setForm({ ...form, phone: text })}
+                        style={{
+                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                            borderWidth: 1,
+                            borderColor: isDark ? '#334155' : '#e5e7eb',
+                            borderRadius: 12,
+                            height: 48,
+                            paddingHorizontal: 16,
+                        }}
+                        textStyle={{
+                            color: isDark ? '#fff' : '#111318',
+                            fontSize: 15,
+                        }}
+                        flagStyle={{
+                            width: 30,
+                            height: 20,
+                            borderWidth: 0,
+                        }}
                     />
                 </View>
 
@@ -196,14 +218,14 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     },
     saveButton: {
         height: 48,
-        backgroundColor: '#1152d4',
+        backgroundColor: '#18181b',
         borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
         marginTop: 8,
-        shadowColor: '#1152d4',
+        shadowColor: '#18181b',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
