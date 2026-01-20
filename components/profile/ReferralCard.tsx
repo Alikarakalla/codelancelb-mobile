@@ -4,13 +4,21 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Clipboard from 'expo-clipboard';
 
+import { useAuth } from '@/hooks/use-auth-context';
+
 export function ReferralCard() {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
+    const { user } = useAuth();
+
+    // Use user's referral code or fallback
+    const referralCode = user?.referral_code || '---';
 
     const copyToClipboard = async () => {
-        await Clipboard.setStringAsync('JANE2024');
+        if (referralCode && referralCode !== '---') {
+            await Clipboard.setStringAsync(referralCode);
+        }
     };
 
     return (
@@ -22,25 +30,23 @@ export function ReferralCard() {
                     <MaterialIcons name="card-giftcard" size={32} color="#1152d4" />
                 </View>
 
-                <Text style={styles.cardTitle}>Invite Friends & Earn $10</Text>
+                <Text style={styles.cardTitle}>Invite Friends & Earn Points</Text>
                 <Text style={styles.cardDesc}>
-                    Share your unique code with friends. They get $10 off their first order, and you get $10 credit!
+                    Share your unique code with friends. They get a discount, and you earn loyalty points!
                 </Text>
 
                 <View style={styles.codeContainer}>
                     <View style={styles.codeBox}>
-                        <Text style={styles.codeText}>JANE2024</Text>
+                        <Text style={styles.codeText}>{referralCode}</Text>
                     </View>
                     <Pressable onPress={copyToClipboard} style={styles.copyButton}>
                         <MaterialIcons name="content-copy" size={20} color="#fff" />
                     </Pressable>
                 </View>
 
-                <Pressable style={styles.shareButton}>
-                    <MaterialIcons name="share" size={16} color="#1152d4" />
-                    <Text style={styles.shareText}>Share Link</Text>
-                </Pressable>
             </View>
+
+            {/* Removed bottom copy link button as requested */}
         </View>
     );
 }

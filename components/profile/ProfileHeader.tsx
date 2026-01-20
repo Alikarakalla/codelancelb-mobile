@@ -32,24 +32,52 @@ export function ProfileHeader() {
 
     const fetchTier = async () => {
         try {
-            const tiers = await api.getLoyaltyTiers();
-            if (tiers && Array.isArray(tiers)) {
-                // Determine tier based on points
-                const points = user?.loyalty_points_balance || 0;
-                const sorted = [...tiers].sort((a: any, b: any) => a.min_points - b.min_points);
+            // Fetch both info and tiers to ensure we have fresh points AND tier definitions
+            const [info, tiers] = await Promise.all([
+                api.getLoyaltyInfo().catch(() => null),
+                api.getLoyaltyTiers().catch(() => [])
+            ]);
+
+            // 1. Determine Effective Points (Prefer fresh info, fallback to user cache)
+            const freshPoints = info?.points_balance ?? info?.points;
+            const points = (freshPoints !== undefined && freshPoints !== null) ? Number(freshPoints) : (Number(user?.loyalty_points_balance) || 0);
+
+            console.log('ProfileHeader: Points Sync', { freshPoints, userPoints: user?.loyalty_points_balance, effective: points });
+
+            // 2. Check for Direct Tier Object from Backend (Best Case)
+            const authoritativeTier = info?.current_tier || info?.currentTier;
+            if (authoritativeTier) {
+                console.log('ProfileHeader: Using tier from backend:', authoritativeTier.name);
+                setTier(authoritativeTier);
+                return;
+            }
+
+            // 3. Fallback: Calculate Tier using Effective Points
+            if (tiers && Array.isArray(tiers) && tiers.length > 0) {
+                const sorted = [...tiers].sort((a: any, b: any) => Number(a.min_points) - Number(b.min_points));
                 let current = null;
+
+                // Iterate high to low to find highest eligible tier
                 for (let i = sorted.length - 1; i >= 0; i--) {
-                    if (points >= sorted[i].min_points) {
+                    if (points >= Number(sorted[i].min_points)) {
                         current = sorted[i];
                         break;
                     }
                 }
-                setTier(current);
+
+                if (current) {
+                    console.log('ProfileHeader: Calculated Fresh Tier:', current.name);
+                    setTier(current);
+                } else {
+                    // Default to first tier if points are 0 or less than all
+                    setTier({ name: 'Member', color: '#64748b', icon: 'person' });
+                }
             }
         } catch (e) {
-            // silent fail
+            console.warn('ProfileHeader: Tier Logic Failed', e);
         }
     };
+
 
     const handleAvatarPress = () => {
         Alert.alert(
@@ -162,10 +190,14 @@ export function ProfileHeader() {
         return null;
     };
 
-    const rawIcon = tier?.icon || (user?.loyaltyTier as any)?.icon || (user as any)?.loyalty_tier?.icon || 'verified';
+    // Fix: Prioritize the user's assigned tier from backend payload, then fallback to calculated 'tier'
+    // This fixes the issue where calculation might default to 'Member' if tiers API is incomplete
+    const userTier = (user?.loyaltyTier as any) || (user as any)?.loyalty_tier;
+
+    const rawIcon = userTier?.icon || tier?.icon || 'verified';
     const tierIcon = getSafeIconName(rawIcon);
-    const tierName = tier?.name || (user?.loyaltyTier as any)?.name || (user as any)?.loyalty_tier?.name || 'Member';
-    const tierColor = tier?.color || (user?.loyaltyTier as any)?.color || (user as any)?.loyalty_tier?.color || '#f59e0b';
+    const tierName = userTier?.name || tier?.name || 'Member';
+    const tierColor = userTier?.color || tier?.color || '#f59e0b';
 
     if (!isAuthenticated || !user) {
         return (
