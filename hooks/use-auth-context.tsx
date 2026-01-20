@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const reloadUser = async () => {
         // We can leverage the stored token or just check if we have one in state
-        const currentToken = token || apiToken; // Assuming apiToken is module-level var we can check? But safer to rely on state.
+        const currentToken = token;
 
         // Actually, we should probably check if we are authenticated
         if (!currentToken) return;
@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         try {
             const data = await api.register(userData);
+            console.log('Register API Response Success:', JSON.stringify(data, null, 2));
             await saveAuthSession(data.user, data.access_token);
         } catch (error) {
             throw error;

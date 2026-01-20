@@ -98,8 +98,10 @@ export default function SignUpScreen() {
                 email: data.email,
                 password: data.password,
                 password_confirmation: data.confirmPassword, // Field required by Laravel
-                phone: `+${callingCode}${data.phone}`,
-                phone_country: countryCode,
+                ...(data.phone ? {
+                    phone: `+${callingCode}${data.phone}`,
+                    phone_country: countryCode,
+                } : {}),
                 referral_code: data.referralCode || undefined,
             };
 
@@ -109,10 +111,46 @@ export default function SignUpScreen() {
                 { text: 'OK', onPress: () => router.replace('/') }
             ]);
         } catch (error: any) {
+            console.log('Register API Response Error:', error.message);
             console.error('Registration Error Details:', error);
-            const errorMessage = error.message?.includes('422')
-                ? 'The email or phone number is already taken, or information is invalid.'
-                : 'Server Error (500). Please check your Laravel logs or ensure HasApiTokens is added to User model.';
+
+            let errorMessage = 'Something went wrong.';
+            const rawMessage = error.message || '';
+
+            if (rawMessage.includes('API Error:')) {
+                const parts = rawMessage.split(' - ');
+                if (parts.length > 1) {
+                    try {
+                        // Try to parse the backend error response
+                        const errorJson = JSON.parse(parts.slice(1).join(' - '));
+
+                        if (errorJson.message) {
+                            errorMessage = errorJson.message;
+                        }
+
+                        // Check for Laravel validation errors
+                        if (errorJson.errors) {
+                            const firstField = Object.keys(errorJson.errors)[0];
+                            if (firstField && errorJson.errors[firstField]?.[0]) {
+                                errorMessage += `\n${errorJson.errors[firstField][0]}`;
+                            }
+                        }
+                    } catch (e) {
+                        // Fallback if not JSON
+                        errorMessage = rawMessage;
+                    }
+                } else {
+                    errorMessage = rawMessage;
+                }
+
+                // Heuristic: If backend crashes with generic 500 "Server Error", it's often a duplicate entry (SQL Key Violation)
+                if (errorMessage === 'Server Error') {
+                    errorMessage = 'Server Error. The email or phone number is likely already registered.';
+                }
+            } else {
+                errorMessage = rawMessage || 'Network Error. Please try again.';
+            }
+
             Alert.alert('Registration Failed', errorMessage);
         } finally {
             setLoading(false);
@@ -238,7 +276,7 @@ export default function SignUpScreen() {
                         label="Password"
                         placeholder="••••••••"
                         secureTextEntry={!showPassword}
-                        rules={{ required: 'Password is required', minLength: { value: 6, message: 'Password must be at least 6 characters' } }}
+                        rules={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
                         rightElement={
                             <Pressable onPress={() => setShowPassword(!showPassword)}>
                                 <MaterialIcons

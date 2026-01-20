@@ -150,7 +150,7 @@ function transformImage(img: any): any {
 
 export const api = {
     // --- Auth ---
-    async register(data: { name: string; email: string; password: string; password_confirmation: string }) {
+    async register(data: { name: string; email: string; password: string; password_confirmation: string; phone?: string; phone_country?: string; referral_code?: string }) {
         const res = await fetchWithTimeout(`${BASE_URL}/register`, {
             method: 'POST',
             headers: getHeaders(),
@@ -173,6 +173,24 @@ export const api = {
         const res = await fetchWithTimeout(`${BASE_URL}/logout`, {
             method: 'POST',
             headers: getHeaders()
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
+    async forgotPassword(email: string) {
+        const res = await fetchWithTimeout(`${BASE_URL}/forgot-password`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ email }),
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
+    async resetPassword(data: { email: string; token: string; password: string; password_confirmation: string }) {
+        const res = await fetchWithTimeout(`${BASE_URL}/reset-password`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
         });
         return handleResponse<{ message: string }>(res);
     },
