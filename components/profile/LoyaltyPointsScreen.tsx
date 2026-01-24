@@ -135,13 +135,24 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingBottom: 40,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 16,
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     content: {
         paddingHorizontal: 24,

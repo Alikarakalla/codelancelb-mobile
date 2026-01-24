@@ -114,30 +114,34 @@ const CategoryNode = memo(({
                     <Pressable
                         style={styles.checkboxWrapper}
                         onPress={() => onSelect(category.id)}
-                        hitSlop={8}
+                        hitSlop={12}
                     >
-                        <View style={[styles.checkbox, isDark && { borderColor: '#444' }, isSelected && styles.checkboxActive]}>
-                            {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                        <View style={[
+                            styles.checkbox,
+                            isDark && { borderColor: '#555' },
+                            isSelected && styles.checkboxActive,
+                            level === 0 && styles.checkboxLarge
+                        ]}>
+                            {isSelected && <Ionicons name="checkmark" size={level === 0 ? 14 : 12} color={isDark && isSelected ? '#000' : '#fff'} />}
                         </View>
                     </Pressable>
 
                     <Pressable
-                        style={{ flex: 1, paddingVertical: 12 }}
+                        style={{ flex: 1, paddingVertical: 14 }}
                         onPress={() => {
                             if (hasChildren) {
                                 onToggleExpand(category.id);
                             }
-                            // Always allow selecting the category as well
                             onSelect(category.id);
                         }}
                     >
                         <Text style={[
                             styles.checkboxLabel,
-                            isDark && { color: '#94A3B8' },
+                            isDark && { color: 'rgba(255,255,255,0.5)' },
                             isSelected && (isDark ? { color: '#fff' } : styles.checkboxLabelActive),
-                            level === 0 && { fontWeight: '700', fontSize: 16, color: isDark ? '#fff' : '#0F172A' }
+                            level === 0 && { fontWeight: '900', fontSize: 16, color: isDark ? '#fff' : '#000', letterSpacing: 1 }
                         ]}>
-                            {category.name}
+                            {category.name.toUpperCase()}
                         </Text>
                     </Pressable>
                 </View>
@@ -146,19 +150,19 @@ const CategoryNode = memo(({
                     <Pressable
                         onPress={() => onToggleExpand(category.id)}
                         style={styles.expandTrigger}
-                        hitSlop={12}
+                        hitSlop={15}
                     >
                         <Ionicons
-                            name={isExpanded ? "chevron-up" : "chevron-down"}
-                            size={20}
-                            color={isDark ? "#64748B" : "#94A3B8"}
+                            name={isExpanded ? "remove" : "add"}
+                            size={22}
+                            color={isDark ? "#fff" : "#000"}
                         />
                     </Pressable>
                 )}
             </View>
 
             {hasChildren && isExpanded && (
-                <View style={[styles.subCategoryList, isDark && { borderLeftColor: '#222' }]}>
+                <View style={[styles.subCategoryList, isDark && { borderLeftColor: '#333' }]}>
                     {children.map(child => (
                         <CategoryNode
                             key={child.id}
@@ -251,9 +255,9 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
 
     const [expandedSections, setExpandedSections] = useState({
         categories: true,
-        price: true,
-        colors: true,
-        sizes: true,
+        price: false,
+        colors: false,
+        sizes: false,
         brands: false
     });
 
@@ -283,11 +287,20 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
         (props: any) => (
             <BottomSheetFooter {...props} bottomInset={0}>
                 <View style={[styles.footer, isDark && { backgroundColor: '#111', borderTopColor: '#222' }]}>
-                    <Pressable style={[styles.clearButton, isDark && { borderColor: '#444' }]}>
-                        <Text style={[styles.clearButtonText, isDark && { color: '#fff' }]}>Clear All</Text>
+                    <Pressable
+                        style={[styles.clearButton, isDark && { borderColor: '#333' }]}
+                        onPress={() => {
+                            setSelectedCategory([]);
+                            setSelectedBrands([]);
+                            setSelectedColor(null);
+                            setSelectedSize(null);
+                            setPriceRange([priceMin, priceMax]);
+                        }}
+                    >
+                        <Text style={[styles.clearButtonText, isDark && { color: '#fff' }]}>RESET</Text>
                     </Pressable>
                     <Pressable style={[styles.applyButton, isDark && { backgroundColor: '#fff' }]} onPress={handleApply}>
-                        <Text style={[styles.applyButtonText, isDark && { color: '#000' }]}>Apply Filters (3)</Text>
+                        <Text style={[styles.applyButtonText, isDark && { color: '#000' }]}>APPLY FILTERS</Text>
                     </Pressable>
                 </View>
             </BottomSheetFooter>
@@ -507,151 +520,162 @@ export function ShopFilterModal({ visible, onClose, onApply, categories, brands 
 const styles = StyleSheet.create({
     sheetBackground: {
         backgroundColor: '#fff',
-        borderTopLeftRadius: 24, // rounded-t-3xl
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
     },
     handleIndicator: {
-        backgroundColor: '#cbd5e1', // gray-300
-        width: 48,
-        height: 6,
+        backgroundColor: '#000',
+        width: 40,
+        height: 4,
         marginTop: 12,
-        borderRadius: 3,
+        borderRadius: 2,
+        opacity: 0.1,
     },
     header: {
-        height: 60,
+        height: 72,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6', // gray-100
+        borderBottomColor: '#eee',
         backgroundColor: '#fff',
     },
     headerTitle: {
-        fontSize: 20, // text-xl
-        fontWeight: '700', // font-bold
-        color: '#111827', // gray-900
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#000',
+        letterSpacing: -0.5,
     },
     closeButton: {
-        padding: 4,
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: '#f8f8f8',
     },
     scrollContent: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 100,
+        paddingHorizontal: 24,
+        paddingTop: 24,
+        paddingBottom: 140,
     },
     section: {
-        marginBottom: 16, // space-y-4 implies ~16px
+        marginBottom: 8,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 16,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700', // font-bold
-        color: '#111827', // gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
+        letterSpacing: 2,
+        textTransform: 'uppercase',
     },
     sectionContent: {
-        paddingTop: 8,
-        paddingBottom: 8,
+        paddingBottom: 16,
     },
     // Categories
     nestedCategory: {
-        marginTop: 8,
+        marginTop: 4,
     },
     categoryRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 4,
     },
     checkboxWrapper: {
-        paddingRight: 10,
-        paddingVertical: 6,
+        paddingRight: 12,
+        paddingVertical: 10,
     },
     checkbox: {
-        width: 16, // h-4 w-4
-        height: 16,
-        borderRadius: 4, // rounded
-        borderWidth: 1,
-        borderColor: '#d1d5db', // gray-300
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     },
+    checkboxLarge: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+    },
     checkboxActive: {
-        backgroundColor: '#1152d4',
-        borderColor: '#1152d4',
+        backgroundColor: '#000',
+        borderColor: '#000',
     },
     checkboxLabel: {
-        fontSize: 14, // text-sm
-        color: '#4b5563', // text-gray-600
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '600',
     },
     checkboxLabelActive: {
-        color: '#111827', // text-gray-900
-        fontWeight: '500', // font-medium
+        color: '#000',
+        fontWeight: '900',
     },
     expandTrigger: {
-        padding: 4,
+        padding: 8,
     },
     subCategoryList: {
-        paddingLeft: 28, // pl-7
+        paddingLeft: 24,
         borderLeftWidth: 2,
-        borderLeftColor: '#f3f4f6', // border-gray-100
-        marginLeft: 8,
+        borderLeftColor: '#eee',
+        marginLeft: 9,
         marginTop: 4,
-        gap: 8, // space-y-2
+        marginBottom: 8,
     },
     divider: {
         height: 1,
-        backgroundColor: '#f3f4f6', // border-gray-100
+        backgroundColor: '#eee',
         marginVertical: 12,
     },
     // Slider
     sliderWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 10,
+        paddingVertical: 24,
     },
     sliderThumb: {
-        width: 20, // h-5
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#1152d4',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    sliderThumbPressed: {
         width: 24,
         height: 24,
         borderRadius: 12,
+        backgroundColor: '#fff',
+        borderWidth: 3,
+        borderColor: '#000',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    sliderThumbPressed: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
     },
     priceInputs: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
     },
     priceInputGroup: {
         flex: 1,
-        backgroundColor: '#f9fafb', // bg-gray-50
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
-        borderRadius: 8, // rounded-lg
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#000',
+        borderRadius: 8,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,
     },
     inputLabel: {
-        fontSize: 12, // text-xs
-        color: '#6b7280', // text-gray-500
-        marginBottom: 2,
+        fontSize: 10,
+        fontWeight: '900',
+        color: 'rgba(0,0,0,0.5)',
+        letterSpacing: 1,
+        marginBottom: 4,
     },
     inputWrapper: {
         flexDirection: 'row',
@@ -659,136 +683,125 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     currencySymbol: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
     },
     textInput: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
         padding: 0,
         flex: 1,
     },
     rangeDivider: {
-        color: '#9ca3af', // text-gray-400
-        fontSize: 18,
+        color: '#000',
+        fontSize: 12,
+        fontWeight: '900',
     },
     // Colors
     rowWrap: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12, // gap-3
+        gap: 12,
     },
     colorDot: {
-        width: 32, // h-8 w-8
-        height: 32,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 2,
+        borderColor: '#eee',
     },
     colorSelected: {
-        // HTML uses ring-2 ring-primary ring-offset-2
-        // We can simulate with border
-        borderWidth: 2,
-        borderColor: '#fff',
-        transform: [{ scale: 1.1 }],
+        borderColor: '#000',
+        borderWidth: 3,
+        transform: [{ scale: 1.05 }],
     },
     // Sizes
     sizeBox: {
-        height: 40, // h-10
-        minWidth: 40, // min-w-[40px]
-        paddingHorizontal: 12, // px-3
-        borderRadius: 8, // rounded-lg
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
-        backgroundColor: 'transparent',
+        height: 48,
+        minWidth: 60,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#eee',
         alignItems: 'center',
         justifyContent: 'center',
     },
-
     sizeBoxActive: {
-        backgroundColor: '#1152d4',
-        borderColor: '#1152d4',
-        shadowColor: '#1152d4',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, // shadow-primary/30
-        shadowRadius: 6,
-        elevation: 4,
+        backgroundColor: '#000',
+        borderColor: '#000',
     },
     sizeText: {
-        fontSize: 14, // text-sm
-        fontWeight: '500', // font-medium
-        color: '#111827', // text-gray-900
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#000',
+        letterSpacing: 0.5,
     },
     sizeTextActive: {
         color: '#fff',
-        fontWeight: '700', // font-bold
+        fontWeight: '900',
     },
     // Footer
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
-        padding: 20,
+        gap: 12,
+        padding: 24,
         backgroundColor: '#fff',
         borderTopWidth: 1,
-        borderTopColor: '#f3f4f6', // border-gray-100
-        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        borderTopColor: '#eee',
+        paddingBottom: Platform.OS === 'ios' ? 44 : 24,
     },
     clearButton: {
         flex: 1,
-        height: 54, // py-3.5 ~ 14px * 2 + lineheight ~ 24 = 52px. Fixed height ensures clickability
-        borderRadius: 12, // rounded-xl
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
+        height: 56,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     },
     clearButtonText: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
+        letterSpacing: 1,
     },
     applyButton: {
-        flex: 1,
-        height: 54,
-        borderRadius: 12, // rounded-xl
-        backgroundColor: '#1152d4',
+        flex: 2,
+        height: 56,
+        borderRadius: 12,
+        backgroundColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#1152d4',
-        shadowOffset: { width: 0, height: 4 }, // shadow-lg-ish
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
     },
     applyButtonText: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
+        fontSize: 14,
+        fontWeight: '900',
         color: '#fff',
+        letterSpacing: 1,
     },
     brandPreview: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        opacity: 0.8,
     },
     previewTag: {
-        backgroundColor: '#f3f4f6', // bg-gray-100
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4, // rounded
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 4,
     },
     previewTagText: {
-        fontSize: 12, // text-xs
-        color: '#6b7280', // text-gray-500
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#666',
+        textTransform: 'uppercase',
     },
     moreText: {
-        fontSize: 12, // text-xs
-        color: '#9ca3af', // text-gray-400
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#999',
     }
 });

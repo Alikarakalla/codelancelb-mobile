@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Platform, Dimensions, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/apiClient';
 import { Category, Brand } from '@/types/schema';
 import { useFilters } from '@/context/FilterContext';
 import { ColorOption } from '@/utils/colorHelpers';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -18,140 +21,141 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'transparent', // IMPORTANT for glass effect
-    },
-    header: {
-        height: 60,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-    },
-    headerTitle: {
-        fontSize: 20, // text-xl
-        fontWeight: '700', // font-bold
-        color: '#111827', // gray-900
-    },
-    closeButton: {
-        padding: 4,
+        backgroundColor: '#fff', // Changed from transparent for non-modal page
     },
     scrollContent: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingHorizontal: 24,
         paddingBottom: 20,
     },
     section: {
-        marginBottom: 16, // space-y-4 implies ~16px
+        marginBottom: 8,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 16,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700', // font-bold
-        color: '#111827', // gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
+        letterSpacing: 2,
+        textTransform: 'uppercase',
     },
     sectionContent: {
-        paddingTop: 8,
-        paddingBottom: 8,
+        paddingBottom: 16,
     },
     // Categories
     nestedCategory: {
-        marginTop: 4, // Reduce gap between nested items
+        marginTop: 4,
     },
     categoryRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 10, // More vertical padding for spaced look
-        minHeight: 44, // Ensure touch target
     },
     checkboxWrapper: {
         paddingRight: 12,
-        paddingVertical: 4,
+        paddingVertical: 10,
     },
     checkbox: {
         width: 18,
         height: 18,
-        borderRadius: 5,
-        borderWidth: 1.5,
-        borderColor: '#d1d5db',
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     },
     checkboxActive: {
-        backgroundColor: '#1152d4',
-        borderColor: '#1152d4',
+        backgroundColor: '#000',
+        borderColor: '#000',
     },
     checkboxLabel: {
-        fontSize: 15, // Unified font size (Standard: 15px)
-        color: '#4b5563',
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '600',
     },
     checkboxLabelActive: {
-        color: '#111827',
-        fontWeight: '600', // Semi-bold for active
+        color: '#000',
+        fontWeight: '900',
     },
     expandTrigger: {
-        padding: 4,
+        padding: 8,
     },
     subCategoryList: {
-        paddingLeft: 20, // Reduced indentation (was 28)
-        borderLeftWidth: 1.5,
-        borderLeftColor: '#f3f4f6',
-        marginLeft: 9, // Slight adjustment for alignment line
-        marginTop: 2,
+        paddingLeft: 24,
+        borderLeftWidth: 2,
+        borderLeftColor: '#eee',
+        marginLeft: 9,
+        marginTop: 4,
+        marginBottom: 8,
     },
     divider: {
         height: 1,
-        backgroundColor: '#f3f4f6',
-        marginVertical: 16,
+        backgroundColor: '#eee',
+        marginVertical: 12,
     },
     // Slider
     sliderWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
-        paddingHorizontal: 10,
+        paddingVertical: 24,
     },
     sliderThumb: {
-        width: 20, // h-5
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#1152d4',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    sliderThumbPressed: {
         width: 24,
         height: 24,
         borderRadius: 12,
+        backgroundColor: '#fff',
+        borderWidth: 3,
+        borderColor: '#000',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     priceInputs: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
+    },
+    backButton: {
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
+        justifyContent: 'center',
+        alignItems: 'center',
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     priceInputGroup: {
         flex: 1,
-        backgroundColor: '#f9fafb', // bg-gray-50
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
-        borderRadius: 8, // rounded-lg
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#000',
+        borderRadius: 8,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,
     },
     inputLabel: {
-        fontSize: 12, // text-xs
-        color: '#6b7280', // text-gray-500
-        marginBottom: 2,
+        fontSize: 10,
+        fontWeight: '900',
+        color: 'rgba(0,0,0,0.5)',
+        letterSpacing: 1,
+        marginBottom: 4,
     },
     inputWrapper: {
         flexDirection: 'row',
@@ -159,133 +163,86 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     currencySymbol: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
     },
     textInput: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#000',
         padding: 0,
         flex: 1,
     },
     rangeDivider: {
-        color: '#9ca3af', // text-gray-400
-        fontSize: 18,
+        color: '#000',
+        fontSize: 12,
+        fontWeight: '900',
     },
     // Colors
     rowWrap: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12, // gap-3
+        gap: 12,
     },
     colorDot: {
-        width: 32, // h-8 w-8
-        height: 32,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 2,
+        borderColor: '#eee',
     },
     colorSelected: {
-        borderWidth: 2,
-        borderColor: '#fff',
-        transform: [{ scale: 1.1 }],
+        borderColor: '#000',
+        borderWidth: 3,
+        transform: [{ scale: 1.05 }],
     },
     // Sizes
     sizeBox: {
-        height: 40, // h-10
-        minWidth: 40, // min-w-[40px]
-        paddingHorizontal: 12, // px-3
-        borderRadius: 8, // rounded-lg
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
-        backgroundColor: 'transparent',
+        height: 48,
+        minWidth: 60,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#eee',
         alignItems: 'center',
         justifyContent: 'center',
     },
     sizeBoxActive: {
-        backgroundColor: '#1152d4',
-        borderColor: '#1152d4',
-        shadowColor: '#1152d4',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, // shadow-primary/30
-        shadowRadius: 6,
-        elevation: 4,
+        backgroundColor: '#000',
+        borderColor: '#000',
     },
     sizeText: {
-        fontSize: 14, // text-sm
-        fontWeight: '500', // font-medium
-        color: '#111827', // text-gray-900
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#000',
+        letterSpacing: 0.5,
     },
     sizeTextActive: {
         color: '#fff',
-        fontWeight: '700', // font-bold
-    },
-    // Footer
-    footer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-        padding: 20,
-        // backgroundColor: 'transparent',
-        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    },
-    clearButton: {
-        flex: 1,
-        height: 54, // py-3.5 ~ 14px * 2 + lineheight ~ 24 = 52px. Fixed height ensures clickability
-        borderRadius: 12, // rounded-xl
-        borderWidth: 1,
-        borderColor: '#e5e7eb', // border-gray-200
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(255,255,255,0.5)'
-    },
-    clearButtonText: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#111827', // text-gray-900
-    },
-    applyButton: {
-        flex: 1,
-        height: 54,
-        borderRadius: 12, // rounded-xl
-        backgroundColor: '#1152d4',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#1152d4',
-        shadowOffset: { width: 0, height: 4 }, // shadow-lg-ish
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    applyButtonText: {
-        fontSize: 14, // text-sm
-        fontWeight: '700', // font-bold
-        color: '#fff',
+        fontWeight: '900',
     },
     brandPreview: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        opacity: 0.8,
     },
     previewTag: {
-        backgroundColor: '#f3f4f6', // bg-gray-100
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4, // rounded
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 4,
     },
     previewTagText: {
-        fontSize: 12, // text-xs
-        color: '#6b7280', // text-gray-500
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#666',
+        textTransform: 'uppercase',
     },
     moreText: {
-        fontSize: 12, // text-xs
-        color: '#9ca3af', // text-gray-400
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#999',
     }
 });
 
@@ -358,23 +315,27 @@ const CategoryNode = memo(({
 
     return (
         <View style={level > 0 ? styles.nestedCategory : null}>
-            <View style={[styles.categoryRow, isSelected && { backgroundColor: isDark ? '#222' : '#f8f9fa', borderRadius: 8 }]}>
+            <View style={styles.categoryRow}>
                 {/* Select Action Area */}
                 <Pressable
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingLeft: 8 }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingLeft: 8 }}
                     onPress={() => onSelect(category.id)}
                 >
-                    <View style={[styles.checkbox, isDark && { borderColor: '#444' }, isSelected && styles.checkboxActive]}>
-                        {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    <View style={[
+                        styles.checkbox,
+                        isDark && { borderColor: '#555' },
+                        isSelected && styles.checkboxActive
+                    ]}>
+                        {isSelected && <Ionicons name="checkmark" size={12} color={isDark && isSelected ? '#000' : '#fff'} />}
                     </View>
 
                     <Text style={[
                         styles.checkboxLabel,
-                        isDark && { color: '#94A3B8' },
+                        isDark && { color: 'rgba(255,255,255,0.5)' },
                         isSelected && (isDark ? { color: '#fff' } : styles.checkboxLabelActive),
-                        level === 0 && { fontSize: 16 }
+                        level === 0 && { fontWeight: '900', fontSize: 16, color: isDark ? '#fff' : '#000', letterSpacing: 1 }
                     ]}>
-                        {category.name_en || category.name}
+                        {(category.name_en || category.name).toUpperCase()}
                     </Text>
                 </Pressable>
 
@@ -385,9 +346,9 @@ const CategoryNode = memo(({
                         onPress={() => onExpand(category.id)}
                     >
                         <Ionicons
-                            name={isExpanded ? "chevron-up" : "chevron-down"}
-                            size={16}
-                            color={isSelected ? (isDark ? "#fff" : "#1152d4") : (isDark ? "#444" : "#9ca3af")}
+                            name={isExpanded ? "remove" : "add"}
+                            size={20}
+                            color={isDark ? "#fff" : "#000"}
                         />
                     </Pressable>
                 )}
@@ -414,12 +375,13 @@ const CategoryNode = memo(({
 });
 
 
-export default function FilterModalScreen() {
+export default function FilterPage() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { filters, updateFilter } = useFilters();
+    const insets = useSafeAreaInsets();
 
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -469,12 +431,30 @@ export default function FilterModalScreen() {
         );
     }, []);
 
-    const applyFiltersAndNavigate = useCallback((newFilters: Partial<typeof filters>) => {
+    const applyFiltersAndNavigate = useCallback((newFilters: any) => {
         // Update context - ShopScreen will react to context changes
-        Object.entries(newFilters).forEach(([key, value]) => {
+        // Merge with existing filters to ensure we don't lose state
+        const updated = {
+            categoryIds: filters.categoryIds,
+            brandIds: filters.brandIds,
+            priceRange: filters.priceRange,
+            color: filters.color,
+            size: filters.size,
+            ...newFilters
+        };
+
+        Object.entries(updated).forEach(([key, value]) => {
             updateFilter(key as keyof typeof filters, value);
         });
     }, [filters, updateFilter]);
+
+    const handleApply = () => {
+        // Apply all current local state
+        // Since we are updating context immediately on change for other filters, just close
+        // But for price which is local, ensure it's synced
+        applyFiltersAndNavigate({ priceRange: localPriceRange });
+        router.dismiss();
+    };
 
     const handleCategorySelect = useCallback((id: number) => {
         const prev = filters.categoryIds;
@@ -554,6 +534,7 @@ export default function FilterModalScreen() {
         updateFilter('priceRange', [priceMin, priceMax]);
         updateFilter('color', null);
         updateFilter('size', null);
+        setLocalPriceRange([priceMin, priceMax]);
     };
 
     // Colors already have hex values from database, just add border for light colors
@@ -580,25 +561,70 @@ export default function FilterModalScreen() {
         (selectedColor ? 1 : 0) + (selectedSize ? 1 : 0) +
         ((priceRange[0] !== priceMin || priceRange[1] !== priceMax) ? 1 : 0);
 
+
     return (
         <View style={styles.container}>
-            <View style={[styles.header, isDark && { borderBottomColor: '#222' }]}>
-                <Text style={[styles.headerTitle, isDark && { color: '#fff' }]}>Filters</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    {activeFilterCount > 0 && (
-                        <Pressable onPress={handleClear} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-                            <Text style={{ color: '#1152d4', fontSize: 14, fontWeight: '600' }}>Clear All</Text>
+            <Stack.Screen
+                options={{
+                    headerShown: true,
+                    headerTransparent: true,
+                    headerTitle: "",
+                    headerLeft: () => (
+                        <Pressable
+                            onPress={() => router.back()}
+                            style={styles.backButton}
+                        >
+                            <IconSymbol
+                                name="chevron.left"
+                                color={isDark ? '#fff' : '#000'}
+                                size={24}
+                            />
                         </Pressable>
-                    )}
-                    <Pressable onPress={() => router.dismiss()} style={[styles.closeButton, isDark && { backgroundColor: '#222' }]}>
-                        <Ionicons name="close" size={20} color={isDark ? "#fff" : "#64748b"} />
-                    </Pressable>
-                </View>
-            </View>
+                    ),
+                    headerRight: () => (
+                        <BlurView
+                            intensity={Platform.OS === 'ios' ? 20 : 100}
+                            tint={isDark ? 'dark' : 'light'}
+                            style={{
+                                flexDirection: 'row',
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                borderRadius: 24,
+                                padding: 4,
+                                marginRight: 4,
+                                overflow: 'hidden',
+                                gap: 4,
+                            }}
+                        >
+                            <Pressable
+                                onPress={handleClear}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 20,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, fontWeight: '900', color: isDark ? '#fff' : '#000', letterSpacing: 1 }}>RESET</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={handleApply}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    backgroundColor: isDark ? '#fff' : '#000',
+                                    borderRadius: 20,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, fontWeight: '900', color: isDark ? '#000' : '#fff', letterSpacing: 1 }}>APPLY</Text>
+                            </Pressable>
+                        </BlurView>
+                    ),
+                    presentation: 'card'
+                }}
+            />
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Categories */}
@@ -640,7 +666,7 @@ export default function FilterModalScreen() {
                                 {/* Min Price Slider */}
                                 <View>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                        <Text style={{ fontSize: 13, color: isDark ? '#9ca3af' : '#6b7280', fontWeight: '500' }}>
+                                        <Text style={{ fontSize: 11, color: isDark ? '#fff' : '#000', fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }}>
                                             Min Price: ${localPriceRange[0]}
                                         </Text>
                                     </View>
@@ -652,16 +678,16 @@ export default function FilterModalScreen() {
                                         value={localPriceRange[0]}
                                         onValueChange={(val: number) => handlePriceChange([val, localPriceRange[1]])}
                                         onSlidingComplete={(val: number) => handlePriceChangeComplete([val, localPriceRange[1]])}
-                                        minimumTrackTintColor="#1152d4"
-                                        maximumTrackTintColor={isDark ? '#333' : '#e2e8f0'}
-                                        thumbTintColor={isDark ? '#fff' : '#fff'}
+                                        minimumTrackTintColor="#000"
+                                        maximumTrackTintColor={isDark ? '#333' : '#e0e0e0'}
+                                        thumbTintColor={isDark ? '#fff' : '#000'}
                                     />
                                 </View>
 
                                 {/* Max Price Slider */}
                                 <View>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                        <Text style={{ fontSize: 13, color: isDark ? '#9ca3af' : '#6b7280', fontWeight: '500' }}>
+                                        <Text style={{ fontSize: 11, color: isDark ? '#fff' : '#000', fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }}>
                                             Max Price: ${localPriceRange[1]}
                                         </Text>
                                     </View>
@@ -673,9 +699,9 @@ export default function FilterModalScreen() {
                                         value={localPriceRange[1]}
                                         onValueChange={(val: number) => handlePriceChange([localPriceRange[0], val])}
                                         onSlidingComplete={(val: number) => handlePriceChangeComplete([localPriceRange[0], val])}
-                                        minimumTrackTintColor="#1152d4"
-                                        maximumTrackTintColor={isDark ? '#333' : '#e2e8f0'}
-                                        thumbTintColor={isDark ? '#fff' : '#fff'}
+                                        minimumTrackTintColor="#000"
+                                        maximumTrackTintColor={isDark ? '#333' : '#e0e0e0'}
+                                        thumbTintColor={isDark ? '#fff' : '#000'}
                                     />
                                 </View>
                             </View>
@@ -784,4 +810,3 @@ export default function FilterModalScreen() {
         </View>
     );
 }
-

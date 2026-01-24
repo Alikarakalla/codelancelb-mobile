@@ -46,7 +46,7 @@ export function AddressFormScreen() {
         const allCountries = Country.getAllCountries().map(c => ({
             label: `${c.flag} ${c.name}`,
             value: c.isoCode,
-            phone: c.phonecode.replace('+', ''),
+            phone: (c.phonecode || '').replace('+', ''),
             name: c.name
         }));
         setCountries(allCountries);
@@ -67,10 +67,10 @@ export function AddressFormScreen() {
                     if (phoneRaw.startsWith('+')) {
                         // Try to find matching country by phone code
                         const possibleMatch = allCountries.find(c =>
-                            phoneRaw.startsWith('+' + c.phonecode.replace('+', ''))
+                            c.phone && phoneRaw.startsWith('+' + c.phone)
                         );
                         if (possibleMatch) {
-                            callingCode = possibleMatch.phonecode.replace('+', '');
+                            callingCode = possibleMatch.phone;
                             phoneRaw = phoneRaw.replace('+' + callingCode, '').trim();
                         } else {
                             // Split fallback

@@ -319,7 +319,7 @@ export default function ShopScreen() {
                 <ShopFilterBar
                     activeFilters={activeFilters}
                     onFilterPress={() => router.push({
-                        pathname: '/modal/filter',
+                        pathname: '/filter',
                         params: {}
                     })}
                     onSortPress={handleSortPress}
