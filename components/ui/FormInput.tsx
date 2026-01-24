@@ -78,36 +78,29 @@ export function FormInput<T extends FieldValues>({
 
 const getStyles = (isDark: boolean) => StyleSheet.create({
     container: {
-        marginBottom: 16,
+        marginBottom: 20,
     },
     label: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: isDark ? '#e5e7eb' : '#111318',
+        fontSize: 12,
+        fontWeight: '900', // Ultra bold for modern look
+        color: isDark ? '#fff' : '#000',
         marginBottom: 8,
+        letterSpacing: 1,
     },
     inputWrapper: {
         position: 'relative',
     },
     input: {
-        height: 56,
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        borderRadius: 12,
+        height: 60,
+        backgroundColor: isDark ? '#000' : '#fff',
+        borderWidth: 2, // Thicker border for modern look
+        borderColor: isDark ? '#fff' : '#000',
+        borderRadius: 8, // Softened corners
         paddingLeft: 16,
         paddingRight: 16,
-        fontSize: 16,
-        color: isDark ? '#fff' : '#111318',
-    },
-    errorBorder: {
-        // We can't apply border directly to View if the input covers it, 
-        // but here the View wraps the Input.
-        // Actually, we should apply border color to the input if possible, 
-        // OR make sure the input bg is transparent? 
-        // The current design has border on Input. 
-        // Let's refactor: apply style to TextInput in the render function above if needed
-        // but easier: just pass error prop or conditional style to TextInput
+        fontSize: 15,
+        fontWeight: '600',
+        color: isDark ? '#fff' : '#000',
     },
     iconContainer: {
         position: 'absolute',
@@ -118,15 +111,16 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         position: 'absolute',
         right: 0,
         top: 0,
-        height: 56,
+        height: 60,
         justifyContent: 'center',
         alignItems: 'center',
         minWidth: 56,
     },
     errorText: {
-        color: '#ef4444',
-        fontSize: 12,
-        marginTop: 4,
-        marginLeft: 4,
+        color: '#ff0000',
+        fontSize: 10,
+        fontWeight: '800',
+        marginTop: 6,
+        textTransform: 'uppercase',
     }
 });

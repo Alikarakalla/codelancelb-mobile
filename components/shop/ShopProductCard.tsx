@@ -111,6 +111,25 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
         discountPercentage = Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100);
     }
 
+    const isOutOfStock = React.useMemo(() => {
+        // Basic check for simple product
+        if (!product.has_variants) {
+            return (product.stock_quantity ?? 0) <= 0;
+        }
+
+        // If a specific variant is selected on the card
+        if (selectedVariant) {
+            return (selectedVariant.stock_quantity ?? 0) <= 0;
+        }
+
+        // General status: if ALL variants are out of stock, the whole product is "Out of Stock"
+        if (product.variants && product.variants.length > 0) {
+            return product.variants.every(v => (v.stock_quantity ?? 0) <= 0);
+        }
+
+        return (product.stock_quantity ?? 0) <= 0;
+    }, [product, selectedVariant]);
+
     let badge = null;
     if (product.created_at && new Date(product.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
         badge = (
@@ -152,9 +171,9 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
 
     const handleCardPress = () => {
         router.push({
-            pathname: `/product/${product.id}`,
-            params: { initialImage: currentImage }
-        });
+            pathname: '/product/[id]',
+            params: { id: product.id.toString(), initialImage: currentImage }
+        } as any);
     };
 
     const handleQuickView = (e?: any) => {
@@ -197,10 +216,16 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
             <Pressable onPress={handleCardPress} style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
                 <AnimatedImage
                     source={{ uri: currentImage }}
-                    style={styles.image}
+                    style={[styles.image, isOutOfStock && { opacity: 0.6 }]}
                     contentFit="cover"
-                    sharedTransitionTag={`product-image-${product.id}`}
+                    {...({ sharedTransitionTag: `product-image-${product.id}` } as any)}
                 />
+
+                {isOutOfStock && (
+                    <View style={styles.outOfStockOverlay}>
+                        <Text style={styles.outOfStockText}>OUT OF STOCK</Text>
+                    </View>
+                )}
 
                 <Pressable
                     onPress={handleToggleWishlist}
@@ -230,7 +255,10 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                             const v = variant as any;
                             // Prioritize 'code' found in option_values (nested) as per logs, then other fallbacks
                             const rawColor = v.option_values?.color?.code || v.code || v.hex || v.hex_color || v.color_hex || variant.color;
-                            const validColor = getValidColor(rawColor);
+
+                            // Use the same robust hex extraction logic as the product page
+                            const { getColorHex } = require('@/utils/colorHelpers');
+                            const validColor = getValidColor(rawColor) || getColorHex(variant.color || '');
 
                             return (
                                 <Pressable
@@ -264,11 +292,20 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     </View>
 
                     <Pressable
-                        style={[styles.cartButton, isDark && { backgroundColor: '#fff' }]}
-                        onPress={handleQuickView}
+                        style={[
+                            styles.cartButton,
+                            isDark && { backgroundColor: '#fff' },
+                            isOutOfStock && { backgroundColor: '#E5E7EB', opacity: 0.8 }
+                        ]}
+                        onPress={isOutOfStock ? undefined : handleQuickView}
                         ref={cartButtonRef}
+                        disabled={isOutOfStock}
                     >
-                        <HugeiconsIcon icon={ShoppingBag01Icon} size={20} color={isDark ? '#000' : '#fff'} />
+                        <HugeiconsIcon
+                            icon={ShoppingBag01Icon}
+                            size={20}
+                            color={isOutOfStock ? '#9CA3AF' : (isDark ? '#000' : '#fff')}
+                        />
                     </Pressable>
                 </View>
             </View>
@@ -415,5 +452,23 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    outOfStockOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 5,
+    },
+    outOfStockText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
     }
 });

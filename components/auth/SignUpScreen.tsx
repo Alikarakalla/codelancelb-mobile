@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, Alert, KeyboardAvoidingView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,20 +59,19 @@ export default function SignUpScreen() {
     const countryPickerStyle = React.useMemo(() => ({
         modal: {
             height: 500,
-            backgroundColor: isDark ? '#1f2937' : '#ffffff',
+            backgroundColor: isDark ? '#000000' : '#ffffff',
         },
         countryName: {
-            color: isDark ? '#fff' : '#111827',
+            color: isDark ? '#fff' : '#000',
         },
         dialCode: {
-            color: isDark ? '#9ca3af' : '#6b7280',
-        },
-        searchMessageText: {
-            color: isDark ? '#9ca3af' : '#6b7280',
+            color: isDark ? '#fff' : '#000',
+            opacity: 0.6,
         },
         textInput: {
-            color: isDark ? '#fff' : '#111827',
-            backgroundColor: isDark ? '#374151' : '#f3f4f6',
+            color: isDark ? '#fff' : '#000',
+            backgroundColor: isDark ? '#111' : '#f3f4f6',
+            borderRadius: 8,
         }
     }), [isDark]);
 
@@ -111,465 +110,234 @@ export default function SignUpScreen() {
                 { text: 'OK', onPress: () => router.replace('/') }
             ]);
         } catch (error: any) {
-            console.log('Register API Response Error:', error.message);
-            console.error('Registration Error Details:', error);
-
-            let errorMessage = 'Something went wrong.';
-            const rawMessage = error.message || '';
-
-            if (rawMessage.includes('API Error:')) {
-                const parts = rawMessage.split(' - ');
-                if (parts.length > 1) {
-                    try {
-                        // Try to parse the backend error response
-                        const errorJson = JSON.parse(parts.slice(1).join(' - '));
-
-                        if (errorJson.message) {
-                            errorMessage = errorJson.message;
-                        }
-
-                        // Check for Laravel validation errors
-                        if (errorJson.errors) {
-                            const firstField = Object.keys(errorJson.errors)[0];
-                            if (firstField && errorJson.errors[firstField]?.[0]) {
-                                errorMessage += `\n${errorJson.errors[firstField][0]}`;
-                            }
-                        }
-                    } catch (e) {
-                        // Fallback if not JSON
-                        errorMessage = rawMessage;
-                    }
-                } else {
-                    errorMessage = rawMessage;
-                }
-
-                // Heuristic: If backend crashes with generic 500 "Server Error", it's often a duplicate entry (SQL Key Violation)
-                if (errorMessage === 'Server Error') {
-                    errorMessage = 'Server Error. The email or phone number is likely already registered.';
-                }
-            } else {
-                errorMessage = rawMessage || 'Network Error. Please try again.';
-            }
-
-            Alert.alert('Registration Failed', errorMessage);
+            console.error('Registration Error:', error);
+            Alert.alert('Registration Failed', error.message || 'Something went wrong.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#ffffff' }]}>
-            <Stack.Screen
-                options={{
-                    headerShown: true,
-                    headerTransparent: true,
-                    headerTitle: '',
-                    ...Platform.select({
-                        ios: {
-                            headerLeft: () => (
-                                <Pressable
-                                    onPress={() => router.back()}
-                                    style={styles.nativeGlassWrapper}
-                                >
-                                    <IconSymbol
-                                        name="chevron.left"
-                                        color={isDark ? '#fff' : '#000'}
-                                        size={24}
-                                        weight="medium"
-                                    />
-                                </Pressable>
-                            ),
-                            unstable_nativeHeaderOptions: {
-                                headerBackground: {
-                                    material: 'glass',
-                                },
-                            }
-                        },
-                        android: {
-                            headerLeft: () => (
-                                <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-                                    <IconSymbol name="chevron.left" color={isDark ? '#fff' : '#000'} size={24} />
-                                </Pressable>
-                            ),
-                        }
-                    })
-                } as any}
-            />
-
-            <ScrollView
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20, paddingTop: 60 + insets.top }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Headline Section */}
-                <View style={styles.headline}>
-                    <Text style={styles.headlineText}>Create Account</Text>
-                    <Text style={styles.subheadText}>Start shopping the latest trends today.</Text>
-                </View>
-
-                {/* Form Section */}
-                <View style={styles.form}>
-                    <FormInput
-                        control={control}
-                        name="name"
-                        label="Full Name"
-                        placeholder="John Doe"
-                        icon="person-outline"
-                        rules={{ required: 'Full Name is required' }}
-                        autoCapitalize="words"
-                    />
-
-                    <FormInput
-                        control={control}
-                        name="email"
-                        label="Email Address"
-                        placeholder="hello@example.com"
-                        icon="mail-outline"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        rules={{
-                            required: 'Email is required',
-                            pattern: {
-                                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                message: 'Invalid email address'
-                            }
-                        }}
-                    />
-
-                    {/* Phone - With Country Picker */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Phone Number</Text>
-                        <View style={[
-                            styles.phoneContainer,
-                            isDark && styles.phoneContainerDark,
-                        ]}>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <View style={styles.container}>
+                <Stack.Screen
+                    options={{
+                        headerShown: true,
+                        headerTransparent: true,
+                        headerTitle: '',
+                        headerLeft: () => (
                             <Pressable
-                                style={styles.countryCodeBtn}
-                                onPress={() => setCountryPickerVisible(true)}
+                                onPress={() => router.back()}
+                                style={styles.backButton}
                             >
-                                <Text style={styles.countryCodeText}>{callingCode ? `+${callingCode}` : '+1'}</Text>
-                                <MaterialIcons name="arrow-drop-down" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+                                <IconSymbol
+                                    name="chevron.left"
+                                    color={isDark ? '#fff' : '#000'}
+                                    size={24}
+                                />
                             </Pressable>
-                            <View style={[styles.verticalDivider, isDark && { backgroundColor: '#374151' }]} />
+                        )
+                    }}
+                />
 
-                            <Controller
+                <ScrollView
+                    contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.content}>
+                        {/* Minimalist Header */}
+                        <View style={styles.header}>
+                            <Text style={styles.title}>SIGN UP</Text>
+                            <View style={styles.titleUnderline} />
+                        </View>
+
+                        {/* Form Section */}
+                        <View style={styles.form}>
+                            <FormInput
                                 control={control}
-                                name="phone"
-                                rules={{ required: false }}
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <TextInput
-                                        style={styles.phoneInput}
-                                        placeholder="Enter phone number"
-                                        placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                                        onBlur={onBlur}
-                                        onChangeText={onChange}
-                                        value={value}
-                                        keyboardType="phone-pad"
-                                    />
-                                )}
+                                name="name"
+                                label="NAME"
+                                placeholder="YOUR FULL NAME"
+                                rules={{ required: 'Full Name is required' }}
+                                autoCapitalize="words"
                             />
+
+                            <FormInput
+                                control={control}
+                                name="email"
+                                label="EMAIL"
+                                placeholder="YOUR@EMAIL.COM"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                rules={{
+                                    required: 'Email is required',
+                                    pattern: {
+                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                        message: 'Invalid email address'
+                                    }
+                                }}
+                            />
+
+                            {/* Phone - With Country Picker */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>PHONE NUMBER</Text>
+                                <View style={styles.phoneContainer}>
+                                    <Pressable
+                                        style={styles.countryCodeBtn}
+                                        onPress={() => setCountryPickerVisible(true)}
+                                    >
+                                        <Text style={styles.countryCodeText}>{callingCode ? `+${callingCode}` : '+1'}</Text>
+                                        <MaterialIcons name="arrow-drop-down" size={20} color={isDark ? '#fff' : '#000'} />
+                                    </Pressable>
+                                    <View style={styles.verticalDivider} />
+
+                                    <Controller
+                                        control={control}
+                                        name="phone"
+                                        rules={{ required: false }}
+                                        render={({ field: { onChange, onBlur, value } }) => (
+                                            <TextInput
+                                                style={styles.phoneInput}
+                                                placeholder="ENTER PHONE"
+                                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
+                                                onBlur={onBlur}
+                                                onChangeText={onChange}
+                                                value={value}
+                                                keyboardType="phone-pad"
+                                            />
+                                        )}
+                                    />
+                                </View>
+                            </View>
+
+                            <FormInput
+                                control={control}
+                                name="password"
+                                label="PASSWORD"
+                                placeholder="••••••••"
+                                secureTextEntry={!showPassword}
+                                rules={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
+                                rightElement={
+                                    <Pressable onPress={() => setShowPassword(!showPassword)}>
+                                        <MaterialIcons
+                                            name={showPassword ? "visibility" : "visibility-off"}
+                                            size={20}
+                                            color={isDark ? "#fff" : "#000"}
+                                        />
+                                    </Pressable>
+                                }
+                            />
+
+                            <FormInput
+                                control={control}
+                                name="confirmPassword"
+                                label="CONFIRM PASSWORD"
+                                placeholder="••••••••"
+                                secureTextEntry={!showConfirmPassword}
+                                rules={{
+                                    required: 'Please confirm your password',
+                                    validate: value => value === pwd || 'Passwords do not match'
+                                }}
+                                rightElement={
+                                    <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                        <MaterialIcons
+                                            name={showConfirmPassword ? "visibility" : "visibility-off"}
+                                            size={20}
+                                            color={isDark ? "#fff" : "#000"}
+                                        />
+                                    </Pressable>
+                                }
+                            />
+
+                            <FormInput
+                                control={control}
+                                name="referralCode"
+                                label="REFERRAL CODE (OPTIONAL)"
+                                placeholder="ENTER CODE"
+                                autoCapitalize="characters"
+                            />
+
+                            {/* Terms Check */}
+                            <View style={styles.termsContainer}>
+                                <Controller
+                                    control={control}
+                                    name="agreeToTerms"
+                                    rules={{ required: 'You must agree to the terms' }}
+                                    render={({ field: { onChange, value } }) => (
+                                        <Pressable
+                                            onPress={() => onChange(!value)}
+                                            style={[
+                                                styles.checkbox,
+                                                value && { backgroundColor: isDark ? '#fff' : '#000', borderColor: isDark ? '#fff' : '#000' }
+                                            ]}
+                                        >
+                                            {value && <MaterialIcons name="check" size={16} color={isDark ? '#000' : '#fff'} />}
+                                        </Pressable>
+                                    )}
+                                />
+                                <Text style={styles.termsText}>
+                                    BY CREATING AN ACCOUNT, YOU AGREE TO OUR <Text style={styles.linkText}>TERMS</Text> AND <Text style={styles.linkText}>PRIVACY POLICY</Text>.
+                                </Text>
+                            </View>
+
+                            {/* Sign Up Button */}
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.signUpButton,
+                                    pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
+                                ]}
+                                onPress={handleSubmit(onSubmit)}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <Text style={styles.signUpButtonText}>CREATING ACCOUNT...</Text>
+                                ) : (
+                                    <Text style={styles.signUpButtonText}>CREATE ACCOUNT</Text>
+                                )}
+                            </Pressable>
+                        </View>
+
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>ALREADY HAVE AN ACCOUNT?</Text>
+                            <Pressable onPress={() => router.push('/login')}>
+                                <Text style={styles.loginLinkText}>LOG IN</Text>
+                            </Pressable>
                         </View>
                     </View>
+                </ScrollView>
 
-                    <FormInput
-                        control={control}
-                        name="password"
-                        label="Password"
-                        placeholder="••••••••"
-                        secureTextEntry={!showPassword}
-                        rules={{ required: 'Password is required', minLength: { value: 8, message: 'Password must be at least 8 characters' } }}
-                        rightElement={
-                            <Pressable onPress={() => setShowPassword(!showPassword)}>
-                                <MaterialIcons
-                                    name={showPassword ? "visibility" : "visibility-off"}
-                                    size={20}
-                                    color="#9ca3af"
-                                />
-                            </Pressable>
-                        }
-                    />
-
-                    <FormInput
-                        control={control}
-                        name="confirmPassword"
-                        label="Confirm Password"
-                        placeholder="••••••••"
-                        secureTextEntry={!showConfirmPassword}
-                        rules={{
-                            required: 'Please confirm your password',
-                            validate: value => value === pwd || 'Passwords do not match'
-                        }}
-                        rightElement={
-                            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                <MaterialIcons
-                                    name={showConfirmPassword ? "visibility" : "visibility-off"}
-                                    size={20}
-                                    color="#9ca3af"
-                                />
-                            </Pressable>
-                        }
-                    />
-
-                    <FormInput
-                        control={control}
-                        name="referralCode"
-                        label="Referral Code (Optional)"
-                        placeholder="ENTER CODE"
-                        autoCapitalize="characters"
-                    />
-
-                    {/* Terms Check */}
-                    <View style={styles.termsContainer}>
-                        <Controller
-                            control={control}
-                            name="agreeToTerms"
-                            rules={{ required: 'You must agree to the terms' }}
-                            render={({ field: { onChange, value } }) => (
-                                <Pressable
-                                    onPress={() => onChange(!value)}
-                                    style={[
-                                        styles.checkbox,
-                                        value && { backgroundColor: '#000', borderColor: '#000' }
-                                    ]}
-                                >
-                                    {value && <MaterialIcons name="check" size={16} color="#fff" />}
-                                </Pressable>
-                            )}
-                        />
-                        <Text style={styles.termsText}>
-                            I agree to the <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>.
-                        </Text>
-                    </View>
-
-                    {/* Sign Up Button */}
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.primaryButton,
-                            pressed && styles.primaryButtonPressed
-                        ]}
-                        onPress={handleSubmit(onSubmit)}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <Text style={styles.primaryButtonText}>Creating Account...</Text>
-                        ) : (
-                            <Text style={styles.primaryButtonText}>Sign Up</Text>
-                        )}
-                    </Pressable>
-                </View>
-
-                {/* Divider */}
-                <View style={styles.dividerRow}>
-                    <View style={styles.dividerLine} />
-                    <View style={styles.dividerTextWrapper}>
-                        <Text style={styles.dividerText}>Or continue with</Text>
-                    </View>
-                </View>
-
-                {/* Social Buttons */}
-                <View style={styles.socialRow}>
-                    <Pressable style={styles.socialButton}>
-                        <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={{ width: 20, height: 20 }} />
-                        <Text style={styles.socialButtonText}>Google</Text>
-                    </Pressable>
-                    <Pressable style={styles.socialButton}>
-                        <MaterialIcons name="apple" size={24} color={isDark ? '#fff' : '#000'} />
-                        <Text style={styles.socialButtonText}>Apple</Text>
-                    </Pressable>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>Already have an account? </Text>
-                    <Pressable onPress={() => router.push('/login')}>
-                        <Text style={styles.linkText}>Log In</Text>
-                    </Pressable>
-                </View>
-            </ScrollView>
-
-            {/* Country Picker Modal */}
-            <CountryPicker
-                show={countryPickerVisible}
-                lang={'en'}
-                pickerButtonOnPress={(item) => {
-                    setCountryCode(item.code);
-                    setCallingCode(item.dial_code.replace('+', ''));
-                    setCountryPickerVisible(false);
-                }}
-                onBackdropPress={() => setCountryPickerVisible(false)}
-                style={countryPickerStyle}
-            />
-        </View>
+                {/* Country Picker Modal */}
+                <CountryPicker
+                    show={countryPickerVisible}
+                    lang={'en'}
+                    pickerButtonOnPress={(item) => {
+                        setCountryCode(item.code);
+                        setCallingCode(item.dial_code.replace('+', ''));
+                        setCountryPickerVisible(false);
+                    }}
+                    onBackdropPress={() => setCountryPickerVisible(false)}
+                    style={countryPickerStyle}
+                />
+            </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const getStyles = (isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-    },
-    backButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: isDark ? '#fff' : '#111318',
+        backgroundColor: isDark ? '#000' : '#fff',
     },
     scrollContent: {
-        paddingHorizontal: 20,
+        flexGrow: 1,
         paddingBottom: 40,
     },
-    headline: {
-        paddingVertical: 24,
-    },
-    headlineText: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: isDark ? '#fff' : '#111318',
-        lineHeight: 40,
-    },
-    subheadText: {
-        fontSize: 16,
-        color: isDark ? '#9ca3af' : '#616f89',
-        marginTop: 8,
-    },
-    form: {
-        gap: 20,
-    },
-    inputGroup: {
-        gap: 8,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: isDark ? '#e5e7eb' : '#111318',
-    },
-    optionalLabel: {
-        fontSize: 12,
-        color: '#616f89',
-    },
-    inputWrapper: {
-        position: 'relative',
-    },
-    input: {
-        height: 56,
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        borderRadius: 12,
-        paddingLeft: 16,
-        paddingRight: 16,
-        fontSize: 16,
-        color: isDark ? '#fff' : '#111318',
-    },
-    inputIcon: {
-        position: 'absolute',
-        right: 16,
-        top: 18,
-    },
-    eyeIcon: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        height: 56,
-        width: 56,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    // Phone styles
-    phoneContainer: {
-        height: 56, // Match other inputs
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    phoneContainerDark: {
-        backgroundColor: '#1a2230',
-        borderColor: '#374151',
-    },
-    countryCodeBtn: {
-        paddingHorizontal: 16,
-        height: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    countryCodeText: {
-        fontSize: 15,
-        color: isDark ? '#9ca3af' : '#6b7280',
-    },
-    verticalDivider: {
-        width: 1,
-        height: '60%',
-        backgroundColor: isDark ? '#374151' : '#e5e7eb',
-    },
-    phoneInput: {
-        flex: 1,
-        height: '100%',
-        paddingHorizontal: 12,
-        fontSize: 16,
-        color: isDark ? '#fff' : '#111827',
-    },
-    // End Phone styles
-    termsContainer: {
-        flexDirection: 'row',
-        gap: 12,
-        alignItems: 'flex-start',
-        paddingVertical: 8,
-    },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 2,
-    },
-    termsText: {
-        flex: 1,
-        fontSize: 14,
-        color: isDark ? '#9ca3af' : '#616f89',
-        lineHeight: 20,
-    },
-    linkText: {
-        fontWeight: '700',
-        color: '#000',
-    },
-    primaryButton: {
-        height: 56,
-        backgroundColor: '#000',
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    primaryButtonPressed: {
-        opacity: 0.9,
-        transform: [{ scale: 0.98 }],
-    },
-    nativeGlassWrapper: {
+    backButton: {
         width: 20,
         height: 20,
         borderRadius: 50,
@@ -589,62 +357,135 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
             }
         })
     },
-    primaryButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#ffffff',
-    },
-    dividerRow: {
-        position: 'relative',
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginVertical: 12,
-    },
-    dividerLine: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        height: 1,
-        backgroundColor: isDark ? '#374151' : '#e5e7eb',
-    },
-    dividerTextWrapper: {
-        backgroundColor: isDark ? '#101622' : '#ffffff',
-        paddingHorizontal: 8,
-    },
-    dividerText: {
-        fontSize: 14,
-        color: isDark ? '#9ca3af' : '#616f89',
-    },
-    socialRow: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    socialButton: {
+    content: {
         flex: 1,
-        height: 52,
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        borderWidth: 1,
-        borderColor: isDark ? '#374151' : '#dbdfe6',
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    header: {
+        marginBottom: 32,
+        alignItems: 'flex-start',
+    },
+    title: {
+        fontSize: 42,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        letterSpacing: -1,
+    },
+    titleUnderline: {
+        width: 40,
+        height: 6,
+        backgroundColor: isDark ? '#fff' : '#000',
+        marginTop: 4,
+    },
+    form: {
+        gap: 12,
+    },
+    inputGroup: {
         gap: 8,
     },
-    socialButtonText: {
-        fontSize: 14,
+    label: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        marginBottom: 8,
+        letterSpacing: 1,
+    },
+    phoneContainer: {
+        height: 60,
+        backgroundColor: isDark ? '#000' : '#fff',
+        borderWidth: 2,
+        borderColor: isDark ? '#fff' : '#000',
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    countryCodeBtn: {
+        paddingHorizontal: 16,
+        height: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    countryCodeText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: isDark ? '#fff' : '#000',
+    },
+    verticalDivider: {
+        width: 2,
+        height: '40%',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+    },
+    phoneInput: {
+        flex: 1,
+        height: '100%',
+        paddingHorizontal: 12,
+        fontSize: 15,
         fontWeight: '600',
-        color: isDark ? '#fff' : '#111318',
+        color: isDark ? '#fff' : '#000',
+    },
+    termsContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'flex-start',
+        paddingVertical: 8,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: isDark ? '#fff' : '#000',
+        backgroundColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    termsText: {
+        flex: 1,
+        fontSize: 10,
+        fontWeight: '700',
+        color: isDark ? '#fff' : '#000',
+        opacity: 0.6,
+        lineHeight: 16,
+        letterSpacing: 0.5,
+    },
+    linkText: {
+        color: isDark ? '#fff' : '#000',
+        textDecorationLine: 'underline',
+        fontWeight: '900',
+    },
+    signUpButton: {
+        height: 64,
+        backgroundColor: isDark ? '#fff' : '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 12,
+        borderRadius: 8,
+    },
+    signUpButtonText: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: isDark ? '#000' : '#fff',
+        letterSpacing: 2,
     },
     footer: {
         marginTop: 40,
-        flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
+        gap: 8,
     },
     footerText: {
-        fontSize: 16,
-        color: isDark ? '#9ca3af' : '#616f89',
+        fontSize: 12,
+        fontWeight: '700',
+        color: isDark ? '#fff' : '#000',
+        opacity: 0.4,
+        letterSpacing: 1,
+    },
+    loginLinkText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        textTransform: 'uppercase',
+        textDecorationLine: 'underline',
     },
 });

@@ -1,191 +1,229 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { ProductOption, ProductVariant } from '@/types/schema';
+import { DynamicProductOption, VariantMatrixEntry, ProductOptionValue } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getColorHex } from '@/utils/colorHelpers';
 
 interface ProductSelectorsProps {
-    options?: ProductOption[];
-    variants?: ProductVariant[];
-    onVariantChange?: (variant: ProductVariant | null) => void;
+    productOptions?: DynamicProductOption[];
+    variantMatrix?: Record<string, VariantMatrixEntry>;
+    onVariantChange?: (variantId: number | null, variantData: VariantMatrixEntry | null) => void;
 }
 
-export function ProductSelectors({ options = [], variants = [], onVariantChange }: ProductSelectorsProps) {
+export function ProductSelectors({
+    productOptions = [],
+    variantMatrix = {},
+    onVariantChange
+}: ProductSelectorsProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
-    // Find options dynamically
-    const colorOption = options.find(o => o.name.toLowerCase() === 'color' || o.name.toLowerCase() === 'colour');
-    const sizeOption = options.find(o => o.name.toLowerCase() === 'size' || o.name.toLowerCase() === 'shade'); // Added 'shade' just in case
+    // State: Store selected value for each option
+    const [selections, setSelections] = React.useState<Record<string, string>>({});
 
-    // Fallback: If no explicit size/color, pick the first non-color option as "secondary"
-    const otherOption = !sizeOption ? options.find(o => o.name.toLowerCase() !== 'color') : sizeOption;
-
-    // Defaults
-    const allColors = colorOption?.values || [];
-    const allOtherValues = otherOption?.values || [];
-
-    // State
-    const [selectedColor, setSelectedColor] = React.useState('');
-    const [selectedOther, setSelectedOther] = React.useState('');
-
-    // Pre-select defaults
+    // Pre-select first value for each option ONLY if selections are empty
     useEffect(() => {
-        if (allColors.length > 0 && !selectedColor) setSelectedColor(allColors[0]);
-        if (allOtherValues.length > 0 && !selectedOther) setSelectedOther(allOtherValues[0]);
-    }, [allColors, allOtherValues]);
+        if (productOptions.length > 0 && Object.keys(selections).length === 0) {
+            const initialSelections: Record<string, string> = {};
+            productOptions.forEach(option => {
+                if (option.values.length > 0) {
+                    const firstValue = option.values[0];
+                    initialSelections[option.name] = typeof firstValue === 'string'
+                        ? firstValue
+                        : firstValue.value;
+                }
+            });
+            setSelections(initialSelections);
+        }
+    }, [productOptions]);
 
-    // --- AVAILABILITY LOGIC ---
-    // 1. Available Colors (if Size selected) - usually we pick color first, so keep all colors enabled or check stock
+    // Build variant matrix key from current selections
+    const buildMatrixKey = (currentSelections: Record<string, string>) => {
+        return productOptions
+            .map(opt => currentSelections[opt.name] || '')
+            .filter(Boolean)
+            .join('|');
+    };
 
-    // 2. Available Sizes (depend on Color if Color exists)
-    const availableOtherValues = React.useMemo(() => {
-        if (!otherOption) return [];
+    // Get available values for an option based on current selections of OTHER options
+    const getAvailableValues = (optionName: string, optionValues: (string | ProductOptionValue)[]) => {
+        // Create a temporary selection without this option to see what's possible
+        const tempSelections = { ...selections };
+        delete tempSelections[optionName];
 
-        // If we have Color, filter by it
-        if (colorOption && selectedColor) {
-            const validVariants = variants.filter(v =>
-                v.color === selectedColor &&
-                v.stock_quantity > 0
+        const availableSet = new Set<string>();
+
+        // Check each entry in the matrix
+        Object.entries(variantMatrix).forEach(([key, entry]) => {
+            if (entry.stock <= 0) return; // Skip if out of stock
+
+            const keyParts = key.split('|');
+            const keyMap: Record<string, string> = {};
+
+            productOptions.forEach((opt, idx) => {
+                if (keyParts[idx]) {
+                    keyMap[opt.name] = keyParts[idx];
+                }
+            });
+
+            // If all OTHER selections match, this option value is available
+            const matchesOthers = Object.entries(tempSelections).every(
+                ([name, value]) => keyMap[name] === value
             );
-            // In user data context: variant.size holds the value for the second option
-            const validValues = validVariants.map(v => v.size).filter(Boolean);
-            return allOtherValues.filter(val => validValues.includes(val));
-        }
 
-        // If NO Color option (e.g. Foundation only has Size/Shade), check generic stock
-        // The variants list has `size` property corresponding to this option
-        const validVariants = variants.filter(v => v.stock_quantity > 0);
-        const validValues = validVariants.map(v => v.size).filter(Boolean);
-        return allOtherValues.filter(val => validValues.includes(val));
-
-    }, [colorOption, selectedColor, otherOption, variants, allOtherValues]);
-
-
-    // Notify parent
-    useEffect(() => {
-        if (variants.length === 0) return;
-
-        let found: ProductVariant | undefined;
-
-        if (colorOption && otherOption) {
-            // Both exist
-            if (selectedColor && selectedOther) {
-                found = variants.find(v => v.color === selectedColor && v.size === selectedOther);
+            if (matchesOthers && keyMap[optionName]) {
+                availableSet.add(keyMap[optionName]);
             }
-        } else if (colorOption && !otherOption) {
-            // Only Color
-            if (selectedColor) found = variants.find(v => v.color === selectedColor);
-        } else if (!colorOption && otherOption) {
-            // Only Size (Foundation case)
-            if (selectedOther) found = variants.find(v => v.size === selectedOther);
+        });
+
+        return optionValues.filter(val => {
+            const valueStr = typeof val === 'string' ? val : val.value;
+            // If the matrix is empty (legacy or single variant), everything is "available"
+            if (Object.keys(variantMatrix).length === 0) return true;
+            return availableSet.has(valueStr);
+        });
+    };
+
+    // Notify parent when selections change
+    useEffect(() => {
+        const matrixKey = buildMatrixKey(selections);
+        const variantData = variantMatrix[matrixKey];
+
+        if (variantData) {
+            onVariantChange?.(variantData.variant_id, variantData);
+        } else {
+            // If we have selections for all options but no matrix entry, something is wrong
+            // but we still notify null.
+            onVariantChange?.(null, null);
         }
-
-        onVariantChange?.(found || null);
-    }, [selectedColor, selectedOther, variants, colorOption, otherOption]);
-
+    }, [selections, variantMatrix]);
 
     // Helper for Hex
-    const getColorHex = (name: string) => {
-        const variantWithColor = variants.find(v => v.color === name);
-        if (variantWithColor?.option_values?.color?.code) {
-            return variantWithColor.option_values.color.code;
-        }
-        const map: Record<string, string> = {
-            'Black': '#111827', 'White': '#ffffff', 'Red': '#ef4444',
-            'Blue': '#3b82f6', 'Navy': '#1e3a8a', 'Beige': '#d6cbb6'
-        };
-        return map[name] || '#ccc';
+    const getColorHexVal = (val: string | ProductOptionValue) => {
+        if (!val) return '#94A3B8';
+        if (typeof val === 'object' && val.hex) return val.hex;
+        const name = typeof val === 'string' ? val : val.value;
+        return getColorHex(name);
     };
+
+    // Current selected variant data
+    const currentVariant = React.useMemo(() => {
+        const matrixKey = buildMatrixKey(selections);
+        return variantMatrix[matrixKey];
+    }, [selections, variantMatrix]);
+
+    if (productOptions.length === 0) return null;
 
     return (
         <View style={styles.container}>
-            {/* COLOR SELECTOR */}
-            {allColors.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select Color</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorsRow}>
-                        {allColors.map((colorName) => {
-                            const isSelected = selectedColor === colorName;
-                            const hex = getColorHex(colorName);
-                            const isWhite = hex.toLowerCase() === '#ffffff';
-                            return (
-                                <Pressable
-                                    key={colorName}
-                                    onPress={() => setSelectedColor(colorName)}
-                                    style={[
-                                        styles.colorPill,
-                                        isDark && { backgroundColor: '#111', borderColor: '#333' },
-                                        isSelected && { borderColor: isDark ? '#fff' : hex, borderWidth: 1.5 },
-                                    ]}
-                                >
-                                    <View style={[
-                                        styles.innerDot,
-                                        { backgroundColor: hex },
-                                        (isWhite || isDark) && styles.dotBorder
-                                    ]} />
-                                    <Text style={[
-                                        styles.colorName,
-                                        isDark && { color: '#fff' },
-                                        isSelected && styles.colorNameSelectedBold
-                                    ]}>
-                                        {colorName}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-            )}
+            {productOptions.map((option) => {
+                const isColor = option.name.toLowerCase() === 'color' || option.name.toLowerCase() === 'colour';
+                const availableValues = getAvailableValues(option.name, option.values);
+                const selectedValue = selections[option.name];
 
-            {/* OTHER OPTION SELECTOR (Size/Shade) */}
-            {allOtherValues.length > 0 && (
-                <View style={styles.section}>
-                    <View style={styles.sizeHeader}>
-                        <Text style={[styles.heading, isDark && { color: '#fff' }]}>Select {otherOption?.name || 'Option'}</Text>
+                return (
+                    <View key={option.name} style={styles.section}>
+                        <View style={styles.optionHeader}>
+                            <Text style={[styles.heading, isDark && { color: '#fff' }]}>
+                                {option.name}
+                            </Text>
+                            {selectedValue && (
+                                <Text style={[styles.selectedLabel, isDark && { color: '#94A3B8' }]}>
+                                    : {selectedValue}
+                                </Text>
+                            )}
+                        </View>
+
+                        {isColor ? (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorsRow}>
+                                {option.values.map((val, idx) => {
+                                    const valueStr = val && (typeof val === 'string' ? val : val.value) || `opt-${idx}`;
+                                    const isSelected = selectedValue === valueStr;
+                                    const isAvailable = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+                                    const hex = getColorHexVal(val) || '#ccc';
+                                    const isWhite = hex.toLowerCase() === '#ffffff';
+
+                                    return (
+                                        <Pressable
+                                            key={`${option.name}-${valueStr}-${idx}`}
+                                            onPress={() => isAvailable && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
+                                            style={[
+                                                styles.colorPill,
+                                                isDark && { backgroundColor: '#111', borderColor: '#333' },
+                                                isSelected && { borderColor: isDark ? '#fff' : hex, borderWidth: 1.5 },
+                                                !isAvailable && { opacity: 0.3 }
+                                            ]}
+                                            disabled={!isAvailable}
+                                        >
+                                            <View style={[
+                                                styles.innerDot,
+                                                { backgroundColor: hex },
+                                                (isWhite || isDark) && styles.dotBorder
+                                            ]} />
+                                            <Text style={[
+                                                styles.colorName,
+                                                isDark && { color: '#fff' },
+                                                isSelected && styles.colorNameSelectedBold,
+                                                !isAvailable && { textDecorationLine: 'line-through' }
+                                            ]}>
+                                                {valueStr}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.sizesRow}>
+                                {option.values.map((val, idx) => {
+                                    const valueStr = val && (typeof val === 'string' ? val : val.value) || `opt-${idx}`;
+                                    const isSelected = selectedValue === valueStr;
+                                    const isAvailable = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+
+                                    return (
+                                        <Pressable
+                                            key={`${option.name}-${valueStr}-${idx}`}
+                                            onPress={() => isAvailable && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
+                                            style={[
+                                                styles.sizeBox,
+                                                { width: 'auto', paddingHorizontal: 16, minWidth: 64 },
+                                                isDark && { backgroundColor: '#111', borderColor: '#333' },
+                                                isSelected && styles.sizeBoxSelected,
+                                                isSelected && isDark && { borderColor: '#fff' },
+                                                !isAvailable && styles.sizeBoxDisabled,
+                                                !isAvailable && isDark && { backgroundColor: '#222', borderColor: '#333' }
+                                            ]}
+                                            disabled={!isAvailable}
+                                        >
+                                            <Text style={[
+                                                styles.sizeText,
+                                                isDark && { color: '#94A3B8' },
+                                                isSelected && styles.sizeTextSelected,
+                                                isSelected && isDark && { color: '#fff' },
+                                                !isAvailable && styles.sizeTextDisabled
+                                            ]}>
+                                                {valueStr}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {!selectedValue && (
+                            <Text style={styles.outOfStockText}>Please select an option</Text>
+                        )}
                     </View>
+                );
+            })}
 
-                    <View style={styles.sizesRow}>
-                        {allOtherValues.map((val) => {
-                            const isSelected = selectedOther === val;
-                            const isAvailable = availableOtherValues.includes(val);
-                            const isDisabled = !isAvailable;
-
-                            // For Foundation shades, we might want purely text chips, or wider ones.
-                            // keeping "sizeBox" style but maybe allow auto width? 
-                            // existing sizeBox is fixed width 64. Might be too small for "110 Porcelain".
-                            // Let's modify style to be flexible width.
-
-                            return (
-                                <Pressable
-                                    key={val}
-                                    onPress={() => !isDisabled && setSelectedOther(val)}
-                                    style={[
-                                        styles.sizeBox,
-                                        { width: 'auto', paddingHorizontal: 12, minWidth: 64 }, // Flexible width
-                                        isDark && { backgroundColor: '#111', borderColor: '#333' },
-                                        isSelected && styles.sizeBoxSelected,
-                                        isSelected && isDark && { borderColor: '#fff' },
-                                        isDisabled && styles.sizeBoxDisabled,
-                                        isDisabled && isDark && { backgroundColor: '#222', borderColor: '#333' }
-                                    ]}
-                                >
-                                    <Text style={[
-                                        styles.sizeText,
-                                        isDark && { color: '#94A3B8' },
-                                        isSelected && styles.sizeTextSelected,
-                                        isSelected && isDark && { color: '#fff' },
-                                        isDisabled && styles.sizeTextDisabled
-                                    ]}>
-                                        {val}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-                    {availableOtherValues.length === 0 && selectedColor && colorOption && (
-                        <Text style={styles.outOfStockText}>Out of stock in {selectedColor}</Text>
-                    )}
+            {currentVariant && (
+                <View style={styles.stockStatusContainer}>
+                    <View style={[styles.stockDot, { backgroundColor: currentVariant.stock > 0 ? '#22c55e' : '#ef4444' }]} />
+                    <Text style={[styles.stockText, isDark && { color: '#fff' }]}>
+                        {currentVariant.stock > 0
+                            ? `${currentVariant.stock} units available`
+                            : 'Out of stock'}
+                    </Text>
                 </View>
             )}
         </View>
@@ -201,6 +239,32 @@ const styles = StyleSheet.create({
     section: {
         paddingHorizontal: 20,
         gap: 16,
+    },
+    optionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    selectedLabel: {
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    stockStatusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        gap: 8,
+        marginTop: -8,
+    },
+    stockDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    stockText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
     },
     heading: {
         fontSize: 18,

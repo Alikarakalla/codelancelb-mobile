@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -51,227 +51,240 @@ export default function ResetPasswordScreen() {
             });
 
             if (response.message === 'Your password has been reset!' || response.message?.toLowerCase().includes('reset')) {
-                Alert.alert('Success', 'Your password has been reset successfully!', [
-                    { text: 'Login', onPress: () => router.dismissAll() } // Or navigate to login
+                Alert.alert('SUCCESS', 'YOUR PASSWORD HAS BEEN RESET SUCCESSFULLY!', [
+                    { text: 'LOGIN', onPress: () => router.dismissAll() }
                 ]);
             } else {
-                Alert.alert('Error', response.message || 'Failed to reset password.');
+                Alert.alert('ERROR', response.message || 'FAILED TO RESET PASSWORD.');
             }
         } catch (error: any) {
             console.error('Reset Password Error:', error);
             const errorMessage = error.message?.includes('422')
-                ? 'Invalid token or passwords do not match.'
-                : 'Something went wrong. Please check your token and try again.';
-            Alert.alert('Reset Failed', errorMessage);
+                ? 'INVALID TOKEN OR PASSWORDS DO NOT MATCH.'
+                : 'SOMETHING WENT WRONG. PLEASE CHECK YOUR TOKEN AND TRY AGAIN.';
+            Alert.alert('RESET FAILED', errorMessage);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#101622' : '#ffffff' }]}>
-            <Stack.Screen
-                options={{
-                    headerShown: true,
-                    headerTransparent: true,
-                    headerTitle: '',
-                    headerLeft: () => (
-                        <Pressable
-                            onPress={() => router.back()}
-                            style={styles.nativeGlassWrapper}
-                        >
-                            <IconSymbol
-                                name="chevron.left"
-                                color={isDark ? '#fff' : '#000'}
-                                size={24}
-                                weight="medium"
-                            />
-                        </Pressable>
-                    ),
-                } as any}
-            />
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <View style={styles.container}>
+                <Stack.Screen
+                    options={{
+                        headerShown: true,
+                        headerTransparent: true,
+                        headerTitle: '',
+                        headerLeft: () => (
+                            <Pressable
+                                onPress={() => router.back()}
+                                style={styles.backButton}
+                            >
+                                <IconSymbol
+                                    name="chevron.left"
+                                    color={isDark ? '#fff' : '#000'}
+                                    size={24}
+                                />
+                            </Pressable>
+                        )
+                    }}
+                />
 
-            <ScrollView
-                contentContainerStyle={[styles.scrollContent, { paddingTop: 60 + insets.top }]}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.card}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.iconBox}>
-                            <MaterialIcons name="lock-open" size={32} color="#000" />
+                <ScrollView
+                    contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.content}>
+                        {/* Minimalist Header */}
+                        <View style={styles.header}>
+                            <Text style={styles.title}>RESET</Text>
+                            <Text style={styles.titleBold}>PASSWORD</Text>
+                            <View style={styles.titleUnderline} />
+                            <Text style={styles.subtitle}>ENTER YOUR CODE AND NEW PASSWORD</Text>
                         </View>
-                        <Text style={styles.title}>Reset Password</Text>
-                        <Text style={styles.subtitle}>Enter the code from your email and a new password.</Text>
+
+                        {/* Form Section */}
+                        <View style={styles.form}>
+                            <FormInput
+                                control={control}
+                                name="email"
+                                label="EMAIL"
+                                placeholder="YOUR@EMAIL.COM"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                rules={{ required: 'Email is required' }}
+                            />
+
+                            <FormInput
+                                control={control}
+                                name="token"
+                                label="RESET TOKEN"
+                                placeholder="ENTER CODE FROM EMAIL"
+                                autoCapitalize="none"
+                                rules={{ required: 'Token is required' }}
+                            />
+
+                            <FormInput
+                                control={control}
+                                name="password"
+                                label="NEW PASSWORD"
+                                placeholder="••••••••"
+                                secureTextEntry={!showPassword}
+                                rules={{
+                                    required: 'Password is required',
+                                    minLength: { value: 8, message: 'Must be at least 8 characters' }
+                                }}
+                                rightElement={
+                                    <Pressable onPress={() => setShowPassword(!showPassword)}>
+                                        <MaterialIcons
+                                            name={showPassword ? "visibility" : "visibility-off"}
+                                            size={20}
+                                            color={isDark ? "#fff" : "#000"}
+                                        />
+                                    </Pressable>
+                                }
+                            />
+
+                            <FormInput
+                                control={control}
+                                name="confirmPassword"
+                                label="CONFIRM PASSWORD"
+                                placeholder="••••••••"
+                                secureTextEntry={!showPassword}
+                                rules={{
+                                    required: 'Please confirm password',
+                                    validate: value => value === pwd || 'Passwords do not match'
+                                }}
+                            />
+
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.submitButton,
+                                    pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
+                                ]}
+                                onPress={handleSubmit(onSubmit)}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color={isDark ? '#000' : '#fff'} />
+                                ) : (
+                                    <View style={styles.buttonContent}>
+                                        <Text style={styles.submitButtonText}>RESET PASSWORD</Text>
+                                        <MaterialIcons name="check-circle" size={20} color={isDark ? '#000' : '#fff'} />
+                                    </View>
+                                )}
+                            </Pressable>
+                        </View>
+
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>NEVER MIND?</Text>
+                            <Pressable onPress={() => router.replace('/login')}>
+                                <Text style={styles.loginLinkText}>BACK TO LOGIN</Text>
+                            </Pressable>
+                        </View>
                     </View>
-
-                    {/* Form */}
-                    <View style={styles.form}>
-                        <FormInput
-                            control={control}
-                            name="email"
-                            label="Email Address"
-                            placeholder="Confirm your email"
-                            icon="mail-outline"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            rules={{ required: 'Email is required' }}
-                        />
-
-                        <FormInput
-                            control={control}
-                            name="token"
-                            label="Reset Token"
-                            placeholder="Paste token here"
-                            icon="vpn-key"
-                            autoCapitalize="none"
-                            rules={{ required: 'Token is required' }}
-                        />
-
-                        <FormInput
-                            control={control}
-                            name="password"
-                            label="New Password"
-                            placeholder="Enter new password"
-                            icon="lock-outline"
-                            secureTextEntry={!showPassword}
-                            rules={{
-                                required: 'Password is required',
-                                minLength: { value: 8, message: 'Must be at least 8 characters' }
-                            }}
-                            rightElement={
-                                <Pressable onPress={() => setShowPassword(!showPassword)}>
-                                    <MaterialIcons
-                                        name={showPassword ? "visibility" : "visibility-off"}
-                                        size={20}
-                                        color="#9ca3af"
-                                    />
-                                </Pressable>
-                            }
-                        />
-
-                        <FormInput
-                            control={control}
-                            name="confirmPassword"
-                            label="Confirm Password"
-                            placeholder="Re-enter new password"
-                            icon="lock-outline"
-                            secureTextEntry={!showPassword}
-                            rules={{
-                                required: 'Please confirm password',
-                                validate: value => value === pwd || 'Passwords do not match'
-                            }}
-                        />
-
-
-                        {/* Submit Button */}
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.loginButton,
-                                pressed && styles.loginButtonPressed
-                            ]}
-                            onPress={handleSubmit(onSubmit)}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <>
-                                    <Text style={styles.loginButtonText}>Reset Password</Text>
-                                    <MaterialIcons name="check-circle" size={20} color="#fff" />
-                                </>
-                            )}
-                        </Pressable>
-                    </View>
-                </View>
-            </ScrollView>
-        </View>
+                </ScrollView>
+            </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const getStyles = (isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: isDark ? '#000' : '#fff',
     },
     scrollContent: {
-        paddingHorizontal: 16,
+        flexGrow: 1,
         paddingBottom: 40,
-        alignItems: 'center',
     },
-    card: {
-        width: '100%',
-        maxWidth: 400,
-        backgroundColor: isDark ? '#1a2230' : '#ffffff',
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: isDark ? '#2a3441' : '#e5e7eb',
-        overflow: 'hidden',
-        marginTop: 20,
-    },
-    header: {
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 40,
-        paddingBottom: 24,
+        marginLeft: 16,
+    },
+    content: {
+        flex: 1,
         paddingHorizontal: 24,
     },
-    iconBox: {
-        width: 64,
-        height: 64,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24,
+    header: {
+        marginBottom: 32,
+        alignItems: 'flex-start',
     },
     title: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: isDark ? '#fff' : '#111318',
-        marginBottom: 8,
-        textAlign: 'center',
+        fontSize: 36,
+        fontWeight: '300',
+        color: isDark ? '#fff' : '#000',
+        letterSpacing: -1,
+    },
+    titleBold: {
+        fontSize: 42,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        letterSpacing: -1,
+        marginTop: -10,
+    },
+    titleUnderline: {
+        width: 40,
+        height: 6,
+        backgroundColor: isDark ? '#fff' : '#000',
+        marginTop: 4,
+        marginBottom: 16,
     },
     subtitle: {
-        fontSize: 16,
-        color: isDark ? '#9ca3af' : '#616f89',
-        textAlign: 'center',
+        fontSize: 10,
+        fontWeight: '700',
+        color: isDark ? '#fff' : '#000',
+        opacity: 0.5,
+        letterSpacing: 1,
     },
     form: {
-        padding: 24,
-        gap: 20,
-        paddingBottom: 40,
+        gap: 12,
     },
-    loginButton: {
-        height: 56,
-        backgroundColor: '#000',
-        borderRadius: 12,
+    submitButton: {
+        height: 64,
+        backgroundColor: isDark ? '#fff' : '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        borderRadius: 8,
+    },
+    buttonContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-        marginTop: 8,
+        gap: 12,
     },
-    loginButtonPressed: {
-        transform: [{ scale: 0.98 }],
-        opacity: 0.9,
-    },
-    nativeGlassWrapper: {
-        width: 32,
-        height: 32,
-        borderRadius: 50,
-        backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginHorizontal: 8,
-    },
-    loginButtonText: {
+    submitButtonText: {
         fontSize: 16,
+        fontWeight: '900',
+        color: isDark ? '#000' : '#fff',
+        letterSpacing: 2,
+    },
+    footer: {
+        marginTop: 64,
+        alignItems: 'center',
+        gap: 8,
+    },
+    footerText: {
+        fontSize: 12,
         fontWeight: '700',
-        color: '#ffffff',
-        letterSpacing: 0.5,
+        color: isDark ? '#fff' : '#000',
+        opacity: 0.4,
+        letterSpacing: 1,
+    },
+    loginLinkText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        textTransform: 'uppercase',
+        textDecorationLine: 'underline',
     },
 });

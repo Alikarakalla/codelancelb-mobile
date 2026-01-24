@@ -1,3 +1,30 @@
+// Dynamic Variant System Types
+export interface ProductOptionValue {
+    value: string;
+    hex?: string; // For color options
+}
+
+export interface DynamicProductOption {
+    name: string;
+    values: (string | ProductOptionValue)[];
+}
+
+export interface VariantMatrixEntry {
+    variant_id: number;
+    price: number | null;
+    stock: number;
+    sku?: string | null;
+}
+
+export interface Tag {
+    id: number;
+    name: string;
+    name_en?: string;
+    name_ar?: string;
+    slug: string;
+    color: string; // Can be preset name (e.g., 'orange', 'red') or HEX (e.g., '#4f46e5')
+}
+
 export interface Product {
     id: number;
     category_id: number;
@@ -43,6 +70,11 @@ export interface Product {
     category?: Category;
     type?: 'standard' | 'bundle';
     bundle_items?: Product[];
+    tags?: Tag[];
+
+    // NEW: Dynamic Variant System
+    product_options?: DynamicProductOption[];
+    variant_matrix?: Record<string, VariantMatrixEntry>;
 }
 
 export interface ProductVariant {
@@ -168,7 +200,8 @@ export interface CartItem {
     user_id?: number | null;
     session_id?: string | null;
     product_id: number;
-    variant_key?: string | null; // potentially variant slug or ID reference
+    variant_id?: number | null; // NEW: Use variant_id from API
+    variant_key?: string | null; // DEPRECATED: Keep for backward compatibility
     options?: any; // json options selected
     qty: number;
     price: number;
@@ -243,9 +276,11 @@ export interface OrderItem {
     id: number;
     order_id: number;
     product_id: number;
+    variant_id?: number | null; // NEW: Specific variant ID
     quantity: number;
     price: number;
     options?: any;
+    option_label?: string; // NEW: "Red - XL - Silk" formatted label
     product?: Product;
 }
 

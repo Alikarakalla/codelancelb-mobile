@@ -54,15 +54,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const addToCart = (product: Product, variant?: ProductVariant | null, quantity: number = 1, options?: any) => {
         setItems(prev => {
-            // Unique key logic: ProductID + VariantSlug (if exists)
+            // NEW: Use variant_id from the selected variant
+            const variantId = variant?.id || null;
+
+            // Unique key logic: ProductID + VariantID (if exists)
             // For Bundle, we might need a unique key based on selections if we want to allow multiple bundles with different options.
-            // For now, let's keep it simple.
             const variantKey = variant ? variant?.slug : (product.type === 'bundle' ? 'bundle-' + Date.now() : null);
 
-            // Check if item already exists (Skip for bundles to allow multiple configs, or implement deep compare of options)
+            // Check if item already exists (Skip for bundles to allow multiple configs)
             const existingIndex = product.type === 'bundle' ? -1 : prev.findIndex(item =>
                 item.product_id === product.id &&
-                item.variant_key === variantKey
+                item.variant_id === variantId
             );
 
             if (existingIndex >= 0) {
@@ -73,9 +75,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // Add new item
                 const newItem: CartItem = {
-                    id: Date.now(), // Mock ID
+                    id: Date.now(), // Mock ID for local storage
                     product_id: product.id,
-                    variant_key: variantKey || null,
+                    variant_id: variantId, // NEW
+                    variant_key: variantKey || null, // Keep for backward compatibility
                     options: options || (variant ? { ...variant.option_values } : null),
                     qty: quantity,
                     price: variant ? (variant.price || product.price || 0) : (product.price || 0),
@@ -84,7 +87,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return [...prev, newItem];
             }
         });
-        console.log(`Added to cart: ${product.name} (Variant: ${variant?.slug || 'None'}) x${quantity}`);
+        console.log(`Added to cart: ${product.name} (Variant ID: ${variant?.id || 'None'}) x${quantity}`);
     };
 
     const removeFromCart = (itemId: number) => {

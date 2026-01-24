@@ -40,18 +40,22 @@ export const ProductQuickViewModal = ({
 }: ProductQuickViewModalProps) => {
     const [quantity, setQuantity] = useState(1);
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+    const [selectedVariantData, setSelectedVariantData] = useState<any>(null); // NEW
     const { triggerCartAnimation } = useCartAnimation();
     const cartButtonRef = React.useRef<View>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
+    // ...
+
     // Reset quantity when product changes
     React.useEffect(() => {
         if (product) {
             setQuantity(1);
-            // Default variant logic is handled by ProductSelectors on mount, 
-            // but we can initialize it here if needed for immediate render state before callback
-            if (product.variants?.length) {
+            setSelectedVariantData(null);
+            // Default variant logic is partially handled by ProductSelectors, 
+            // but we reset our local state for a clean selection.
+            if (product.variants?.length && !product.product_options?.length) {
                 const defaultVariant = product.variants.find(v => v.is_default) || product.variants[0];
                 setSelectedVariant(defaultVariant);
             } else {
@@ -62,9 +66,20 @@ export const ProductQuickViewModal = ({
 
     if (!product) return null;
 
+    const handleVariantChange = (variantId: number | null, variantData: any | null) => {
+        setSelectedVariantData(variantData);
+        if (variantId && product?.variants) {
+            const found = product.variants.find(v => v.id === variantId);
+            setSelectedVariant(found || null);
+        } else {
+            setSelectedVariant(null);
+        }
+    };
+
     const handleAddToCart = () => {
         if (product.has_variants && !selectedVariant) {
             // Should theoretically be handled by valid default, but good safety
+            Alert.alert('Selection Required', 'Please select an option');
             return;
         }
 
@@ -124,7 +139,7 @@ export const ProductQuickViewModal = ({
                             <ProductInfo
                                 brand={product.brand?.name}
                                 title={product.name_en || product.name || ''}
-                                price={selectedVariant?.price ?? product.price ?? 0}
+                                price={selectedVariantData?.price ?? (selectedVariant?.price ?? product.price ?? 0)}
                                 originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
                                 rating={4.8}
                                 reviewCount={product.reviews?.length || 0}
@@ -135,9 +150,9 @@ export const ProductQuickViewModal = ({
                         <View style={{ marginHorizontal: -20, marginTop: 10 }}>
                             <ProductSelectors
                                 key={product.id}
-                                options={product.options}
-                                variants={product.variants}
-                                onVariantChange={setSelectedVariant}
+                                productOptions={product.product_options}
+                                variantMatrix={product.variant_matrix}
+                                onVariantChange={handleVariantChange}
                             />
                         </View>
 

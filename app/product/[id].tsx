@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductInfo } from '@/components/product/ProductInfo';
+import { ProductTags } from '@/components/product/ProductTags';
 import { ProductDescription } from '@/components/product/ProductDescription';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
@@ -31,6 +32,7 @@ export default function ProductDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+    const [selectedVariantData, setSelectedVariantData] = useState<any>(null); // From matrix
     const [bundleSelections, setBundleSelections] = useState<Record<number, ProductVariant | null>>({});
 
     const { addToCart, cartCount } = useCart();
@@ -43,11 +45,10 @@ export default function ProductDetailsScreen() {
                 try {
                     const productId = Array.isArray(id) ? id[0] : id;
                     const data = await api.getProduct(productId);
-                    console.log('Product Data:', JSON.stringify(data, null, 2));
                     setProduct(data);
 
-                    // Set default variant if exists
-                    if (data.variants?.length) {
+                    // If it's a simple product with variants but no options (unlikely now)
+                    if (data.variants?.length && !data.product_options?.length) {
                         const defaultVariant = data.variants.find(v => v.is_default) || data.variants[0];
                         setSelectedVariant(defaultVariant);
                     }
@@ -78,13 +79,23 @@ export default function ProductDetailsScreen() {
         }
     }, [id]);
 
-    // Combine all images (product images + variant images + selected variant gallery)
+    // Handle variant change from dynamic selectors
+    const handleVariantChange = (variantId: number | null, variantData: any | null) => {
+        setSelectedVariantData(variantData);
+        if (variantId && product?.variants) {
+            const found = product.variants.find(v => v.id === variantId);
+            setSelectedVariant(found || null);
+        } else {
+            setSelectedVariant(null);
+        }
+    };
+
+    // ... combined all images logic ...
     const allImages = useMemo(() => {
         if (!product) {
             return initialImage ? [initialImage as string] : [];
         }
 
-        // Ensure we properly fix URLs for all sources
         const fixUrl = (url: string | undefined | null) => {
             if (!url) return null;
             if (url.startsWith('http')) return url;
@@ -104,7 +115,6 @@ export default function ProductDetailsScreen() {
             return acc;
         }, []) || [];
 
-        // Main Image -> Base Images -> Variant Main Images -> All Variant Gallery Images
         let list: string[] = [];
         if (mainImage) list.push(mainImage);
         list = [...list, ...baseImages, ...variantImages, ...allVariantsGalleries];
@@ -124,36 +134,42 @@ export default function ProductDetailsScreen() {
     const isOutOfStock = useMemo(() => {
         if (!product) return true;
 
-        // Bundle Logic: check if any required item is out of stock (less critical since usually bundle keeps own stock, but if dynamic...)
-        // For now, respect main bundle stock primarily.
+        if (product.has_variants) {
+            // Respect selection data first
+            if (selectedVariantData) {
+                return selectedVariantData.stock <= 0;
+            }
+            // Fallback to selected variant object
+            if (selectedVariant) {
+                return selectedVariant.stock_quantity <= 0;
+            }
+            return true; // Must select something
+        }
 
         if (!product.track_inventory) return false;
-        if (product.has_variants) {
-            if (!selectedVariant) return true; // Must select a variant
-            return selectedVariant.stock_quantity <= 0;
-        }
         return product.stock_quantity <= 0;
-    }, [product, selectedVariant]);
+    }, [product, selectedVariant, selectedVariantData]);
 
     // Calculate effective price (handling discounts)
     const priceData = useMemo(() => {
+        // Use variant-specific price from matrix if available
+        const variantPrice = selectedVariantData?.price;
         const target = selectedVariant || product;
         if (!target) return { price: 0, originalPrice: undefined };
 
-        const rawPrice = Number(target.price) || 0;
+        const rawPrice = variantPrice !== undefined && variantPrice !== null ? Number(variantPrice) : (Number(target.price) || 0);
         let finalPrice = rawPrice;
         let originalPrice = undefined;
 
-        // Apply discount if present
+        // Apply discount if present on the target (product or variant object)
         if (target.discount_amount && Number(target.discount_amount) > 0) {
             const discountAmount = Number(target.discount_amount);
-            originalPrice = rawPrice; // Base price is the 'Original' price
+            originalPrice = rawPrice;
 
             if ((target.discount_type as string) === 'percent' || (target.discount_type as string) === 'percentage') {
                 const percent = discountAmount / 100;
                 finalPrice = rawPrice - (rawPrice * percent);
             } else {
-                // fixed
                 finalPrice = Math.max(0, rawPrice - discountAmount);
             }
         } else if (target.compare_at_price && Number(target.compare_at_price) > rawPrice) {
@@ -161,12 +177,11 @@ export default function ProductDetailsScreen() {
             originalPrice = Number(target.compare_at_price);
         }
 
-        // Return rounded for display
         return {
-            price: finalPrice, // The actual price to pay
-            originalPrice: originalPrice // The strikethrough price (if any)
+            price: finalPrice,
+            originalPrice: originalPrice
         };
-    }, [product, selectedVariant]);
+    }, [product, selectedVariant, selectedVariantData]);
 
     const handleAddToCart = () => {
         if (!product) return;
@@ -422,11 +437,17 @@ export default function ProductDetailsScreen() {
                             />
                         </Animated.View>
 
+                        {product.tags && product.tags.length > 0 && (
+                            <Animated.View entering={FadeInDown.delay(350).duration(600).damping(12)}>
+                                <ProductTags tags={product.tags} />
+                            </Animated.View>
+                        )}
+
                         <Animated.View entering={FadeInDown.delay(400).duration(600).damping(12)}>
                             <ProductSelectors
-                                options={product.options}
-                                variants={product.variants}
-                                onVariantChange={setSelectedVariant}
+                                productOptions={product.product_options}
+                                variantMatrix={product.variant_matrix}
+                                onVariantChange={handleVariantChange}
                             />
                         </Animated.View>
 

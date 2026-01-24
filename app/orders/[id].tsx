@@ -220,16 +220,21 @@ export default function OrderDetailsPage() {
                                     // Logic to find variant info
                                     let variantInfo = [];
 
-                                    // 1. Check direct fields on item
-                                    if (item.size) variantInfo.push(`Size: ${item.size}`);
-                                    if (item.color) variantInfo.push(`Color: ${item.color}`);
+                                    // 1. Check direct NEW field from API
+                                    if (item.option_label) {
+                                        variantInfo.push(item.option_label);
+                                    } else {
+                                        // Fallback to legacy/old fields
+                                        if (item.size) variantInfo.push(`Size: ${item.size}`);
+                                        if (item.color) variantInfo.push(`Color: ${item.color}`);
 
-                                    // 2. Check options object (if parsed)
-                                    if (item.product_options) {
-                                        try {
-                                            const opts = typeof item.product_options === 'string' ? JSON.parse(item.product_options) : item.product_options;
-                                            Object.values(opts).forEach(v => { if (v) variantInfo.push(String(v)) });
-                                        } catch (e) { }
+                                        // 2. Check options object (if parsed)
+                                        if (item.product_options) {
+                                            try {
+                                                const opts = typeof item.product_options === 'string' ? JSON.parse(item.product_options) : item.product_options;
+                                                Object.values(opts).forEach(v => { if (v) variantInfo.push(String(v)) });
+                                            } catch (e) { }
+                                        }
                                     }
 
                                     // 3. Smart Fallback: If product has only ONE variant, assume that's it

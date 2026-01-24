@@ -1,4 +1,4 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry } from '@/types/schema';
 import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
 
 
@@ -117,27 +117,188 @@ function transformProduct(p: any): Product {
         // Brand logo if loaded
         brand: p.brand ? { ...p.brand, logo: fixUrl(p.brand.logo) } : p.brand,
         // Transform Bundle Items if present
-        bundle_items: Array.isArray(p.bundle_items) ? p.bundle_items.map(transformProduct) : []
+        bundle_items: Array.isArray(p.bundle_items) ? p.bundle_items.map(transformProduct) : [],
+        // NEW: Dynamic Variant System
+        product_options: p.product_options || [],
+        variant_matrix: p.variant_matrix || {},
     };
 
-    // Ensure options values are parsed if they come as strings (sometimes API returns json-stringified columns)
-    if (Array.isArray(product.options)) {
-        product.options = product.options.map((opt: any) => ({
-            ...opt,
-            values: Array.isArray(opt.values) ? opt.values : (typeof opt.values === 'string' ? JSON.parse(opt.values) : opt.values)
-        }));
+    // --- FALLBACK: Synthesize NEW fields from OLD if missing ---
+    if (product.product_options.length === 0 && Array.isArray(product.options) && product.options.length > 0) {
+        product.product_options = product.options.map((opt: any) => {
+            const isColor = opt.name.toLowerCase() === 'color' || opt.name.toLowerCase() === 'colour';
+            let values = Array.isArray(opt.values) ? opt.values : (typeof opt.values === 'string' ? JSON.parse(opt.values) : []);
+
+            if (isColor) {
+                // Try to find hex codes in variants for these color values
+                values = values.map((v: any) => {
+                    const name = typeof v === 'object' ? (v.name || v.value) : v;
+                    let hex = typeof v === 'object' ? v.hex : undefined;
+
+                    // Search variants for a matching color and its hex code
+                    if (!hex && product.variants) {
+                        const vMatch = product.variants.find((variant: any) => {
+                            // Check nested option_values first (new system)
+                            if (variant.option_values) {
+                                const ovs = Object.values(variant.option_values);
+                                const match: any = ovs.find((o: any) => (o.name === name || o.value === name));
+                                if (match && (match.code || match.hex || match.hex_color || match.color_hex)) return true;
+                            }
+                            // Check legacy direct fields
+                            return variant.color === name && (variant.color_hex || variant.hex || variant.code || variant.color_code || variant.hex_color);
+                        });
+
+                        if (vMatch) {
+                            if (vMatch.option_values) {
+                                const ovs = Object.values(vMatch.option_values);
+                                const match: any = ovs.find((o: any) => (o.name === name || o.value === name));
+                                hex = match?.code || match?.hex || match?.hex_color || match?.color_hex;
+                            }
+                            hex = hex || vMatch.color_hex || vMatch.hex || vMatch.code || vMatch.color_code || vMatch.hex_color;
+                        }
+                    }
+
+                    // Extra Fallback: Check available_colors if it exists as an object array
+                    if (!hex && Array.isArray(p.available_colors)) {
+                        const acMatch = p.available_colors.find((ac: any) =>
+                            (typeof ac === 'object') && (ac.name === name || ac.value === name) && (ac.hex || ac.code || ac.color_hex)
+                        );
+                        if (acMatch) hex = acMatch.hex || acMatch.code || acMatch.color_hex;
+                    }
+
+                    // Deep fallback to global name-to-hex map if still nothing
+                    if (!hex) {
+                        const parsed = parseColorValue(name);
+                        hex = parsed?.hex;
+                    }
+
+                    return { value: name, hex };
+                });
+            }
+
+            return {
+                name: opt.name,
+                values
+            };
+        });
+    } else if (Array.isArray(product.variants) && product.variants.length > 0) {
+        // Priority 2: Synthesize FULLY DYNAMICally from variants' option_values
+        const dynamicOptions: Record<string, { values: Set<string>, hexMap: Record<string, string> }> = {};
+
+        product.variants.forEach((v: any) => {
+            if (v.option_values && typeof v.option_values === 'object') {
+                Object.entries(v.option_values).forEach(([key, valObj]: [string, any]) => {
+                    // Extract display name (e.g. "Color")
+                    const attrName = (valObj && typeof valObj === 'object' && valObj.attribute)
+                        ? valObj.attribute
+                        : key.charAt(0).toUpperCase() + key.slice(1);
+
+                    if (!dynamicOptions[attrName]) dynamicOptions[attrName] = { values: new Set(), hexMap: {} };
+
+                    const valName = (valObj && typeof valObj === 'object') ? (valObj.name || valObj.value || String(valObj)) : String(valObj);
+                    dynamicOptions[attrName].values.add(valName);
+
+                    const isColor = attrName.toLowerCase().includes('color') || attrName.toLowerCase().includes('colour');
+                    if (isColor && valObj && typeof valObj === 'object') {
+                        const hex = valObj.code || valObj.hex || valObj.color_hex || valObj.hex_color;
+                        if (hex) dynamicOptions[attrName].hexMap[valName] = hex;
+                    }
+                });
+            }
+
+            // Fallback for direct color/size fields if not in option_values
+            if (v.color && !Object.keys(v.option_values || {}).some(k => k.toLowerCase().includes('color'))) {
+                if (!dynamicOptions['Color']) dynamicOptions['Color'] = { values: new Set(), hexMap: {} };
+                dynamicOptions['Color'].values.add(v.color);
+                const hex = v.color_hex || v.hex || v.code || v.hex_color;
+                if (hex) dynamicOptions['Color'].hexMap[v.color] = hex;
+            }
+            if (v.size && !Object.keys(v.option_values || {}).some(k => k.toLowerCase().includes('size'))) {
+                if (!dynamicOptions['Size']) dynamicOptions['Size'] = { values: new Set(), hexMap: {} };
+                dynamicOptions['Size'].values.add(v.size);
+            }
+        });
+
+        product.product_options = Object.entries(dynamicOptions).map(([name, data]) => {
+            const isColor = name.toLowerCase().includes('color') || name.toLowerCase().includes('colour');
+            return {
+                name,
+                values: Array.from(data.values).map(val => {
+                    if (isColor) return { value: val, hex: data.hexMap[val] || parseColorValue(val)?.hex };
+                    return val;
+                })
+            };
+        });
     }
+
+    // Reconstruct variant_matrix if missing OR if it's an array (we need a dictionary)
+    if ((Object.keys(product.variant_matrix).length === 0 || Array.isArray(product.variant_matrix)) && Array.isArray(product.variants) && product.variants.length > 0) {
+        const matrix: Record<string, VariantMatrixEntry> = {};
+        product.variants.forEach((v: any) => {
+            const keyParts: string[] = [];
+            product.product_options.forEach((opt: any) => {
+                const optNameLower = opt.name.toLowerCase();
+
+                // Dynamic extraction from option_values JSON (Preferred)
+                let val = null;
+                if (v.option_values) {
+                    const ovMatch = Object.values(v.option_values).find((o: any) =>
+                        (o && typeof o === 'object' && o.attribute && o.attribute.toLowerCase() === optNameLower) ||
+                        (o && typeof o === 'object' && o.name && o.attribute === opt.name)
+                    ) as any;
+
+                    if (ovMatch) {
+                        val = ovMatch.name || ovMatch.value;
+                    } else {
+                        // Key-based fallback
+                        const directMatch = v.option_values[opt.name] || v.option_values[optNameLower];
+                        if (directMatch) {
+                            val = typeof directMatch === 'object' ? (directMatch.name || directMatch.value) : directMatch;
+                        }
+                    }
+                }
+
+                if (!val) {
+                    val = v[optNameLower] || v[optNameLower === 'colour' ? 'color' : optNameLower];
+                }
+
+                if (val) keyParts.push(String(val));
+            });
+
+            if (keyParts.length > 0) {
+                const key = keyParts.join('|');
+                // Use a fallback for stock fields
+                const variantStock = (v.stock_quantity != null) ? v.stock_quantity : ((v.stock != null) ? v.stock : v.quantity);
+
+                matrix[key] = {
+                    variant_id: v.id,
+                    price: v.price ? parseFloat(v.price) : null,
+                    stock: variantStock != null ? Number(variantStock) : 0,
+                    sku: v.sku
+                };
+            }
+        });
+        product.variant_matrix = matrix;
+    }
+    // --- FINAL NORMALIZATION ---
+    // If we have options, the product MUST be treated as having variants
+    if (product.product_options.length > 0) {
+        product.has_variants = true;
+    }
+    // -----------------------------------------------------------
 
     return product;
 }
 
 function transformVariant(v: any): any {
+    const stock = (v.stock_quantity != null) ? v.stock_quantity : ((v.stock != null) ? v.stock : v.quantity);
     return {
         ...v,
         price: v.price ? parseFloat(v.price) : null,
         compare_at_price: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
         cost_price: v.cost_price ? parseFloat(v.cost_price) : null,
-        image_path: fixUrl(v.image_path)
+        image_path: fixUrl(v.image_path),
+        stock_quantity: stock != null ? Number(stock) : 0
     };
 }
 
@@ -164,6 +325,15 @@ export const api = {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(data)
+        });
+        return handleResponse<{ message: string; access_token: string; user: User }>(res);
+    },
+
+    async googleLogin(token: string) {
+        const res = await fetchWithTimeout(`${BASE_URL}/auth/google`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ token })
         });
         return handleResponse<{ message: string; access_token: string; user: User }>(res);
     },
@@ -694,14 +864,19 @@ export const api = {
         return handleResponse<CartItem[]>(res);
     },
 
-    async addToCart(sessionId: string, productId: number, qty: number, options: any) {
-        const res = await fetchWithTimeout(`${BASE_URL}/cart/add`, {
+    async addToCart(sessionId: string, productId: number, qty: number, variantId?: number | null, options?: any) {
+        const res = await fetchWithTimeout(`${BASE_URL}/cart`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Session-ID': sessionId
             },
-            body: JSON.stringify({ product_id: productId, quantity: qty, options })
+            body: JSON.stringify({
+                product_id: productId,
+                quantity: qty,
+                variant_id: variantId, // NEW: Send variant_id to API
+                options
+            })
         });
         return handleResponse(res);
     },

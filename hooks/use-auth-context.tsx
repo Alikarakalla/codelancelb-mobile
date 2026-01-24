@@ -15,6 +15,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     isLoading: boolean;
     reloadUser: () => Promise<void>;
+    loginWithGoogle: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const loginWithGoogle = async (token: string) => {
+        setIsLoading(true);
+        try {
+            const data = await api.googleLogin(token);
+            await saveAuthSession(data.user, data.access_token);
+        } catch (error) {
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const register = async (userData: any) => {
         setIsLoading(true);
         try {
@@ -121,7 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             register,
             logout,
             isLoading,
-            reloadUser
+            reloadUser,
+            loginWithGoogle
         }}>
             {children}
         </AuthContext.Provider>

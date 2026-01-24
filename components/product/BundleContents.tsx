@@ -70,9 +70,12 @@ export function BundleContents({ items, selections, onSelectionChange }: BundleC
                             {hasVariants && (
                                 <View style={styles.selectorsContainer}>
                                     <ProductSelectors
-                                        options={item.options || []}
-                                        variants={item.variants || []}
-                                        onVariantChange={(variant) => onSelectionChange(item.id, variant)}
+                                        productOptions={item.product_options}
+                                        variantMatrix={item.variant_matrix}
+                                        onVariantChange={(variantId) => {
+                                            const found = item.variants?.find(v => v.id === variantId);
+                                            onSelectionChange(item.id, found || null);
+                                        }}
                                     />
                                 </View>
                             )}

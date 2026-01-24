@@ -1,5 +1,7 @@
 // Helper function to get hex color from color name
-export function getColorHex(colorName: string): string {
+export function getColorHex(colorName: string | null | undefined): string {
+    if (!colorName) return '#94A3B8'; // Default gray if no color name provided
+
     const colorMap: Record<string, string> = {
         'white': '#FFFFFF',
         'black': '#000000',
