@@ -42,7 +42,7 @@ export function SavedAddresses() {
 
     const handleEditAddress = (address: any) => {
         router.push({
-            pathname: '/modal/address',
+            pathname: '/address',
             params: { data: JSON.stringify(address) }
         });
     };
@@ -161,7 +161,7 @@ export function SavedAddresses() {
             <View style={styles.header}>
                 <Text style={styles.title}>Addresses</Text>
                 <Pressable
-                    onPress={() => router.push('/modal/address')}
+                    onPress={() => router.push('/address')}
                     style={styles.addButton}
                 >
                     <MaterialIcons name="add" size={18} color="#18181b" />
@@ -176,7 +176,7 @@ export function SavedAddresses() {
                         <Text style={[styles.address, { marginTop: 16, textAlign: 'center' }]}>No saved addresses yet</Text>
                         <Pressable
                             style={[styles.addButton, { marginTop: 16, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#18181b', borderRadius: 12 }]}
-                            onPress={() => router.push('/modal/address')}
+                            onPress={() => router.push('/address')}
                         >
                             <MaterialIcons name="add" size={18} color="#fff" />
                             <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>Add Address</Text>

@@ -72,6 +72,25 @@ export default function CheckoutScreen() {
         }
     }, [isAuthenticated, user]);
 
+    // Sync phone number with selected address
+    useEffect(() => {
+        if (isUsingSavedAddress && selectedAddressId && addresses.length > 0) {
+            const selectedAddr = addresses.find(a => a.id === selectedAddressId);
+            if (selectedAddr && selectedAddr.phone) {
+                setPhone(selectedAddr.phone);
+            }
+        }
+    }, [selectedAddressId, addresses, isUsingSavedAddress]);
+
+    // Keep PhoneInput component in sync with phone state
+    useEffect(() => {
+        if (phone && phoneRef.current) {
+            // Using a small delay to ensure ref is ready if needed, 
+            // though usually it's fine
+            phoneRef.current.setValue(phone);
+        }
+    }, [phone]);
+
     const loadMyRewards = async () => {
         try {
             const history = await api.getLoyaltyHistory();

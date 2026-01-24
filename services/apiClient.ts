@@ -356,7 +356,7 @@ export const api = {
         return handleResponse<{ message: string }>(res);
     },
 
-    async resetPassword(data: { email: string; token: string; password: string; password_confirmation: string }) {
+    async resetPassword(data: { email: string; token?: string; otp?: string; password: string; password_confirmation: string }) {
         const res = await fetchWithTimeout(`${BASE_URL}/reset-password`, {
             method: 'POST',
             headers: getHeaders(),

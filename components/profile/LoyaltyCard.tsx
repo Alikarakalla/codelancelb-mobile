@@ -196,83 +196,85 @@ export function LoyaltyCard() {
             </View>
 
             {/* Dynamic Card */}
-            <LinearGradient
-                // Utilize the tier color. If it's light (like #E3E3E3), we might want a darker end for gradient or keep it metallic.
-                // Let's mix the tier color with a standard dark shade if usually cards are dark, 
-                // OR just use the tier color. Let's try to trust the color is readable with white text 
-                // OR use a dark overlay. 
-                // Given "Platinum" is #E3e3e3, white text will vanish.
-                // I will add a condition: If tier color is #E3e3e3 (Platinum), use bold black text?
-                // For now, let's stick to a premium design: Dark Card with Tier Color as ACCENT/GLOW?
-                // User said: "change the backgroundcolor of card... based in the tier".
-                // Okay, I will use the color.
-                colors={[tierColor.length === 7 ? tierColor : '#1152d4', '#1e293b']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.card}
-            >
-                {/* Decorative Circles with tier color opacity */}
-                <View style={[styles.circle, styles.topCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
-                <View style={[styles.circle, styles.bottomCircle, { backgroundColor: 'rgba(0,0,0,0.1)' }]} />
+            <Pressable onPress={() => router.push('/loyalty-points')}>
+                <LinearGradient
+                    // Utilize the tier color. If it's light (like #E3E3E3), we might want a darker end for gradient or keep it metallic.
+                    // Let's mix the tier color with a standard dark shade if usually cards are dark, 
+                    // OR just use the tier color. Let's try to trust the color is readable with white text 
+                    // OR use a dark overlay. 
+                    // Given "Platinum" is #E3e3e3, white text will vanish.
+                    // I will add a condition: If tier color is #E3e3e3 (Platinum), use bold black text?
+                    // For now, let's stick to a premium design: Dark Card with Tier Color as ACCENT/GLOW?
+                    // User said: "change the backgroundcolor of card... based in the tier".
+                    // Okay, I will use the color.
+                    colors={[tierColor.length === 7 ? tierColor : '#1152d4', '#1e293b']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
+                >
+                    {/* Decorative Circles with tier color opacity */}
+                    <View style={[styles.circle, styles.topCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+                    <View style={[styles.circle, styles.bottomCircle, { backgroundColor: 'rgba(0,0,0,0.1)' }]} />
 
-                <View style={styles.content}>
-                    <View style={styles.header}>
-                        <View>
-                            <Text style={[styles.label, { color: 'rgba(255,255,255,0.9)' }]}>Current Balance</Text>
-                            <View style={styles.pointsRow}>
-                                <Text style={styles.points}>{points}</Text>
-                                <Text style={[styles.pointsUnit, { color: 'rgba(255,255,255,0.8)' }]}>pts</Text>
+                    <View style={styles.content}>
+                        <View style={styles.header}>
+                            <View>
+                                <Text style={[styles.label, { color: 'rgba(255,255,255,0.9)' }]}>Current Balance</Text>
+                                <View style={styles.pointsRow}>
+                                    <Text style={styles.points}>{points}</Text>
+                                    <Text style={[styles.pointsUnit, { color: 'rgba(255,255,255,0.8)' }]}>pts</Text>
+                                </View>
+                            </View>
+
+                            <View style={[styles.tierBadge, { borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(0,0,0,0.2)' }]}>
+                                {(tierIcon && (tierIcon.includes('.') || tierIcon.includes('/'))) ? (
+                                    <Image
+                                        source={{ uri: fixUrl(tierIcon) || '' }}
+                                        style={{ width: 18, height: 18, resizeMode: 'contain', tintColor: '#fff' }}
+                                    />
+                                ) : (
+                                    <MaterialIcons name={tierIcon as any} size={18} color="#fff" />
+                                )}
+                                <Text style={styles.tierText}>{tierName}</Text>
                             </View>
                         </View>
 
-                        <View style={[styles.tierBadge, { borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(0,0,0,0.2)' }]}>
-                            {(tierIcon && (tierIcon.includes('.') || tierIcon.includes('/'))) ? (
-                                <Image
-                                    source={{ uri: fixUrl(tierIcon) || '' }}
-                                    style={{ width: 18, height: 18, resizeMode: 'contain', tintColor: '#fff' }}
-                                />
-                            ) : (
-                                <MaterialIcons name={tierIcon as any} size={18} color="#fff" />
+                        {/* Features / Benefits Row */}
+                        <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                            {hasFreeShipping && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                                    <MaterialIcons name="local-shipping" size={14} color="#fff" />
+                                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Free Shipping</Text>
+                                </View>
                             )}
-                            <Text style={styles.tierText}>{tierName}</Text>
+                            {multiplier > 1 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                                    <MaterialIcons name="trending-up" size={14} color="#fff" />
+                                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{multiplier}x Earning</Text>
+                                </View>
+                            )}
                         </View>
-                    </View>
 
-                    {/* Features / Benefits Row */}
-                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                        {hasFreeShipping && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                                <MaterialIcons name="local-shipping" size={14} color="#fff" />
-                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Free Shipping</Text>
-                            </View>
-                        )}
-                        {multiplier > 1 && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                                <MaterialIcons name="trending-up" size={14} color="#fff" />
-                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{multiplier}x Earning</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    <View style={styles.progressContainer}>
-                        <View style={styles.progressLabels}>
-                            <Text style={[styles.progressText, { color: 'rgba(255,255,255,0.7)' }]}>
-                                {isMaxTier ? 'Top Tier Reached' : `${points} / ${nextTierPoints} pts`}
-                            </Text>
-                            {!isMaxTier && (
-                                <Text style={[styles.progressText, { color: '#fff', fontWeight: '600' }]}>
-                                    {targetNextTier?.name || 'Next Tier'}
+                        <View style={styles.progressContainer}>
+                            <View style={styles.progressLabels}>
+                                <Text style={[styles.progressText, { color: 'rgba(255,255,255,0.7)' }]}>
+                                    {isMaxTier ? 'Top Tier Reached' : `${points} / ${nextTierPoints} pts`}
                                 </Text>
-                            )}
+                                {!isMaxTier && (
+                                    <Text style={[styles.progressText, { color: '#fff', fontWeight: '600' }]}>
+                                        {targetNextTier?.name || 'Next Tier'}
+                                    </Text>
+                                )}
+                            </View>
+                            <View style={styles.progressBarBg}>
+                                <View style={[styles.progressBarFill, { width: `${progressPercent}%`, backgroundColor: '#fff' }]} />
+                            </View>
                         </View>
-                        <View style={styles.progressBarBg}>
-                            <View style={[styles.progressBarFill, { width: `${progressPercent}%`, backgroundColor: '#fff' }]} />
-                        </View>
-                    </View>
 
-                    {/* Redeem Button Removed as per request */}
-                </View>
-            </LinearGradient>
+                        {/* Redeem Button Removed as per request */}
+                    </View>
+                </LinearGradient>
+            </Pressable>
         </View>
     );
 }

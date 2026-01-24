@@ -5,7 +5,8 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, Stack } from 'expo-router';
-import { CountryPicker } from 'react-native-country-codes-picker';
+import { Dropdown } from 'react-native-element-dropdown/lib/module';
+import { Country } from 'country-state-city';
 import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -33,21 +34,32 @@ export default function SignUpScreen() {
     const [countryCode, setCountryCode] = useState('US');
     const [callingCode, setCallingCode] = useState('1');
     const [loading, setLoading] = useState(false);
-    const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+    const [countries, setCountries] = useState<any[]>([]);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const pwd = watch('password');
 
-    // Auto-detect country based on IP
+    // Load countries on mount
     React.useEffect(() => {
+        const allCountries = Country.getAllCountries().map(c => ({
+            label: `${c.flag} ${c.name}`,
+            value: c.isoCode,
+            phone: c.phonecode.replace('+', ''),
+            name: c.name
+        }));
+        setCountries(allCountries);
+
         const fetchLocation = async () => {
             try {
                 const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
-                if (data.country_code && data.country_calling_code) {
+                if (data.country_code) {
                     setCountryCode(data.country_code);
-                    setCallingCode(data.country_calling_code.replace('+', ''));
+                    const countryObj = Country.getCountryByCode(data.country_code);
+                    if (countryObj) {
+                        setCallingCode(countryObj.phonecode.replace('+', ''));
+                    }
                 }
             } catch (error) {
                 console.log('Error fetching location:', error);
@@ -56,24 +68,7 @@ export default function SignUpScreen() {
         fetchLocation();
     }, []);
 
-    const countryPickerStyle = React.useMemo(() => ({
-        modal: {
-            height: 500,
-            backgroundColor: isDark ? '#000000' : '#ffffff',
-        },
-        countryName: {
-            color: isDark ? '#fff' : '#000',
-        },
-        dialCode: {
-            color: isDark ? '#fff' : '#000',
-            opacity: 0.6,
-        },
-        textInput: {
-            color: isDark ? '#fff' : '#000',
-            backgroundColor: isDark ? '#111' : '#f3f4f6',
-            borderRadius: 8,
-        }
-    }), [isDark]);
+    const [focusedField, setFocusedField] = useState<string | null>(null);
 
     const { register, isAuthenticated } = useAuth();
 
@@ -92,13 +87,23 @@ export default function SignUpScreen() {
 
         setLoading(true);
         try {
+            let purePhone = (data.phone || '').trim().replace(/\s+/g, '');
+            const prefixWithPlus = `+${callingCode}`;
+            const prefixNoPlus = `${callingCode}`;
+
+            if (purePhone.startsWith(prefixWithPlus)) {
+                purePhone = purePhone.substring(prefixWithPlus.length);
+            } else if (purePhone.startsWith(prefixNoPlus) && purePhone.length > callingCode.length) {
+                purePhone = purePhone.substring(prefixNoPlus.length);
+            }
+
             const payload = {
                 name: data.name,
                 email: data.email,
                 password: data.password,
                 password_confirmation: data.confirmPassword, // Field required by Laravel
-                ...(data.phone ? {
-                    phone: `+${callingCode}${data.phone}`,
+                ...(purePhone ? {
+                    phone: `+${callingCode}${purePhone}`,
                     phone_country: countryCode,
                 } : {}),
                 referral_code: data.referralCode || undefined,
@@ -186,13 +191,32 @@ export default function SignUpScreen() {
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>PHONE NUMBER</Text>
                                 <View style={styles.phoneContainer}>
-                                    <Pressable
-                                        style={styles.countryCodeBtn}
-                                        onPress={() => setCountryPickerVisible(true)}
-                                    >
-                                        <Text style={styles.countryCodeText}>{callingCode ? `+${callingCode}` : '+1'}</Text>
-                                        <MaterialIcons name="arrow-drop-down" size={20} color={isDark ? '#fff' : '#000'} />
-                                    </Pressable>
+                                    <Dropdown
+                                        style={[
+                                            styles.countryDropdown,
+                                            focusedField === 'country' && styles.inputFocused
+                                        ]}
+                                        placeholderStyle={styles.placeholderStyle}
+                                        selectedTextStyle={styles.selectedTextStyle}
+                                        inputSearchStyle={styles.inputSearchStyle}
+                                        data={countries}
+                                        search
+                                        maxHeight={300}
+                                        labelField="label"
+                                        valueField="value"
+                                        placeholder="CODE"
+                                        searchPlaceholder="SEARCH..."
+                                        value={countryCode}
+                                        onFocus={() => setFocusedField('country')}
+                                        onBlur={() => setFocusedField(null)}
+                                        onChange={(item: any) => {
+                                            setCountryCode(item.value);
+                                            setCallingCode(item.phone);
+                                        }}
+                                        containerStyle={styles.dropdownContainer}
+                                        itemTextStyle={styles.itemText}
+                                        renderRightIcon={() => null}
+                                    />
                                     <View style={styles.verticalDivider} />
 
                                     <Controller
@@ -201,10 +225,17 @@ export default function SignUpScreen() {
                                         rules={{ required: false }}
                                         render={({ field: { onChange, onBlur, value } }) => (
                                             <TextInput
-                                                style={styles.phoneInput}
+                                                style={[
+                                                    styles.phoneInput,
+                                                    focusedField === 'phone' && styles.inputFocused
+                                                ]}
                                                 placeholder="ENTER PHONE"
                                                 placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
-                                                onBlur={onBlur}
+                                                onBlur={() => {
+                                                    onBlur();
+                                                    setFocusedField(null);
+                                                }}
+                                                onFocus={() => setFocusedField('phone')}
                                                 onChangeText={onChange}
                                                 value={value}
                                                 keyboardType="phone-pad"
@@ -311,18 +342,6 @@ export default function SignUpScreen() {
                     </View>
                 </ScrollView>
 
-                {/* Country Picker Modal */}
-                <CountryPicker
-                    show={countryPickerVisible}
-                    lang={'en'}
-                    pickerButtonOnPress={(item) => {
-                        setCountryCode(item.code);
-                        setCallingCode(item.dial_code.replace('+', ''));
-                        setCountryPickerVisible(false);
-                    }}
-                    onBackdropPress={() => setCountryPickerVisible(false)}
-                    style={countryPickerStyle}
-                />
             </View>
         </KeyboardAvoidingView>
     );
@@ -422,6 +441,43 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 12,
         fontSize: 15,
         fontWeight: '600',
+        color: isDark ? '#fff' : '#000',
+    },
+    inputFocused: {
+        borderColor: isDark ? '#fff' : '#000',
+    },
+    countryDropdown: {
+        width: 100,
+        height: '100%',
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+    },
+    dropdownContainer: {
+        backgroundColor: isDark ? '#111' : '#fff',
+        borderWidth: 1,
+        borderColor: isDark ? '#333' : '#eee',
+        borderRadius: 8,
+    },
+    itemText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: isDark ? '#fff' : '#000',
+    },
+    placeholderStyle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+    },
+    selectedTextStyle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: isDark ? '#fff' : '#000',
+    },
+    inputSearchStyle: {
+        height: 48,
+        fontSize: 14,
+        borderRadius: 8,
+        backgroundColor: isDark ? '#222' : '#f9f9f9',
         color: isDark ? '#fff' : '#000',
     },
     termsContainer: {

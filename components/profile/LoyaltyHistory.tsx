@@ -39,7 +39,7 @@ export function LoyaltyHistory() {
                 <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Points History</Text>
 
                 <Pressable
-                    onPress={() => router.push('/modal/points-history')}
+                    onPress={() => router.push('/loyalty-points')}
                     style={styles.nativeGlassWrapper}
                 >
                     <IconSymbol

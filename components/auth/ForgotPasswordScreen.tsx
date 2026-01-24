@@ -30,17 +30,17 @@ export default function ForgotPasswordScreen() {
             const response = await api.forgotPassword(data.email);
             if (response.message) {
                 Alert.alert(
-                    'EMAIL SENT',
-                    'CHECK YOUR EMAIL FOR THE RESET TOKEN.',
+                    'CODE SENT',
+                    'CHECK YOUR EMAIL FOR THE 6-DIGIT VERIFICATION CODE.',
                     [
                         {
-                            text: 'PROCEED TO RESET',
+                            text: 'VERIFY CODE',
                             onPress: () => router.push({ pathname: '/reset-password', params: { email: data.email } })
                         }
                     ]
                 );
             } else {
-                Alert.alert('ERROR', 'COULD NOT SEND RESET LINK.');
+                Alert.alert('ERROR', 'COULD NOT SEND VERIFICATION CODE.');
             }
         } catch (error: any) {
             console.error('Forgot Password Error:', error);
@@ -95,7 +95,7 @@ export default function ForgotPasswordScreen() {
                             <Text style={styles.title}>FORGOT</Text>
                             <Text style={styles.titleBold}>PASSWORD</Text>
                             <View style={styles.titleUnderline} />
-                            <Text style={styles.subtitle}>ENTER YOUR EMAIL TO RECEIVE A RESET TOKEN</Text>
+                            <Text style={styles.subtitle}>ENTER YOUR EMAIL TO RECEIVE A 6-DIGIT CODE</Text>
                         </View>
 
                         {/* Form Section */}
@@ -128,7 +128,7 @@ export default function ForgotPasswordScreen() {
                                     <ActivityIndicator color={isDark ? '#000' : '#fff'} />
                                 ) : (
                                     <View style={styles.buttonContent}>
-                                        <Text style={styles.submitButtonText}>SEND RESET LINK</Text>
+                                        <Text style={styles.submitButtonText}>GET VERIFICATION CODE</Text>
                                         <MaterialIcons name="arrow-forward" size={20} color={isDark ? '#000' : '#fff'} />
                                     </View>
                                 )}
@@ -138,7 +138,7 @@ export default function ForgotPasswordScreen() {
                         {/* Secondary Options */}
                         <View style={styles.options}>
                             <Pressable onPress={() => router.push('/reset-password')} style={styles.optionItem}>
-                                <Text style={styles.optionText}>ALREADY HAVE A TOKEN?</Text>
+                                <Text style={styles.optionText}>ALREADY HAVE A CODE?</Text>
                             </Pressable>
                         </View>
 
@@ -166,11 +166,24 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingBottom: 40,
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent', // Important: Let the system provide the glass
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 16,
+        // On iOS 26, the system wraps this Pressable in a glass bubble automatically
+        // if it's inside a native header and has a fixed width/height.
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     content: {
         flex: 1,

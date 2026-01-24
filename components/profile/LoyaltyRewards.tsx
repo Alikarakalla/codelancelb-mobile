@@ -38,7 +38,7 @@ export function LoyaltyRewards() {
                 <Text style={[styles.title, { color: isDark ? '#fff' : '#111318' }]}>Rewards</Text>
 
                 <Pressable
-                    onPress={() => router.push('/modal/available-rewards')}
+                    onPress={() => router.push('/rewards')}
                     style={styles.nativeGlassWrapper}
                 >
                     <IconSymbol
@@ -65,7 +65,7 @@ export function LoyaltyRewards() {
                                 styles.card,
                                 { backgroundColor: isDark ? '#1e293b' : '#fff' }
                             ]}
-                            onPress={() => router.push('/modal/available-rewards')}
+                            onPress={() => router.push('/rewards')}
                         >
                             {/* Image Placeholder or Actual Image */}
                             <View style={[styles.rewardImage, { backgroundColor: isDark ? '#0f172a' : '#F1F5F9' }]}>

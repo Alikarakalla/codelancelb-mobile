@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { api } from '@/services/apiClient';
@@ -25,7 +25,7 @@ export default function ResetPasswordScreen() {
     const { control, handleSubmit, watch, setValue } = useForm({
         defaultValues: {
             email: initialEmail,
-            token: initialToken,
+            otp: initialToken, // Using otp field
             password: '',
             confirmPassword: '',
         }
@@ -33,19 +33,29 @@ export default function ResetPasswordScreen() {
 
     useEffect(() => {
         if (initialEmail) setValue('email', initialEmail);
-        if (initialToken) setValue('token', initialToken);
+        if (initialToken) setValue('otp', initialToken);
     }, [initialEmail, initialToken, setValue]);
 
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const pwd = watch('password');
+    const otpValue = watch('otp');
+
+    const otpInputRef = useRef<TextInput>(null);
 
     const onSubmit = async (data: any) => {
+        if (data.otp.length !== 6) {
+            Alert.alert('INVALID CODE', 'PLEASE ENTER THE 6-DIGIT CODE SENT TO YOUR EMAIL.');
+            return;
+        }
+
         setLoading(true);
         try {
+            // Updated to send as 'otp' as per user backend changes
+            // Note: api.resetPassword might need update if it specifically looks for 'token'
             const response = await api.resetPassword({
                 email: data.email,
-                token: data.token,
+                otp: data.otp,
                 password: data.password,
                 password_confirmation: data.confirmPassword,
             });
@@ -60,12 +70,35 @@ export default function ResetPasswordScreen() {
         } catch (error: any) {
             console.error('Reset Password Error:', error);
             const errorMessage = error.message?.includes('422')
-                ? 'INVALID TOKEN OR PASSWORDS DO NOT MATCH.'
-                : 'SOMETHING WENT WRONG. PLEASE CHECK YOUR TOKEN AND TRY AGAIN.';
+                ? 'INVALID CODE OR PASSWORDS DO NOT MATCH.'
+                : 'SOMETHING WENT WRONG. PLEASE CHECK YOUR CODE AND TRY AGAIN.';
             Alert.alert('RESET FAILED', errorMessage);
         } finally {
             setLoading(false);
         }
+    };
+
+    const renderOtpBoxes = () => {
+        const boxes = [];
+        for (let i = 0; i < 6; i++) {
+            const digit = otpValue?.[i] || '';
+            const isFocused = otpValue?.length === i || (i === 5 && otpValue?.length === 6);
+            boxes.push(
+                <View
+                    key={i}
+                    style={[
+                        styles.otpBox,
+                        digit !== '' && styles.otpBoxFilled,
+                        isFocused && styles.otpBoxFocused
+                    ]}
+                >
+                    <Text style={[styles.otpText, isFocused && styles.otpTextFocused]}>
+                        {digit}
+                    </Text>
+                </View>
+            );
+        }
+        return boxes;
     };
 
     return (
@@ -102,10 +135,10 @@ export default function ResetPasswordScreen() {
                     <View style={styles.content}>
                         {/* Minimalist Header */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>RESET</Text>
-                            <Text style={styles.titleBold}>PASSWORD</Text>
+                            <Text style={styles.title}>VERIFY</Text>
+                            <Text style={styles.titleBold}>ACCOUNT</Text>
                             <View style={styles.titleUnderline} />
-                            <Text style={styles.subtitle}>ENTER YOUR CODE AND NEW PASSWORD</Text>
+                            <Text style={styles.subtitle}>PLEASE ENTER THE 6-DIGIT CODE SENT TO YOUR EMAIL</Text>
                         </View>
 
                         {/* Form Section */}
@@ -113,21 +146,55 @@ export default function ResetPasswordScreen() {
                             <FormInput
                                 control={control}
                                 name="email"
-                                label="EMAIL"
+                                label="CONFIRM EMAIL"
                                 placeholder="YOUR@EMAIL.COM"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 rules={{ required: 'Email is required' }}
                             />
 
-                            <FormInput
-                                control={control}
-                                name="token"
-                                label="RESET TOKEN"
-                                placeholder="ENTER CODE FROM EMAIL"
-                                autoCapitalize="none"
-                                rules={{ required: 'Token is required' }}
-                            />
+                            <View style={styles.otpContainer}>
+                                <View style={styles.labelRow}>
+                                    <Text style={styles.label}>6-DIGIT CODE</Text>
+                                    <Pressable onPress={() => {
+                                        Alert.alert('CODE RESENT', 'WE HAVE SENT A NEW CODE TO YOUR EMAIL.');
+                                        // Logic to call api.forgotPassword(email) again
+                                        api.forgotPassword(watch('email')).catch(e => console.log('Resend failed', e));
+                                    }}>
+                                        <Text style={styles.resendText}>RESEND CODE</Text>
+                                    </Pressable>
+                                </View>
+                                <View style={styles.inputWrapper}>
+                                    <Pressable
+                                        style={styles.otpBoxesWrapper}
+                                        onPress={() => otpInputRef.current?.focus()}
+                                    >
+                                        {renderOtpBoxes()}
+                                    </Pressable>
+
+                                    <Controller
+                                        control={control}
+                                        name="otp"
+                                        render={({ field: { onChange, value } }) => (
+                                            <TextInput
+                                                ref={otpInputRef}
+                                                value={value}
+                                                onChangeText={(text) => {
+                                                    const numericValue = text.replace(/[^0-9]/g, '');
+                                                    if (numericValue.length <= 6) onChange(numericValue);
+                                                }}
+                                                keyboardType="number-pad"
+                                                textContentType="oneTimeCode"
+                                                autoComplete="one-time-code"
+                                                style={styles.hiddenInput}
+                                                maxLength={6}
+                                                caretHidden={true}
+                                                selectionColor="transparent"
+                                            />
+                                        )}
+                                    />
+                                </View>
+                            </View>
 
                             <FormInput
                                 control={control}
@@ -205,11 +272,22 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingBottom: 40,
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: 20,
+        height: 20,
+        borderRadius: 50,
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 16,
+        ...Platform.select({
+            ios: {
+                shadowColor: 'transparent',
+                marginHorizontal: 8,
+            },
+            android: {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                marginHorizontal: 8,
+            }
+        })
     },
     content: {
         flex: 1,
@@ -248,6 +326,72 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     },
     form: {
         gap: 12,
+    },
+    label: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        marginBottom: 8,
+        letterSpacing: 1,
+    },
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    resendText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+        textDecorationLine: 'underline',
+        opacity: 0.8,
+    },
+    otpContainer: {
+        marginBottom: 16,
+    },
+    otpBoxesWrapper: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    otpBox: {
+        flex: 1,
+        height: 64,
+        borderWidth: 2,
+        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: isDark ? '#000' : '#fff',
+    },
+    otpBoxFilled: {
+        borderColor: isDark ? '#fff' : '#000',
+        backgroundColor: isDark ? '#111' : '#f9f9f9',
+    },
+    otpBoxFocused: {
+        borderColor: isDark ? '#fff' : '#000',
+        borderWidth: 3,
+        transform: [{ scale: 1.05 }],
+    },
+    otpText: {
+        fontSize: 26,
+        fontWeight: '900',
+        color: isDark ? '#fff' : '#000',
+    },
+    otpTextFocused: {
+        opacity: 0.3,
+    },
+    inputWrapper: {
+        position: 'relative',
+        height: 64, // Same as otpBox height
+    },
+    hiddenInput: {
+        ...StyleSheet.absoluteFillObject,
+        opacity: 0.01,
+        color: 'transparent',
+        fontSize: 1,
+        backgroundColor: 'transparent',
     },
     submitButton: {
         height: 64,
