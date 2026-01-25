@@ -344,3 +344,17 @@ export interface LoyaltyLog {
     description?: string;
     created_at: string;
 }
+
+export interface HomeSection {
+    id: string;
+    type: 'hero' | 'flash_sales' | 'categories' | 'featured_new' | 'highlights' | 'makeup' | 'fragrances' | 'must_have_brands' | 'banners' | 'category_carousels' | 'product_strip' | 'features';
+    sort_order: number;
+    title?: string;
+    subtitle?: string;
+    show_header?: boolean;
+    data: any;
+}
+
+export interface HomeResponse {
+    sections: HomeSection[];
+}

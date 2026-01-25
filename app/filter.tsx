@@ -299,7 +299,7 @@ const CategoryNode = memo(({
     category: Category,
     selectedIds: number[],
     expandedIds: number[],
-    onSelect: (id: number) => void,
+    onSelect: (category: Category) => void,
     onExpand: (id: number) => void,
     isDark: boolean,
     level?: number
@@ -319,7 +319,7 @@ const CategoryNode = memo(({
                 {/* Select Action Area */}
                 <Pressable
                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingLeft: 8 }}
-                    onPress={() => onSelect(category.id)}
+                    onPress={() => onSelect(category)}
                 >
                     <View style={[
                         styles.checkbox,
@@ -456,7 +456,8 @@ export default function FilterPage() {
         router.dismiss();
     };
 
-    const handleCategorySelect = useCallback((id: number) => {
+    const handleCategorySelect = useCallback((category: Category) => {
+        const id = category.id;
         const prev = filters.categoryIds;
         const isSelected = prev.includes(id);
         const newIds = isSelected ? prev.filter(cid => cid !== id) : [...prev, id];

@@ -1,4 +1,4 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse } from '@/types/schema';
 import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
 
 
@@ -20,11 +20,17 @@ export const setApiToken = (token: string | null) => {
     apiToken = token;
 };
 
+let currentLocale = 'en';
+export const setLocale = (lang: string) => {
+    currentLocale = lang;
+};
+
 // Helper to get headers
 function getHeaders(extraHeaders: Record<string, string> = {}) {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Accept-Language': currentLocale,
         'X-Requested-With': 'XMLHttpRequest',
         ...extraHeaders,
         'X-API-Key': 'sk_kiTY7EJfsNncJ4UNJowb5jkfibZXiK7iDtXVMdRDw5ROvE03'.trim(),
@@ -602,6 +608,18 @@ export const api = {
     },
 
 
+
+    async getHomeData(): Promise<HomeResponse> {
+        try {
+            const res = await fetchWithTimeout(`${BASE_URL}/home`, { headers: getHeaders() });
+            const data = await handleResponse<HomeResponse>(res);
+            return data;
+        } catch (err) {
+            console.error('Error fetching home data:', err);
+            // Return empty structure on failure so UI handles it gracefully
+            return { sections: [] };
+        }
+    },
 
     // --- Products ---
     async getProducts(params: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { StyleSheet, View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -14,7 +14,7 @@ import { PromoBanner } from '@/components/home/PromoBanner';
 import { BrandSlider } from '@/components/home/BrandSlider';
 import { StorefrontBanner } from '@/components/home/StorefrontBanner';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
-import { Product, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature } from '@/types/schema';
+import { Product, HomeSection } from '@/types/schema';
 import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import Animated, {
   useSharedValue,
@@ -23,59 +23,35 @@ import Animated, {
 import { RevealingSection } from '@/components/home/RevealingSection';
 import { api } from '@/services/apiClient';
 
-// Mock slides for initial render / API fallback
-
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('Featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
 
-  const [slides, setSlides] = useState<CarouselSlide[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [highlights, setHighlights] = useState<HighlightSection[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [features, setFeatures] = useState<CMSFeature[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [latestProducts, setLatestProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sections, setSections] = useState<HomeSection[]>([]);
+
+  // Tabbed Section State (Local to the screen for now, could be in the component)
+  const [activeTabMap, setActiveTabMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Load data from API
     const loadData = async () => {
       try {
-        const [apiSlides, apiCategories, apiHighlights, apiBrands, apiBanners, apiFeatures, apiFeatured, apiLatest] = await Promise.all([
-          api.getCarouselSlides(),
-          api.getCategories(),
-          api.getHighlightSections(),
-          api.getBrands(),
-          api.getBanners(),
-          api.getCMSFeatures(),
-          api.getProducts({ is_featured: true, limit: 10 }),
-          api.getProducts({ limit: 10 }) // latest
-        ]);
-
-        if (apiSlides && apiSlides.length > 0) setSlides(apiSlides);
-        if (apiCategories && apiCategories.length > 0) setCategories(apiCategories as any);
-        if (apiHighlights && apiHighlights.length > 0) setHighlights(apiHighlights as any);
-        if (apiBrands && apiBrands.length > 0) setBrands(apiBrands as any);
-        if (apiBanners && apiBanners.length > 0) setBanners(apiBanners as any);
-        if (apiFeatures && apiFeatures.length > 0) setFeatures(apiFeatures as any);
-        if (apiFeatured && apiFeatured.length > 0) setFeaturedProducts(apiFeatured);
-        if (apiLatest && apiLatest.length > 0) setLatestProducts(apiLatest);
+        const response = await api.getHomeData();
+        if (response && response.sections) {
+          setSections(response.sections);
+        }
       } catch (error) {
-        console.error('Failed to load home data', error);
+        console.error('Failed to load home config', error);
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
   }, []);
-
-  const displayFeatured = featuredProducts;
-  const displayLatest = latestProducts;
 
   const handleProductPress = (product: Product) => {
     router.push({
@@ -85,12 +61,157 @@ export default function HomeScreen() {
   };
 
   const scrollY = useSharedValue(0);
-
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y;
     },
   });
+
+  const renderSection = (section: HomeSection, index: number) => {
+    // Animation type can be varied based on index or type
+    const animType = index === 0 ? 'fade-up' : 'reveal';
+
+    // Helper to wrap components in RevealingSection
+    const Wrapper = ({ children, style }: { children: React.ReactNode, style?: any }) => (
+      <RevealingSection key={section.id} scrollY={scrollY} index={index} animationType={animType} style={style}>
+        {children}
+      </RevealingSection>
+    );
+
+    switch (section.type) {
+      case 'hero':
+        return (
+          <React.Fragment key={section.id}>
+            <Wrapper>
+              <HeroSlider slides={section.data} onIndexChange={setCurrentHeroIndex} />
+            </Wrapper>
+            {/* Summary is coupled to Hero, usually rendered right after. 
+                            If API sends them together, great. If not, we might need to assume it goes here.
+                            For now, assuming section.data is the slides array. 
+                        */}
+            <RevealingSection scrollY={scrollY} index={index + 0.5} animationType="reveal">
+              <HeroCarouselSummary slides={section.data} activeIndex={currentHeroIndex} />
+            </RevealingSection>
+          </React.Fragment>
+        );
+
+      case 'categories':
+        return (
+          <Wrapper style={{ marginTop: 20 }}>
+            <PremiumCategoryGrid scrollY={scrollY} categories={section.data} />
+          </Wrapper>
+        );
+
+      case 'highlights':
+        // Assuming data is array, we take the first one or map all?
+        // Existing code took the first one `highlights[0]`.
+        // Let's support mapping if multiple, or just one.
+        const highlights = Array.isArray(section.data) ? section.data : [section.data];
+        return (
+          <React.Fragment key={section.id}>
+            {highlights.map((h: any, i: number) => (
+              <RevealingSection key={`${section.id}-${i}`} scrollY={scrollY} index={index} animationType="none" style={styles.promoSection}>
+                {(progress) => <PromoBanner progress={progress} section={h} />}
+              </RevealingSection>
+            ))}
+          </React.Fragment>
+        );
+
+      case 'featured_new':
+        // This section expects an object { featured: Product[], new_arrivals: Product[] }
+        // or generic tabs.
+        // Adapting HomeQuickTabs logic:
+        const tabs = ['JUST LANDED', 'FEATURED'];
+        const currentTab = activeTabMap[section.id] || 'JUST LANDED';
+
+        // section.data might look like { featured: [...], new_arrivals: [...] }
+        // We map 'JUST LANDED' -> new_arrivals, 'FEATURED' -> featured
+        const products = currentTab === 'JUST LANDED'
+          ? (section.data.new_arrivals || [])
+          : (section.data.featured || []);
+
+        return (
+          <Wrapper>
+            <HomeQuickTabs
+              tabs={tabs}
+              activeTab={currentTab}
+              onChange={(tab) => {
+                // Map UI tab names to internal state keys if needed, 
+                // or just store the UI string.
+                setActiveTabMap(prev => ({ ...prev, [section.id]: tab }));
+              }}
+            />
+            <HorizontalProductSlider
+              products={products}
+              onProductPress={handleProductPress}
+            />
+          </Wrapper>
+        );
+
+      case 'must_have_brands':
+        return (
+          <Wrapper>
+            <BrandSlider scrollY={scrollY} brands={section.data} />
+          </Wrapper>
+        );
+
+      case 'banners':
+        // Full width banner
+        const banners = Array.isArray(section.data) ? section.data : [section.data];
+        return (
+          <React.Fragment key={section.id}>
+            {banners.map((b: any, i: number) => (
+              <Wrapper key={`${section.id}-${i}`}>
+                <StorefrontBanner scrollY={scrollY} banner={b} />
+              </Wrapper>
+            ))}
+          </React.Fragment>
+        );
+
+      // NEW CASES (Mapped to existing components loosely)
+      case 'makeup':
+      case 'fragrances':
+      case 'product_strip':
+        // Horizontal list with a title
+        return (
+          <Wrapper style={{ marginVertical: 20 }}>
+            {section.title && (
+              <View style={{ paddingHorizontal: 24, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+                {/* Optional: View All link */}
+              </View>
+            )}
+            <HorizontalProductSlider
+              products={section.data}
+              onProductPress={handleProductPress}
+            />
+          </Wrapper>
+        );
+
+      // case 'flash_sales': 
+      //    return <FlashSaleSection ... /> (Not yet implemented, skipping or using placeholder)
+
+      default:
+        // If it helps, we can render FeaturesSection at the end if strict mapping isn't found
+        // or if it matches a specific type.
+        if (section.type === 'features' || section.id === 'features') { // Assuming type might differ
+          return (
+            <Wrapper>
+              <FeaturesSection features={section.data} />
+            </Wrapper>
+          )
+        }
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
@@ -106,51 +227,11 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <RevealingSection scrollY={scrollY} index={0} animationType="fade-up">
-          <HeroSlider slides={slides} onIndexChange={setCurrentHeroIndex} />
-        </RevealingSection>
+        {/* Dynamically Render Sections */}
+        {sections.map((section, index) => renderSection(section, index))}
 
-        <RevealingSection scrollY={scrollY} index={0.5} animationType="reveal">
-          <HeroCarouselSummary slides={slides} activeIndex={currentHeroIndex} />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={1} animationType="reveal" style={{ marginTop: 20 }}>
-          <PremiumCategoryGrid scrollY={scrollY} categories={categories} />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={2} animationType="none" style={styles.promoSection}>
-          {(progress) => <PromoBanner progress={progress} section={highlights.length > 0 ? highlights[0] : undefined} />}
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={3} animationType="zoom-in">
-          <HomeQuickTabs
-            tabs={['JUST LANDED', 'FEATURED']}
-            activeTab={activeTab === 'Latest' ? 'JUST LANDED' : (activeTab === 'Featured' ? 'FEATURED' : activeTab)}
-            onChange={(tab) => {
-              if (tab === 'JUST LANDED') setActiveTab('Latest');
-              else if (tab === 'FEATURED') setActiveTab('Featured');
-              else setActiveTab(tab);
-            }}
-          />
-          <HorizontalProductSlider
-            products={activeTab === 'Featured' ? displayFeatured : displayLatest}
-            onProductPress={handleProductPress}
-          />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={4} animationType="slide-right">
-          <BrandSlider scrollY={scrollY} brands={brands} />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={5} animationType="fade-up">
-          <StorefrontBanner scrollY={scrollY} banner={banners.length > 0 ? banners[0] : undefined} />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={6} animationType="reveal">
-          <FeaturesSection features={features} />
-        </RevealingSection>
-
-        <RevealingSection scrollY={scrollY} index={7} animationType="fade-up">
+        {/* Always show Footer at the bottom */}
+        <RevealingSection scrollY={scrollY} index={sections.length + 1} animationType="fade-up">
           <View style={[styles.footer, isDark && { backgroundColor: '#111' }]}>
             <Pressable
               onPress={() => router.push('/shop')}
@@ -193,6 +274,13 @@ const styles = StyleSheet.create({
   },
   promoSection: {
     marginVertical: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   footer: {
     paddingHorizontal: 20,
