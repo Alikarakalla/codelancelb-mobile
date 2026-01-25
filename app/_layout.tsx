@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, Platform } from 'react-native';
@@ -16,6 +16,7 @@ import { api } from '@/services/apiClient';
 import 'react-native-reanimated';
 import SplashScreen from '@/components/ui/SplashScreen';
 import { FilterProvider } from '@/context/FilterContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 ExpoSplashScreen.preventAutoHideAsync();
 
@@ -27,6 +28,20 @@ export default function RootLayout() {
   useEffect(() => {
     preloadAppData();
   }, []);
+
+  // Notification Setup
+  const { expoPushToken, notification, lastNotificationResponse } = usePushNotifications();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (lastNotificationResponse) {
+      const data = lastNotificationResponse.notification.request.content.data;
+      if (data?.url) {
+        // Handle deep link from notification
+        router.push(data.url as any);
+      }
+    }
+  }, [lastNotificationResponse]);
 
   const preloadAppData = async () => {
     try {
@@ -59,12 +74,11 @@ export default function RootLayout() {
     return null;
   }
 
-
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="auto" />
       <AuthProvider>
+        <NotificationSync expoPushToken={expoPushToken} />
         <CurrencyProvider>
           <WishlistProvider>
             <CartProvider>
@@ -102,4 +116,24 @@ export default function RootLayout() {
       </AuthProvider>
     </GestureHandlerRootView>
   );
+}
+
+/**
+ * Helper component to sync push token with backend.
+ * Placed inside AuthProvider to access user auth state.
+ */
+function NotificationSync({ expoPushToken }: { expoPushToken?: string }) {
+  const { token, isAuthenticated } = require('@/hooks/use-auth-context').useAuth();
+
+  useEffect(() => {
+    if (expoPushToken) {
+      // Re-sync whenever token (login/logout) or push token changes
+      console.log(`Syncing push token (Auth: ${isAuthenticated ? 'Yes' : 'No'})`);
+      api.updatePushToken(expoPushToken).catch(err => {
+        console.error("Failed to sync push token:", err);
+      });
+    }
+  }, [expoPushToken, token]);
+
+  return null;
 }

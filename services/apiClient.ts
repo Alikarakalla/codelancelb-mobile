@@ -344,6 +344,20 @@ export const api = {
         return handleResponse<{ message: string; access_token: string; user: User }>(res);
     },
 
+    async updatePushToken(token: string) {
+        const deviceId = await require('@/utils/device').getDeviceId();
+        const res = await fetchWithTimeout(`${BASE_URL}/notifications/token`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+                token: token,
+                platform: require('react-native').Platform.OS,
+                device_id: deviceId
+            })
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
     async logout() {
         if (!apiToken) return;
         const res = await fetchWithTimeout(`${BASE_URL}/logout`, {
