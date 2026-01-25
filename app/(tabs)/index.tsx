@@ -14,6 +14,7 @@ import { PromoBanner } from '@/components/home/PromoBanner';
 import { BrandSlider } from '@/components/home/BrandSlider';
 import { StorefrontBanner } from '@/components/home/StorefrontBanner';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
+import { CategoryCompositeSection } from '@/components/home/CategoryCompositeSection';
 import { Product, HomeSection } from '@/types/schema';
 import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import Animated, {
@@ -97,7 +98,7 @@ export default function HomeScreen() {
 
       case 'categories':
         return (
-          <Wrapper style={{ marginTop: 20 }}>
+          <Wrapper key={section.id} style={{ marginTop: 20 }}>
             <PremiumCategoryGrid scrollY={scrollY} categories={section.data} />
           </Wrapper>
         );
@@ -131,7 +132,7 @@ export default function HomeScreen() {
           : (section.data.featured || []);
 
         return (
-          <Wrapper>
+          <Wrapper key={section.id}>
             <HomeQuickTabs
               tabs={tabs}
               activeTab={currentTab}
@@ -150,7 +151,7 @@ export default function HomeScreen() {
 
       case 'must_have_brands':
         return (
-          <Wrapper>
+          <Wrapper key={section.id}>
             <BrandSlider scrollY={scrollY} brands={section.data} />
           </Wrapper>
         );
@@ -174,7 +175,7 @@ export default function HomeScreen() {
       case 'product_strip':
         // Horizontal list with a title
         return (
-          <Wrapper style={{ marginVertical: 20 }}>
+          <Wrapper key={section.id} style={{ marginVertical: 20 }}>
             {section.title && (
               <View style={{ paddingHorizontal: 24, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -191,12 +192,27 @@ export default function HomeScreen() {
       // case 'flash_sales': 
       //    return <FlashSaleSection ... /> (Not yet implemented, skipping or using placeholder)
 
+      case 'category_carousels':
+        const catSections = Array.isArray(section.data) ? section.data : [section.data];
+        return (
+          <React.Fragment key={section.id}>
+            {catSections.map((catData: any, i: number) => (
+              <Wrapper key={catData.id ? `cat-${catData.id}` : `${section.id}-${i}`} style={{ marginVertical: 12 }}>
+                <CategoryCompositeSection
+                  data={catData}
+                  onProductPress={handleProductPress}
+                />
+              </Wrapper>
+            ))}
+          </React.Fragment>
+        );
+
       default:
         // If it helps, we can render FeaturesSection at the end if strict mapping isn't found
         // or if it matches a specific type.
         if (section.type === 'features' || section.id === 'features') { // Assuming type might differ
           return (
-            <Wrapper>
+            <Wrapper key={section.id}>
               <FeaturesSection features={section.data} />
             </Wrapper>
           )

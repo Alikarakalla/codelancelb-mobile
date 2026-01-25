@@ -613,7 +613,40 @@ export const api = {
         try {
             const res = await fetchWithTimeout(`${BASE_URL}/home`, { headers: getHeaders() });
             const data = await handleResponse<HomeResponse>(res);
+
+            // Recursively transform products in various sections
+            data.sections = data.sections.map(section => {
+                // Case: category_carousels
+                if (section.type === 'category_carousels') {
+                    // data can be array or object. usually array of sections
+                    const items = Array.isArray(section.data) ? section.data : [section.data];
+                    section.data = items.map((item: any) => ({
+                        ...item,
+                        products: Array.isArray(item.products) ? item.products.map((p: any) => transformProduct(p)) : []
+                    }));
+                    return section;
+                }
+
+                // Case: featured_new, product_strip, makeup, fragrances...
+                // Check if data is array of products
+                if (Array.isArray(section.data) && section.data.length > 0 && (section.data[0].product_options || section.data[0].updated_at || section.data[0].price)) {
+                    // It looks like a product list
+                    section.data = section.data.map((p: any) => transformProduct(p));
+                    return section;
+                }
+
+                // Case: featured_new as object { featured: [...], new_arrivals: [...] }
+                if (section.type === 'featured_new' && !Array.isArray(section.data) && typeof section.data === 'object') {
+                    if (section.data.featured) section.data.featured = section.data.featured.map(transformProduct);
+                    if (section.data.new_arrivals) section.data.new_arrivals = section.data.new_arrivals.map(transformProduct);
+                    return section;
+                }
+
+                return section;
+            });
+
             return data;
+
         } catch (err) {
             console.error('Error fetching home data:', err);
             // Return empty structure on failure so UI handles it gracefully
