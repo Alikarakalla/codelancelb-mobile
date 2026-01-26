@@ -11,18 +11,28 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 interface AddToCartFooterProps {
     onAddToCart: () => void;
     onToggleWishlist?: () => void;
+    onNotifyMe?: () => void;
+    isJoinedWaitlist?: boolean;
     isWishlisted?: boolean;
     disabled?: boolean;
     price?: number;
     originalPrice?: number;
 }
 
-export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, disabled, price, originalPrice }: AddToCartFooterProps) {
+export function AddToCartFooter({
+    onAddToCart,
+    onToggleWishlist,
+    onNotifyMe,
+    isJoinedWaitlist,
+    isWishlisted,
+    disabled,
+    price,
+    originalPrice
+}: AddToCartFooterProps) {
     const [quantity, setQuantity] = React.useState(1);
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-
 
     const { triggerCartAnimation } = useCartAnimation();
 
@@ -34,35 +44,27 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
     return (
         <View style={[styles.outerContainer, isDark && { backgroundColor: '#111' }]}>
             <View style={styles.container}>
-                {/* Quantity Selector */}
-                <View style={[styles.quantityBox, isDark && { backgroundColor: '#000', borderColor: '#333' }]}>
-                    <Pressable onPress={decrement} style={styles.qtyBtn}>
-                        <Ionicons name="remove" size={16} color={isDark ? "#fff" : "#1F2937"} />
-                    </Pressable>
-                    <Text style={[styles.qtyText, isDark && { color: '#fff' }]}>{quantity}</Text>
-                    <Pressable onPress={increment} style={styles.qtyBtn}>
-                        <Ionicons name="add" size={16} color={isDark ? "#fff" : "#1F2937"} />
-                    </Pressable>
-                </View>
+                {/* Quantity Selector - Hidden if Out of Stock */}
+                {!disabled && (
+                    <View style={[styles.quantityBox, isDark && { backgroundColor: '#000', borderColor: '#333' }]}>
+                        <Pressable onPress={decrement} style={styles.qtyBtn}>
+                            <Ionicons name="remove" size={16} color={isDark ? "#fff" : "#1F2937"} />
+                        </Pressable>
+                        <Text style={[styles.qtyText, isDark && { color: '#fff' }]}>{quantity}</Text>
+                        <Pressable onPress={increment} style={styles.qtyBtn}>
+                            <Ionicons name="add" size={16} color={isDark ? "#fff" : "#1F2937"} />
+                        </Pressable>
+                    </View>
+                )}
 
-                {/* Optional Price Display (if layout allows, else keeping strictly buttons)
-                   User requested "handle discount price in product page", usually Top Info handles this.
-                   But if footer is sticky, showing price here helps. 
-                   Checking layout: It's a row. Adding text might crowd it.
-                   ProductInfo already shows price.
-                   I will keep the interface update to fix the TS error, and maybe just use price for logic if needed later.
-                   But wait, user said "handle the discount price in product page".
-                   The calculation in [id].tsx already updates <ProductInfo />.
-                   So visually it is handled there.
-                   I am just fixing the TS error here by adding the prop to the interface (DONE).
-                   I won't clutter the footer unless asked specifically.
-                   Actually, let's pass originalPrice to destructured props to be clean.
-                */}
-
-                {/* Add to Cart Button */}
+                {/* Add to Cart / Notify Me Button */}
                 <Pressable
                     onPress={() => {
-                        if (disabled) return;
+                        if (disabled) {
+                            if (!isJoinedWaitlist) onNotifyMe?.();
+                            return;
+                        }
+
                         if (cartButtonRef.current) {
                             requestAnimationFrame(() => {
                                 cartButtonRef.current?.measure((x, y, w, h, px, py) => {
@@ -76,29 +78,29 @@ export function AddToCartFooter({ onAddToCart, onToggleWishlist, isWishlisted, d
                             onAddToCart?.();
                         }
                     }}
-                    disabled={disabled}
+                    disabled={disabled && isJoinedWaitlist}
                     style={({ pressed }) => [
                         styles.cartButton,
                         isDark && { backgroundColor: '#fff' },
-                        pressed && !disabled && styles.pressedOpacity,
-                        disabled && styles.disabledButton,
-                        disabled && isDark && { backgroundColor: '#333' }
+                        pressed && (!disabled || !isJoinedWaitlist) && styles.pressedOpacity,
+                        disabled && !isJoinedWaitlist && styles.notifyButton,
+                        disabled && isJoinedWaitlist && styles.disabledButton,
+                        disabled && isJoinedWaitlist && isDark && { backgroundColor: '#333' }
                     ]}
                     ref={cartButtonRef}
                 >
                     <Text style={[
                         styles.cartText,
                         isDark && { color: '#000' },
-                        disabled && styles.disabledText,
-                        disabled && isDark && { color: '#666' }
+                        disabled && isJoinedWaitlist && styles.disabledText,
+                        disabled && isJoinedWaitlist && isDark && { color: '#666' },
+                        disabled && !isJoinedWaitlist && styles.notifyText
                     ]}>
-                        {disabled ? 'OUT OF STOCK' : 'ADD TO CART'}
+                        {disabled
+                            ? (isJoinedWaitlist ? 'JOINED WAITING LIST' : 'NOTIFY ME WHEN AVAILABLE')
+                            : 'ADD TO CART'}
                     </Text>
                 </Pressable>
-
-
-
-
             </View>
         </View>
     );
@@ -162,6 +164,14 @@ const styles = StyleSheet.create({
     },
     disabledText: {
         color: '#9CA3AF',
+    },
+    notifyButton: {
+        backgroundColor: '#000',
+        borderWidth: 1,
+        borderColor: '#000',
+    },
+    notifyText: {
+        color: '#fff',
     },
     iconBtn: {
         width: 48,

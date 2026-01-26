@@ -16,11 +16,12 @@ import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { AddToCartFooter } from '@/components/product/AddToCartFooter';
 import { BundleContents } from '@/components/product/BundleContents';
-
 import { api } from '@/services/apiClient';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
+import { useAuth } from '@/hooks/use-auth-context';
 import { useCart } from '@/hooks/use-cart-context';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export default function ProductDetailsScreen() {
     const { id, initialImage } = useLocalSearchParams();
@@ -34,9 +35,13 @@ export default function ProductDetailsScreen() {
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
     const [selectedVariantData, setSelectedVariantData] = useState<any>(null); // From matrix
     const [bundleSelections, setBundleSelections] = useState<Record<number, ProductVariant | null>>({});
+    const [isJoinedWaitlist, setIsJoinedWaitlist] = useState(false);
+    const [waitlistRefreshTrigger, setWaitlistRefreshTrigger] = useState(0);
+    const { expoPushToken } = usePushNotifications();
 
     const { addToCart, cartCount } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+    const { user } = useAuth();
 
     useEffect(() => {
         if (id) {
@@ -78,6 +83,23 @@ export default function ProductDetailsScreen() {
             fetchProduct();
         }
     }, [id]);
+
+    const handleNotifyMe = async () => {
+        if (!product) return;
+        try {
+            await api.joinWaitlist({
+                product_id: product.id,
+                product_variant_id: selectedVariant?.id,
+                email: user?.email,
+                push_token: expoPushToken
+            });
+            setIsJoinedWaitlist(true);
+            setWaitlistRefreshTrigger(prev => prev + 1); // Force re-check to confirm backend state
+            Alert.alert('Success', 'You have been added to the waiting list. We will notify you as soon as this item is back in stock!');
+        } catch (error: any) {
+            Alert.alert('Error', error.status === 401 ? 'Please log in to join the waiting list.' : 'Failed to join the waiting list. Please try again.');
+        }
+    };
 
     // Handle variant change from dynamic selectors
     const handleVariantChange = (variantId: number | null, variantData: any | null) => {
@@ -182,6 +204,23 @@ export default function ProductDetailsScreen() {
             originalPrice: originalPrice
         };
     }, [product, selectedVariant, selectedVariantData]);
+
+    // Check Waitlist Status
+    useEffect(() => {
+        if (product && isOutOfStock) {
+            const checkStatus = async () => {
+                try {
+                    const res = await api.getWaitlistStatus(product.id, selectedVariant?.id);
+                    setIsJoinedWaitlist(res.joined);
+                } catch (e) {
+                    // console.warn("Silent failure checking waitlist status");
+                }
+            };
+            checkStatus();
+        } else {
+            setIsJoinedWaitlist(false);
+        }
+    }, [product, selectedVariant, isOutOfStock, waitlistRefreshTrigger]);
 
     const handleAddToCart = () => {
         if (!product) return;
@@ -455,6 +494,8 @@ export default function ProductDetailsScreen() {
                             <AddToCartFooter
                                 onAddToCart={handleAddToCart}
                                 onToggleWishlist={handleToggleWishlist}
+                                onNotifyMe={handleNotifyMe}
+                                isJoinedWaitlist={isJoinedWaitlist}
                                 isWishlisted={isWishlisted}
                                 disabled={isOutOfStock}
                                 price={priceData.price}

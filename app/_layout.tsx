@@ -123,17 +123,17 @@ export default function RootLayout() {
  * Placed inside AuthProvider to access user auth state.
  */
 function NotificationSync({ expoPushToken }: { expoPushToken?: string }) {
-  const { token, isAuthenticated } = require('@/hooks/use-auth-context').useAuth();
+  const { token, isAuthenticated, isLoading } = require('@/hooks/use-auth-context').useAuth();
 
   useEffect(() => {
-    if (expoPushToken) {
-      // Re-sync whenever token (login/logout) or push token changes
+    if (expoPushToken && !isLoading) {
+      // Re-sync whenever token (login/logout) or push token changes, but only after auth is loaded
       console.log(`Syncing push token (Auth: ${isAuthenticated ? 'Yes' : 'No'})`);
       api.updatePushToken(expoPushToken).catch(err => {
         console.error("Failed to sync push token:", err);
       });
     }
-  }, [expoPushToken, token]);
+  }, [expoPushToken, token, isLoading]);
 
   return null;
 }

@@ -668,31 +668,51 @@ export const api = {
         }
     },
 
+    // --- Waitlist ---
+    async joinWaitlist(data: { product_id: number | string, product_variant_id?: number | string, email?: string, push_token?: string }) {
+        const res = await fetchWithTimeout(`${BASE_URL}/waitlist/join`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data)
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+    async getWaitlistStatus(productId: number | string, variantId?: number | string) {
+        const url = variantId
+            ? `${BASE_URL}/waitlist/status/${productId}/${variantId}`
+            : `${BASE_URL}/waitlist/status/${productId}`;
+
+        const res = await fetchWithTimeout(url, { headers: getHeaders() });
+        const json = await handleResponse<{ on_waitlist: boolean }>(res);
+
+        // Backend returns "on_waitlist", frontend expects "joined"
+        return { joined: !!json.on_waitlist };
+    },
+
     // --- Products ---
     async getProducts(params: {
-        category_id?: number,
-        brand_id?: number,
-        category_ids?: number[],
-        sub_category_ids?: number[],
-        sub_sub_category_ids?: number[],
-        brand_ids?: number[],
-        search?: string,
-        limit?: number,
-        page?: number,
-        is_featured?: boolean,
-        color?: string,
-        size?: string,
-        min_price?: number,
-        max_price?: number,
-        sort_by?: string,
-        sort_order?: string
+        category_id?: number;
+        brand_id?: number;
+        category_ids?: number[];
+        sub_category_ids?: number[];
+        sub_sub_category_ids?: number[];
+        brand_ids?: number[];
+        search?: string;
+        limit?: number;
+        page?: number;
+        is_featured?: boolean;
+        color?: string;
+        size?: string;
+        min_price?: number;
+        max_price?: number;
+        sort_by?: string;
+        sort_order?: 'asc' | 'desc';
     } = {}): Promise<Product[]> {
         try {
             const url = new URL(`${BASE_URL}/products`);
             if (params.category_id) url.searchParams.append('category_id', params.category_id.toString());
             if (params.brand_id) url.searchParams.append('brand_id', params.brand_id.toString());
 
-            // Use singular key with array syntax for strict filtering
             if (params.category_ids?.length) {
                 params.category_ids.forEach(id => url.searchParams.append('category_id[]', id.toString()));
             }
@@ -702,16 +722,13 @@ export const api = {
             if (params.sub_sub_category_ids?.length) {
                 params.sub_sub_category_ids.forEach(id => url.searchParams.append('sub_sub_category_id[]', id.toString()));
             }
-
             if (params.brand_ids?.length) {
                 params.brand_ids.forEach(id => url.searchParams.append('brand_id[]', id.toString()));
             }
 
             if (params.search) url.searchParams.append('search', params.search);
 
-            // SPECIAL HANDLING FOR COMPLEX QUERIES (Price Filtering, Sorting, Brand, Color, Size)
-            // Since the backend logic might be limited or inconsistent, we fetch ALL products for these cases
-            // to ensure accurate client-side filtering and sorting.
+            // SPECIAL HANDLING FOR COMPLEX QUERIES
             const isComplexQuery =
                 params.min_price !== undefined ||
                 params.max_price !== undefined ||
@@ -724,62 +741,45 @@ export const api = {
             let requestLimit = params.limit || 10;
 
             if (isComplexQuery) {
-                // Fetch valid large amount to ensure we get everything suitable for filtering/sorting
                 url.searchParams.append('per_page', '1000');
-                // Do NOT append 'page' here, default to 1 (all)
             } else {
-                // Normal Server-Side Pagination
                 url.searchParams.append('per_page', requestLimit.toString());
                 url.searchParams.append('page', requestPage.toString());
             }
 
-            if (params.is_featured) url.searchParams.append('is_featured', '1');
+            if (params.is_featured !== undefined) url.searchParams.append('is_featured', params.is_featured ? '1' : '0');
+            // Note: We don't send color/size/price to backend as we handle it client-side for "complex" queries to be safe,
+            // or if the backend supports it, we could add them. For now, matching the logic seen in other parts:
             if (params.color) url.searchParams.append('color', params.color);
             if (params.size) url.searchParams.append('size', params.size);
 
-            // We do NOT send min_price/max_price to server as it ignores them anyway, 
-            // but keeping them in params object for our logic below.
-
-            const res = await fetchWithTimeout(url.toString(), {
-                headers: getHeaders()
-            });
+            const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
             const responseData = await handleResponse<any>(res);
             let products = Array.isArray(responseData) ? responseData : (responseData.data || []);
             products = products.map(transformProduct);
 
-            // Client-side Processing
+            // Client-side Filtering/Sorting if needed
             if (isComplexQuery) {
                 const min = params.min_price || 0;
                 const max = params.max_price || Infinity;
 
                 // 1. Filter
                 products = products.filter((p: Product) => {
-                    // Price Filter
+                    // Price
                     if (params.min_price !== undefined || params.max_price !== undefined) {
-                        const price = calculateFinalPrice(p.price || 0, p.discount_amount, p.discount_type);
+                        const price = calculateFinalPrice(Number(p.price) || 0, p.discount_amount, p.discount_type);
                         if (price < min || price > max) return false;
                     }
-
-                    // Brand Filter
-                    if (params.brand_ids && params.brand_ids.length > 0) {
-                        if (!p.brand_id || !params.brand_ids.includes(p.brand_id)) return false;
-                        // Note: If brand_id is null/undefined, it fails the check, which is correct (must belong to selected brands)
-                    }
-
-                    // Color Filter
+                    // Color
                     if (params.color) {
-                        // Check if ANY variant matches the color
                         const hasColor = p.variants?.some(v => v.color?.toLowerCase() === params.color!.toLowerCase());
                         if (!hasColor) return false;
                     }
-
-                    // Size Filter
+                    // Size
                     if (params.size) {
-                        // Check if ANY variant matches the size
                         const hasSize = p.variants?.some(v => v.size?.toLowerCase() === params.size!.toLowerCase());
                         if (!hasSize) return false;
                     }
-
                     return true;
                 });
 
@@ -789,14 +789,10 @@ export const api = {
                         let valA: any = a[params.sort_by as keyof Product];
                         let valB: any = b[params.sort_by as keyof Product];
 
-                        // Special handling for price to use discounted price
                         if (params.sort_by === 'price') {
-                            valA = calculateFinalPrice(a.price || 0, a.discount_amount, a.discount_type);
-                            valB = calculateFinalPrice(b.price || 0, b.discount_amount, b.discount_type);
-                        }
-
-                        // Handle dates
-                        if (params.sort_by === 'created_at') {
+                            valA = calculateFinalPrice(Number(a.price) || 0, a.discount_amount, a.discount_type);
+                            valB = calculateFinalPrice(Number(b.price) || 0, b.discount_amount, b.discount_type);
+                        } else if (params.sort_by === 'created_at') {
                             valA = new Date(valA).getTime();
                             valB = new Date(valB).getTime();
                         }
@@ -810,18 +806,14 @@ export const api = {
                     });
                 }
 
-                // 3. Paginate Locally
+                // 3. Paginate
                 const startIndex = (requestPage - 1) * requestLimit;
-                const endIndex = startIndex + requestLimit;
-                products = products.slice(startIndex, endIndex);
+                products = products.slice(startIndex, startIndex + requestLimit);
             }
+
             return products;
         } catch (err) {
             console.error('Error fetching products:', err);
-            if (IS_DEV) {
-                // let filtered = [...MOCK_PRODUCTS]; - Removed
-                return [];
-            }
             return [];
         }
     },

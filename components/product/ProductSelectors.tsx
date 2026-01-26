@@ -55,18 +55,27 @@ export function ProductSelectors({
 
         // Check each entry in the matrix
         Object.entries(variantMatrix).forEach(([key, entry]) => {
-            if (entry.stock <= 0) return; // Skip if out of stock
+            // REMOVED: if (entry.stock <= 0) return; 
+            // We now want to allow selecting out-of-stock items so the "Notify Me" button appears.
 
             const keyParts = key.split('|');
             const keyMap: Record<string, string> = {};
 
-            productOptions.forEach((opt, idx) => {
-                if (keyParts[idx]) {
-                    keyMap[opt.name] = keyParts[idx];
-                }
-            });
+            // If the matrix key is just the single value string, handle that legacy case
+            // Or if it's a dynamic pipe-joined key
+            const isSingle = !key.includes('|') && productOptions.length === 1;
 
-            // If all OTHER selections match, this option value is available
+            if (isSingle) {
+                keyMap[productOptions[0].name] = key;
+            } else {
+                productOptions.forEach((opt, idx) => {
+                    if (keyParts[idx]) {
+                        keyMap[opt.name] = keyParts[idx];
+                    }
+                });
+            }
+
+            // If all OTHER selections match, this option value is available (exists as a variant)
             const matchesOthers = Object.entries(tempSelections).every(
                 ([name, value]) => keyMap[name] === value
             );
@@ -92,11 +101,17 @@ export function ProductSelectors({
         if (variantData) {
             onVariantChange?.(variantData.variant_id, variantData);
         } else {
-            // If we have selections for all options but no matrix entry, something is wrong
-            // but we still notify null.
             onVariantChange?.(null, null);
         }
     }, [selections, variantMatrix]);
+
+    // Check availability (stock > 0) specifically for styling
+    const checkStockAvailability = (optionName: string, val: string) => {
+        const tempSelections = { ...selections, [optionName]: val };
+        const matrixKey = buildMatrixKey(tempSelections);
+        const entry = variantMatrix[matrixKey];
+        return entry && entry.stock > 0;
+    }
 
     // Helper for Hex
     const getColorHexVal = (val: string | ProductOptionValue) => {
@@ -139,21 +154,26 @@ export function ProductSelectors({
                                 {option.values.map((val, idx) => {
                                     const valueStr = val && (typeof val === 'string' ? val : val.value) || `opt-${idx}`;
                                     const isSelected = selectedValue === valueStr;
-                                    const isAvailable = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+                                    const isPossibleVariant = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+
+                                    // Check if it's actually in stock for styling purposes
+                                    const inStock = checkStockAvailability(option.name, valueStr);
+
                                     const hex = getColorHexVal(val) || '#ccc';
                                     const isWhite = hex.toLowerCase() === '#ffffff';
 
                                     return (
                                         <Pressable
                                             key={`${option.name}-${valueStr}-${idx}`}
-                                            onPress={() => isAvailable && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
+                                            onPress={() => isPossibleVariant && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
                                             style={[
                                                 styles.colorPill,
                                                 isDark && { backgroundColor: '#111', borderColor: '#333' },
                                                 isSelected && { borderColor: isDark ? '#fff' : hex, borderWidth: 1.5 },
-                                                !isAvailable && { opacity: 0.3 }
+                                                !isPossibleVariant && { opacity: 0.3 }, // Dim if it doesn't exist at all
+                                                (isPossibleVariant && !inStock) && { opacity: 0.8 } // Slightly dim if exists but out of stock
                                             ]}
-                                            disabled={!isAvailable}
+                                            disabled={!isPossibleVariant}
                                         >
                                             <View style={[
                                                 styles.innerDot,
@@ -164,7 +184,7 @@ export function ProductSelectors({
                                                 styles.colorName,
                                                 isDark && { color: '#fff' },
                                                 isSelected && styles.colorNameSelectedBold,
-                                                !isAvailable && { textDecorationLine: 'line-through' }
+                                                !inStock && { textDecorationLine: 'line-through', opacity: 0.6 } // Strike through if out of stock
                                             ]}>
                                                 {valueStr}
                                             </Text>
@@ -177,29 +197,33 @@ export function ProductSelectors({
                                 {option.values.map((val, idx) => {
                                     const valueStr = val && (typeof val === 'string' ? val : val.value) || `opt-${idx}`;
                                     const isSelected = selectedValue === valueStr;
-                                    const isAvailable = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+                                    const isPossibleVariant = availableValues.some(av => (typeof av === 'string' ? av : av.value) === valueStr);
+
+                                    // Check if it's actually in stock for styling purposes
+                                    const inStock = checkStockAvailability(option.name, valueStr);
 
                                     return (
                                         <Pressable
                                             key={`${option.name}-${valueStr}-${idx}`}
-                                            onPress={() => isAvailable && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
+                                            onPress={() => isPossibleVariant && setSelections(prev => ({ ...prev, [option.name]: valueStr }))}
                                             style={[
                                                 styles.sizeBox,
                                                 { width: 'auto', paddingHorizontal: 16, minWidth: 64 },
                                                 isDark && { backgroundColor: '#111', borderColor: '#333' },
                                                 isSelected && styles.sizeBoxSelected,
                                                 isSelected && isDark && { borderColor: '#fff' },
-                                                !isAvailable && styles.sizeBoxDisabled,
-                                                !isAvailable && isDark && { backgroundColor: '#222', borderColor: '#333' }
+                                                !isPossibleVariant && styles.sizeBoxDisabled,
+                                                !isPossibleVariant && isDark && { backgroundColor: '#222', borderColor: '#333' }
                                             ]}
-                                            disabled={!isAvailable}
+                                            disabled={!isPossibleVariant}
                                         >
                                             <Text style={[
                                                 styles.sizeText,
                                                 isDark && { color: '#94A3B8' },
                                                 isSelected && styles.sizeTextSelected,
                                                 isSelected && isDark && { color: '#fff' },
-                                                !isAvailable && styles.sizeTextDisabled
+                                                !isPossibleVariant && styles.sizeTextDisabled,
+                                                (isPossibleVariant && !inStock) && { textDecorationLine: 'line-through', opacity: 0.6 } // Strike through if out of stock
                                             ]}>
                                                 {valueStr}
                                             </Text>
@@ -222,7 +246,7 @@ export function ProductSelectors({
                     <Text style={[styles.stockText, isDark && { color: '#fff' }]}>
                         {currentVariant.stock > 0
                             ? `${currentVariant.stock} units available`
-                            : 'Out of stock'}
+                            : 'Out of stock - Join Waiting List'}
                     </Text>
                 </View>
             )}
