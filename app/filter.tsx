@@ -394,22 +394,26 @@ export default function FilterPage() {
     const [priceMax, setPriceMax] = useState(1000);
 
     // Context State
-    const selectedCategory = filters.categoryIds;
-    const selectedBrands = filters.brandIds;
-    const priceRange = filters.priceRange;
-    const selectedColor = filters.color;
-    const selectedSize = filters.size;
+
 
     // Local UI State
     const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
 
-    // Local State for Sliders (to prevent filtering while dragging)
-    const [localPriceRange, setLocalPriceRange] = useState<number[]>(priceRange);
+    // Local Filter States (deferred application)
+    const [localPriceRange, setLocalPriceRange] = useState<number[]>(filters.priceRange);
+    const [localCategoryIds, setLocalCategoryIds] = useState<number[]>(filters.categoryIds);
+    const [localBrandIds, setLocalBrandIds] = useState<number[]>(filters.brandIds);
+    const [localColor, setLocalColor] = useState<string | null>(filters.color);
+    const [localSize, setLocalSize] = useState<string | null>(filters.size);
 
-    // Sync local state if external filters change (e.g. Clear All)
+    // Sync local state if external filters change (e.g. from Shop screen or Reset)
     useEffect(() => {
         setLocalPriceRange(filters.priceRange);
-    }, [filters.priceRange]);
+        setLocalCategoryIds(filters.categoryIds);
+        setLocalBrandIds(filters.brandIds);
+        setLocalColor(filters.color);
+        setLocalSize(filters.size);
+    }, [filters]);
 
     const [expandedSections, setExpandedSections] = useState({
         categories: true,
@@ -449,45 +453,44 @@ export default function FilterPage() {
     }, [filters, updateFilter]);
 
     const handleApply = () => {
-        // Apply all current local state
-        // Since we are updating context immediately on change for other filters, just close
-        // But for price which is local, ensure it's synced
-        applyFiltersAndNavigate({ priceRange: localPriceRange });
+        // Apply all local state to context
+        applyFiltersAndNavigate({
+            priceRange: localPriceRange,
+            categoryIds: localCategoryIds,
+            brandIds: localBrandIds,
+            color: localColor,
+            size: localSize
+        });
         router.dismiss();
     };
 
     const handleCategorySelect = useCallback((category: Category) => {
         const id = category.id;
-        const prev = filters.categoryIds;
-        const isSelected = prev.includes(id);
-        const newIds = isSelected ? prev.filter(cid => cid !== id) : [...prev, id];
-        applyFiltersAndNavigate({ categoryIds: newIds });
-    }, [filters.categoryIds, applyFiltersAndNavigate]);
+        setLocalCategoryIds(prev =>
+            prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
+        );
+    }, []);
 
     const handlePriceChange = (values: number[]) => {
         setLocalPriceRange(values);
-        // Don't navigate immediately on price change, wait for user to finish sliding
     };
 
     const handlePriceChangeComplete = (values: number[]) => {
-        setLocalPriceRange(values); // Ensure UI stays synced
-        applyFiltersAndNavigate({ priceRange: values as [number, number] });
+        setLocalPriceRange(values);
     };
 
     const handleBrandSelect = (id: number) => {
-        const prev = filters.brandIds;
-        const newIds = prev.includes(id) ? prev.filter(bid => bid !== id) : [...prev, id];
-        applyFiltersAndNavigate({ brandIds: newIds });
+        setLocalBrandIds(prev =>
+            prev.includes(id) ? prev.filter(bid => bid !== id) : [...prev, id]
+        );
     };
 
     const handleColorSelect = (colorName: string) => {
-        const newColor = selectedColor === colorName ? null : colorName;
-        applyFiltersAndNavigate({ color: newColor });
+        setLocalColor(prev => prev === colorName ? null : colorName);
     };
 
     const handleSizeSelect = (size: string) => {
-        const newSize = selectedSize === size ? null : size;
-        applyFiltersAndNavigate({ size: newSize });
+        setLocalSize(prev => prev === size ? null : size);
     };
 
     // Initialize data
@@ -499,15 +502,6 @@ export default function FilterPage() {
                     api.getBrands(),
                     api.getFilterMetadata()
                 ]);
-
-                console.log(`API Success: Loaded ${cats ? cats.length : 0} categories.`);
-                if (cats) {
-                    // Log just the top level structure to act as a summary
-                    console.log('Categories Summary (IDs/Names):', JSON.stringify(cats.map(c => ({ id: c.id, name: c.name, sub_count: c.sub_categories?.length })), null, 2));
-
-                    // Log the full detailed structure for deep inspection
-                    console.log('FULL Categories Data:', JSON.stringify(cats, null, 2));
-                }
 
                 setCategories(cats || []);
                 setBrands(brs || []);
@@ -526,16 +520,17 @@ export default function FilterPage() {
                 setLoading(false);
             }
         };
-        load();
+        // Only load once
+        if (categories.length === 0) load();
     }, []);
 
     const handleClear = () => {
-        updateFilter('categoryIds', []);
-        updateFilter('brandIds', []);
-        updateFilter('priceRange', [priceMin, priceMax]);
-        updateFilter('color', null);
-        updateFilter('size', null);
+        // Reset local state to defaults
+        setLocalCategoryIds([]);
+        setLocalBrandIds([]);
         setLocalPriceRange([priceMin, priceMax]);
+        setLocalColor(null);
+        setLocalSize(null);
     };
 
     // Colors already have hex values from database, just add border for light colors
@@ -558,9 +553,9 @@ export default function FilterPage() {
     }
 
     // Count active filters
-    const activeFilterCount = selectedCategory.length + selectedBrands.length +
-        (selectedColor ? 1 : 0) + (selectedSize ? 1 : 0) +
-        ((priceRange[0] !== priceMin || priceRange[1] !== priceMax) ? 1 : 0);
+    const activeFilterCount = localCategoryIds.length + localBrandIds.length +
+        (localColor ? 1 : 0) + (localSize ? 1 : 0) +
+        ((localPriceRange[0] !== priceMin || localPriceRange[1] !== priceMax) ? 1 : 0);
 
 
     return (
@@ -641,7 +636,7 @@ export default function FilterPage() {
                                 <CategoryNode
                                     key={cat.id}
                                     category={cat}
-                                    selectedIds={selectedCategory}
+                                    selectedIds={localCategoryIds}
                                     expandedIds={expandedCategories}
                                     onSelect={handleCategorySelect}
                                     onExpand={handleToggleExpand}
@@ -729,7 +724,7 @@ export default function FilterPage() {
                     {expandedSections.colors && (
                         <View style={[styles.sectionContent, styles.rowWrap]}>
                             {colorsList.map((c) => {
-                                const isSelected = selectedColor === c.name;
+                                const isSelected = localColor === c.name;
                                 return (
                                     <Pressable
                                         key={c.name}
@@ -759,7 +754,7 @@ export default function FilterPage() {
                     {expandedSections.sizes && (
                         <View style={[styles.sectionContent, styles.rowWrap]}>
                             {sizesList.map((s) => {
-                                const isSelected = selectedSize === s;
+                                const isSelected = localSize === s;
                                 return (
                                     <Pressable
                                         key={s}
@@ -785,7 +780,7 @@ export default function FilterPage() {
                     {expandedSections.brands && (
                         <View style={[styles.sectionContent, styles.rowWrap]}>
                             {brands.map((brand) => {
-                                const isSelected = selectedBrands.includes(brand.id);
+                                const isSelected = localBrandIds.includes(brand.id);
                                 return (
                                     <Pressable
                                         key={brand.id}

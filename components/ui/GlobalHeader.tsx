@@ -9,9 +9,8 @@ import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Share08Icon, FavouriteIcon, ShoppingBag01Icon, SearchCustomIcon } from '@/components/ui/icons';
+import { Share08Icon, FavouriteIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { SearchBottomSheet } from '@/components/search/SearchBottomSheet';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -43,7 +42,6 @@ export function GlobalHeader({
     const { user, isAuthenticated } = useAuth();
     const { setCartTargetPoint } = useCartAnimation();
     const cartIconRef = React.useRef<View>(null);
-    const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [imageError, setImageError] = React.useState(false);
 
     // Reset error when avatar changes
@@ -87,143 +85,133 @@ export function GlobalHeader({
     };
 
     return (
-        <>
-            <BlurView
-                intensity={80}
-                tint={isDark ? 'dark' : 'light'}
-                style={[styles.container, { paddingTop: insets.top }]}
-            >
-                <View style={styles.content}>
-                    {/* Left Section */}
-                    <View style={styles.leftSection}>
-                        {showBack ? (
-                            <Pressable onPress={() => router.back()} style={styles.iconButton}>
-                                <Feather name="chevron-left" size={28} color={textColor} />
-                            </Pressable>
-                        ) : (
-                            <Pressable
-                                onPress={handleProfilePress}
-                                style={[styles.iconButton, { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }]}
-                            >
-                                {isAuthenticated ? (
-                                    (!imageError && avatarSource) ? (
-                                        <Image
-                                            source={avatarSource}
-                                            style={{ width: 32, height: 32, borderRadius: 16 }}
-                                            contentFit="cover"
-                                            onError={() => setImageError(true)}
-                                        />
-                                    ) : (
-                                        <LinearGradient
-                                            colors={['#18181b', '#000000']}
-                                            style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
-                                        >
-                                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{getInitials(user?.name)}</Text>
-                                        </LinearGradient>
-                                    )
+        <BlurView
+            intensity={80}
+            tint={isDark ? 'dark' : 'light'}
+            style={[styles.container, { paddingTop: insets.top }]}
+        >
+            <View style={styles.content}>
+                {/* Left Section */}
+                <View style={styles.leftSection}>
+                    {showBack ? (
+                        <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                            <Feather name="chevron-left" size={28} color={textColor} />
+                        </Pressable>
+                    ) : (
+                        <Pressable
+                            onPress={handleProfilePress}
+                            style={[styles.iconButton, { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }]}
+                        >
+                            {isAuthenticated ? (
+                                (!imageError && avatarSource) ? (
+                                    <Image
+                                        source={avatarSource}
+                                        style={{ width: 32, height: 32, borderRadius: 16 }}
+                                        contentFit="cover"
+                                        onError={() => setImageError(true)}
+                                    />
                                 ) : (
-                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Feather name="user" size={18} color={textColor} />
-                                    </View>
-                                )}
-                            </Pressable>
-                        )}
-                    </View>
-
-                    {/* Center Section - Hidden in detail mode unless forced */}
-                    <View style={styles.centerSection}>
-                        {(!isDetailMode || alwaysShowTitle) && (
-                            title === 'LUXE' ? (
-                                <Image
-                                    source={require('@/assets/images/logo.png')}
-                                    style={{ width: 60, height: 28 }}
-                                    contentFit="contain"
-                                />
+                                    <LinearGradient
+                                        colors={['#18181b', '#000000']}
+                                        style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                                    >
+                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{getInitials(user?.name)}</Text>
+                                    </LinearGradient>
+                                )
                             ) : (
-                                <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-                            )
-                        )}
-                    </View>
-
-                    {/* Right Section */}
-                    <View style={styles.rightSection}>
-                        {showWishlist && (
-                            <Pressable
-                                style={styles.iconButton}
-                                onPress={onWishlistPress ? onWishlistPress : () => router.push('/wishlist')}
-                            >
-                                <HugeiconsIcon
-                                    icon={FavouriteIcon}
-                                    size={24}
-                                    color={textColor}
-                                />
-                            </Pressable>
-                        )}
-
-                        {showShare && (
-                            <Pressable style={styles.iconButton}>
-                                <HugeiconsIcon icon={Share08Icon} size={24} color={textColor} />
-                            </Pressable>
-                        )}
-
-                        {!isDetailMode && (
-                            <Pressable style={styles.iconButton} onPress={() => setIsSearchOpen(true)}>
-                                <HugeiconsIcon icon={SearchCustomIcon} size={20} color={textColor} />
-                            </Pressable>
-                        )}
-
-                        {(showCart || !isDetailMode) && (
-                            <Pressable
-                                style={styles.iconButton}
-                                onPress={() => router.push('/cart')}
-                                ref={cartIconRef}
-                                onLayout={() => {
-                                    cartIconRef.current?.measure((x, y, width, height, px, py) => {
-                                        setCartTargetPoint({
-                                            x: px + width / 2,
-                                            y: py + height / 2
-                                        });
-                                    });
-                                }}
-                            >
-                                <IconSymbol
-                                    name="bag"
-                                    color={textColor}
-                                    size={24}
-                                    weight="medium"
-                                />
-                                {cartCount > 0 && (
-                                    <View style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        backgroundColor: '#000',
-                                        borderRadius: 10,
-                                        minWidth: 16,
-                                        height: 16,
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        borderWidth: 1,
-                                        borderColor: '#fff'
-                                    }}>
-                                        <Text style={{
-                                            color: '#fff',
-                                            fontSize: 9,
-                                            fontWeight: 'bold',
-                                            paddingHorizontal: 2
-                                        }}>
-                                            {cartCount}
-                                        </Text>
-                                    </View>
-                                )}
-                            </Pressable>
-                        )}
-                    </View>
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Feather name="user" size={18} color={textColor} />
+                                </View>
+                            )}
+                        </Pressable>
+                    )}
                 </View>
-            </BlurView>
 
-            <SearchBottomSheet isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-        </>
+                {/* Center Section - Hidden in detail mode unless forced */}
+                <View style={styles.centerSection}>
+                    {(!isDetailMode || alwaysShowTitle) && (
+                        title === 'LUXE' ? (
+                            <Image
+                                source={require('@/assets/images/logo.png')}
+                                style={{ width: 60, height: 28 }}
+                                contentFit="contain"
+                            />
+                        ) : (
+                            <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                        )
+                    )}
+                </View>
+
+                {/* Right Section */}
+                <View style={styles.rightSection}>
+                    {showWishlist && (
+                        <Pressable
+                            style={styles.iconButton}
+                            onPress={onWishlistPress ? onWishlistPress : () => router.push('/wishlist')}
+                        >
+                            <HugeiconsIcon
+                                icon={FavouriteIcon}
+                                size={24}
+                                color={textColor}
+                            />
+                        </Pressable>
+                    )}
+
+                    {showShare && (
+                        <Pressable style={styles.iconButton}>
+                            <HugeiconsIcon icon={Share08Icon} size={24} color={textColor} />
+                        </Pressable>
+                    )}
+
+                    {(showCart || !isDetailMode) && (
+                        <Pressable
+                            style={styles.iconButton}
+                            onPress={() => router.push('/cart')}
+                            ref={cartIconRef}
+                            onLayout={() => {
+                                cartIconRef.current?.measure((x, y, width, height, px, py) => {
+                                    setCartTargetPoint({
+                                        x: px + width / 2,
+                                        y: py + height / 2
+                                    });
+                                });
+                            }}
+                        >
+                            <IconSymbol
+                                name="bag"
+                                color={textColor}
+                                size={24}
+                                weight="medium"
+                            />
+                            {cartCount > 0 && (
+                                <View style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    right: 0,
+                                    backgroundColor: '#000',
+                                    borderRadius: 10,
+                                    minWidth: 16,
+                                    height: 16,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#fff'
+                                }}>
+                                    <Text style={{
+                                        color: '#fff',
+                                        fontSize: 9,
+                                        fontWeight: 'bold',
+                                        paddingHorizontal: 2
+                                    }}>
+                                        {cartCount}
+                                    </Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    )}
+                </View>
+            </View>
+        </BlurView>
     );
 }
 
@@ -298,3 +286,4 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 });
+

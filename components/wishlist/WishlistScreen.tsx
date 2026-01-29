@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
@@ -43,7 +43,7 @@ export default function WishlistScreen() {
                             <ShopProductCard
                                 key={item.id}
                                 product={item}
-                                style={{ width: '48%' }}
+                                style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
                                 onQuickView={() => setQuickViewProduct(item)}
                             />
                         ))}

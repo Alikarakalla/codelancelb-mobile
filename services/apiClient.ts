@@ -780,6 +780,15 @@ export const api = {
                         const hasSize = p.variants?.some(v => v.size?.toLowerCase() === params.size!.toLowerCase());
                         if (!hasSize) return false;
                     }
+                    // Brand
+                    if (params.brand_ids && params.brand_ids.length > 0) {
+                        const brandId = (typeof p.brand === 'object' && p.brand) ? p.brand.id : null;
+                        if (!brandId || !params.brand_ids.includes(brandId)) return false;
+                    }
+                    if (params.brand_id) {
+                        const brandId = (typeof p.brand === 'object' && p.brand) ? p.brand.id : null;
+                        if (!brandId || brandId !== params.brand_id) return false;
+                    }
                     return true;
                 });
 

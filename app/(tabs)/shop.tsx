@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, ActionSheetIOS } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, ActionSheetIOS, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -138,7 +138,7 @@ export default function ShopScreen() {
                 const sortParams = parseSortInfo(filters.sortInfo);
 
                 const apiParams: any = {
-                    limit: 10,
+                    limit: 12,
                     page: 1,
                     category_ids,
                     sub_category_ids,
@@ -154,7 +154,7 @@ export default function ShopScreen() {
 
                 const data = await api.getProducts(apiParams);
                 setProducts(data);
-                setHasMore(data.length >= 10);
+                setHasMore(data.length >= 12);
                 setPage(1);
 
                 // Update UI Chips
@@ -248,7 +248,7 @@ export default function ShopScreen() {
             const sortParams = parseSortInfo(filters.sortInfo);
 
             const apiParams: any = {
-                limit: 10,
+                limit: 12,
                 page: 1,
                 category_ids,
                 sub_category_ids,
@@ -263,7 +263,7 @@ export default function ShopScreen() {
             };
             const data = await api.getProducts(apiParams);
             setProducts(data);
-            setHasMore(data.length >= 10);
+            setHasMore(data.length >= 12);
             setPage(1);
         } catch (error) {
             console.error('Error refreshing shop:', error);
@@ -281,7 +281,7 @@ export default function ShopScreen() {
             const sortParams = parseSortInfo(filters.sortInfo);
 
             const apiParams: any = {
-                limit: 10,
+                limit: 12,
                 page: nextPage,
                 category_ids,
                 sub_category_ids,
@@ -303,7 +303,7 @@ export default function ShopScreen() {
                 });
                 setPage(nextPage);
             }
-            setHasMore(data.length >= 10);
+            setHasMore(data.length >= 12);
         } catch (error) {
             console.error('Error loading more:', error);
         } finally {
@@ -332,13 +332,14 @@ export default function ShopScreen() {
                     </View>
                 ) : (
                     <FlatList
+                        key={Platform.OS === 'ios' && Platform.isPad ? 3 : 2}
                         data={products}
                         keyExtractor={(item) => item.id.toString()}
-                        numColumns={2}
+                        numColumns={Platform.OS === 'ios' && Platform.isPad ? 3 : 2}
                         renderItem={({ item }) => (
                             <ShopProductCard
                                 product={item}
-                                style={{ width: '48%' }}
+                                style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
                                 onQuickView={() => setQuickViewProduct(item)}
                             />
                         )}

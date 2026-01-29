@@ -90,20 +90,13 @@ export default function SearchIndex() {
         setIsSearching(true);
         try {
             // Search products, brands, and categories in parallel
-            const [allProducts, allBrands, allCategories] = await Promise.all([
-                api.getProducts(),
+            const [products, allBrands, allCategories] = await Promise.all([
+                api.getProducts({ search: query, limit: 100 }),
                 api.getBrands(),
                 api.getCategories()
             ]);
 
-            // Filter products
-            const filteredProducts = allProducts.filter(product => {
-                const brandName = typeof product.brand === 'string' ? product.brand : product.brand?.name || '';
-                return product.name.toLowerCase().includes(query.toLowerCase()) ||
-                    product.description?.toLowerCase().includes(query.toLowerCase()) ||
-                    brandName.toLowerCase().includes(query.toLowerCase());
-            });
-            setSearchResults(filteredProducts.slice(0, 10));
+            setSearchResults(products);
 
             // Filter brands
             const filteredBrands = allBrands.filter(brand =>
