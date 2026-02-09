@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Product } from '@/types/schema';
+import { calculateProductListingPricing } from '@/utils/pricing';
 
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useWishlist } from '@/hooks/use-wishlist-context';
@@ -37,7 +38,8 @@ export const ProductGridItem = ({
     const cartButtonRef = React.useRef<View>(null);
 
     const isWishlisted = isInWishlist(product.id);
-    const hasDiscount = product.discount_amount && product.discount_amount > 0;
+    const pricing = React.useMemo(() => calculateProductListingPricing(product), [product]);
+    const hasDiscount = pricing.hasDiscount;
     const imageUrl = product.main_image || '';
 
     return (
@@ -57,7 +59,7 @@ export const ProductGridItem = ({
                     <View style={styles.discountRow}>
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>
-                                -{product.discount_type === 'percent' ? `${product.discount_amount}%` : `$${product.discount_amount}`}
+                                {pricing.badgeText || 'SALE'}
                             </Text>
                         </View>
                     </View>
@@ -110,14 +112,10 @@ export const ProductGridItem = ({
 
                 <View style={styles.priceContainer}>
                     {hasDiscount && (
-                        <Text style={styles.oldPrice}>{formatPrice(product.price)}</Text>
+                        <Text style={styles.oldPrice}>{formatPrice(pricing.originalPrice)}</Text>
                     )}
                     <Text style={[styles.price, hasDiscount ? styles.salePrice : null]}>
-                        {formatPrice(hasDiscount
-                            ? (product.discount_type === 'percent'
-                                ? product.price! * (1 - product.discount_amount! / 100)
-                                : product.price! - product.discount_amount!)
-                            : product.price)}
+                        {formatPrice(pricing.finalPrice)}
                     </Text>
                 </View>
             </View>

@@ -1,12 +1,106 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { api } from '@/services/apiClient';
 import { Product, Brand, Category } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
+import {
+    clearLocalRecentSearches,
+    getLocalRecentSearches,
+    getLocalRecentlyViewedProducts,
+    getLocalTrendingSearches,
+    saveLocalRecentSearch,
+    setLocalRecentSearches,
+    setLocalRecentlyViewedProducts,
+    setLocalTrendingSearches,
+} from '@/utils/searchStorage';
+
+function normalizeSearchText(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getProductSearchFields(product: Product): string[] {
+    return [
+        product.name_en || '',
+        product.name || '',
+        product.name_ar || '',
+        product.slug || '',
+        product.sku || '',
+    ].map(v => normalizeSearchText(v)).filter(Boolean);
+}
+
+function hasExactProductMatch(product: Product, query: string): boolean {
+    const q = normalizeSearchText(query);
+    if (!q) return false;
+
+    return getProductSearchFields(product).some(field => field === q);
+}
+
+function rankProductsByQuery(products: Product[], query: string): Product[] {
+    const q = normalizeSearchText(query);
+    if (!q) return products;
+
+    const scored = products.map((product, index) => {
+        const fields = getProductSearchFields(product);
+        let score = 0;
+
+        for (const field of fields) {
+            if (!field) continue;
+            if (field === q) score = Math.max(score, 100);
+            else if (field.startsWith(q)) score = Math.max(score, 80);
+            else if (field.includes(` ${q} `) || field.includes(q)) score = Math.max(score, 60);
+        }
+
+        return { product, score, index };
+    });
+
+    scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.index - b.index;
+    });
+
+    return scored.map(item => item.product);
+}
+
+function dedupeProductsById(products: Product[]): Product[] {
+    const seen = new Set<number>();
+    const unique: Product[] = [];
+    products.forEach(product => {
+        if (!seen.has(product.id)) {
+            seen.add(product.id);
+            unique.push(product);
+        }
+    });
+    return unique;
+}
+
+const RECENT_SEARCH_LIMIT = 10;
+const RECENTLY_VIEWED_LIMIT = 10;
+const TRENDING_SEARCH_LIMIT = 10;
+const TRENDING_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function mergeSearches(primary: string[], secondary: string[], limit = RECENT_SEARCH_LIMIT): string[] {
+    const normalized = new Set<string>();
+    const merged = [...primary, ...secondary]
+        .map(item => item.trim())
+        .filter(Boolean)
+        .filter(item => {
+            const key = normalizeSearchText(item);
+            if (!key || normalized.has(key)) return false;
+            normalized.add(key);
+            return true;
+        })
+        .slice(0, limit);
+    return merged;
+}
 
 export default function SearchIndex() {
     const router = useRouter();
@@ -22,6 +116,7 @@ export default function SearchIndex() {
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
     const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<Product[]>([]);
+    const latestSearchRequestRef = useRef(0);
 
     // Listen to native search bar changes
     useLayoutEffect(() => {
@@ -43,12 +138,24 @@ export default function SearchIndex() {
         loadRecentlyViewedProducts();
     }, []);
 
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadRecentSearches();
+            loadTrendingSearches();
+            loadRecentlyViewedProducts();
+        });
+        return unsubscribe;
+    }, [navigation]);
+
     // Debounced search
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            if (searchQuery.trim().length > 2) {
-                performSearch(searchQuery);
+            const trimmedQuery = searchQuery.trim();
+            if (trimmedQuery.length >= 2) {
+                performSearch(trimmedQuery);
             } else {
+                latestSearchRequestRef.current += 1; // invalidate in-flight searches
+                setIsSearching(false);
                 setSearchResults([]);
                 setBrandResults([]);
                 setCategoryResults([]);
@@ -60,8 +167,19 @@ export default function SearchIndex() {
 
     const loadRecentSearches = async () => {
         try {
-            // TODO: Load from AsyncStorage
-            setRecentSearches([]);
+            const local = await getLocalRecentSearches(RECENT_SEARCH_LIMIT);
+            if (local.length > 0) {
+                setRecentSearches(local);
+            } else {
+                setRecentSearches([]);
+            }
+
+            const remote = await api.getSearchHistory(RECENT_SEARCH_LIMIT);
+            if (remote.length > 0) {
+                const merged = mergeSearches(remote, local, RECENT_SEARCH_LIMIT);
+                setRecentSearches(merged);
+                await setLocalRecentSearches(merged, RECENT_SEARCH_LIMIT);
+            }
         } catch (error) {
             console.error('Error loading recent searches:', error);
         }
@@ -69,8 +187,24 @@ export default function SearchIndex() {
 
     const loadTrendingSearches = async () => {
         try {
-            // TODO: Implement trending searches API endpoint
-            setTrendingSearches([]);
+            const localTrending = await getLocalTrendingSearches(TRENDING_SEARCH_LIMIT);
+            if (localTrending.items.length > 0) {
+                setTrendingSearches(localTrending.items);
+            } else {
+                setTrendingSearches([]);
+            }
+
+            const isCacheFresh =
+                localTrending.fetchedAt !== null &&
+                (Date.now() - localTrending.fetchedAt) < TRENDING_CACHE_TTL_MS;
+
+            if (isCacheFresh) return;
+
+            const remoteTrending = await api.getTrendingSearches(TRENDING_SEARCH_LIMIT);
+            if (remoteTrending.length > 0) {
+                setTrendingSearches(remoteTrending);
+                await setLocalTrendingSearches(remoteTrending, TRENDING_SEARCH_LIMIT);
+            }
         } catch (error) {
             console.error('Error loading trending searches:', error);
         }
@@ -78,60 +212,98 @@ export default function SearchIndex() {
 
     const loadRecentlyViewedProducts = async () => {
         try {
-            // For now, fetch some products as placeholder
-            const products = await api.getProducts({ limit: 5 });
-            setRecentlyViewedProducts(products.slice(0, 5));
+            const local = await getLocalRecentlyViewedProducts(RECENTLY_VIEWED_LIMIT);
+            if (local.length > 0) {
+                setRecentlyViewedProducts(local);
+            } else {
+                setRecentlyViewedProducts([]);
+            }
+
+            const remote = await api.getRecentlyViewedProducts(RECENTLY_VIEWED_LIMIT);
+            if (remote.length > 0) {
+                const merged = dedupeProductsById([...remote, ...local]).slice(0, RECENTLY_VIEWED_LIMIT);
+                setRecentlyViewedProducts(merged);
+                await setLocalRecentlyViewedProducts(merged, RECENTLY_VIEWED_LIMIT);
+            }
         } catch (error) {
             console.error('Error loading recently viewed products:', error);
         }
     };
 
     const performSearch = async (query: string) => {
+        const requestId = ++latestSearchRequestRef.current;
         setIsSearching(true);
         try {
             // Search products, brands, and categories in parallel
             const [products, allBrands, allCategories] = await Promise.all([
-                api.getProducts({ search: query, limit: 100 }),
+                api.getProducts({ search: query, limit: 100, page: 1 }),
                 api.getBrands(),
                 api.getCategories()
             ]);
 
-            setSearchResults(products);
+            if (requestId !== latestSearchRequestRef.current) return;
+
+            let rankedProducts = rankProductsByQuery(products, query);
+            const hasExact = rankedProducts.some(product => hasExactProductMatch(product, query));
+
+            // If exact match not present in first page, fetch more pages and rerank.
+            if (!hasExact) {
+                const [page2, page3] = await Promise.all([
+                    api.getProducts({ search: query, limit: 100, page: 2 }),
+                    api.getProducts({ search: query, limit: 100, page: 3 }),
+                ]);
+
+                if (requestId !== latestSearchRequestRef.current) return;
+
+                rankedProducts = rankProductsByQuery(
+                    dedupeProductsById([...products, ...page2, ...page3]),
+                    query
+                );
+            }
+
+            setSearchResults(rankedProducts);
 
             // Filter brands
             const filteredBrands = allBrands.filter(brand =>
-                brand.name.toLowerCase().includes(query.toLowerCase())
+                [brand.name, brand.name_en, brand.name_ar]
+                    .filter((name): name is string => Boolean(name))
+                    .some(name => normalizeSearchText(name).includes(normalizeSearchText(query)))
             );
             setBrandResults(filteredBrands.slice(0, 5));
 
             // Filter categories
             const filteredCategories = allCategories.filter(category =>
-                category.name.toLowerCase().includes(query.toLowerCase())
+                [category.name, category.name_en, category.name_ar]
+                    .filter((name): name is string => Boolean(name))
+                    .some(name => normalizeSearchText(name).includes(normalizeSearchText(query)))
             );
             setCategoryResults(filteredCategories.slice(0, 5));
 
             // Save to recent searches only if query is meaningful
-            if (query.trim().length > 2) {
+            if (query.trim().length >= 2) {
                 saveRecentSearch(query);
             }
         } catch (error) {
+            if (requestId !== latestSearchRequestRef.current) return;
             console.error('Search error:', error);
             setSearchResults([]);
             setBrandResults([]);
             setCategoryResults([]);
         } finally {
-            setIsSearching(false);
+            if (requestId === latestSearchRequestRef.current) {
+                setIsSearching(false);
+            }
         }
     };
 
     const saveRecentSearch = async (query: string) => {
         try {
-            // TODO: Save to AsyncStorage
-            // Only update if the query is not already at the top
-            if (recentSearches[0] !== query) {
-                const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10);
-                setRecentSearches(updated);
-            }
+            const trimmed = query.trim();
+            if (trimmed.length < 2) return;
+
+            const updated = await saveLocalRecentSearch(trimmed, RECENT_SEARCH_LIMIT);
+            setRecentSearches(updated);
+            await api.saveSearchQuery(trimmed);
         } catch (error) {
             console.error('Error saving recent search:', error);
         }
@@ -151,8 +323,9 @@ export default function SearchIndex() {
 
     const clearRecentSearches = async () => {
         try {
-            // TODO: Implement AsyncStorage
+            await clearLocalRecentSearches();
             setRecentSearches([]);
+            await api.clearSearchHistory();
         } catch (error) {
             console.error('Error clearing recent searches:', error);
         }
@@ -272,7 +445,7 @@ export default function SearchIndex() {
             ) : searchQuery.length > 0 && !hasResults ? (
                 <View style={styles.emptyContainer}>
                     <Text style={[styles.emptyText, isDark && styles.textGrayDark]}>
-                        No results found for "{searchQuery}"
+                        No results found for &quot;{searchQuery}&quot;
                     </Text>
                 </View>
             ) : (

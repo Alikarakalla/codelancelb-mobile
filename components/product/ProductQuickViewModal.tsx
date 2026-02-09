@@ -20,6 +20,7 @@ import { Product, ProductVariant } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ProductInfo } from '@/components/product/ProductInfo';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
+import { calculateProductPricing } from '@/utils/pricing';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -75,6 +76,14 @@ export const ProductQuickViewModal = ({
             setSelectedVariant(null);
         }
     };
+
+    const priceData = useMemo(
+        () => calculateProductPricing(product, {
+            selectedVariant,
+            selectedVariantPrice: selectedVariantData?.price ?? null,
+        }),
+        [product, selectedVariant, selectedVariantData]
+    );
 
     const handleAddToCart = () => {
         if (product.has_variants && !selectedVariant) {
@@ -139,8 +148,8 @@ export const ProductQuickViewModal = ({
                             <ProductInfo
                                 brand={product.brand?.name}
                                 title={product.name_en || product.name || ''}
-                                price={selectedVariantData?.price ?? (selectedVariant?.price ?? product.price ?? 0)}
-                                originalPrice={selectedVariant?.compare_at_price ?? product.compare_at_price ?? undefined}
+                                price={priceData.finalPrice}
+                                originalPrice={priceData.originalPrice}
                                 rating={4.8}
                                 reviewCount={product.reviews?.length || 0}
                             />

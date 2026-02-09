@@ -1,5 +1,7 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse, Notification, CustomBundleItem } from '@/types/schema';
 import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
+import { calculateProductPricing } from '@/utils/pricing';
+import { getDeviceId } from '@/utils/device';
 
 
 // 1. CHANGE THIS in your .env file
@@ -13,8 +15,22 @@ console.log('API Client Initialized with BASE_URL:', BASE_URL);
 
 const IS_DEV = __DEV__;
 const IS_PLACEHOLDER = false;
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let apiToken: string | null = null;
+
+// Lightweight in-memory caches for snappier filter/sort UX
+let categoriesCache: Category[] | null = null;
+let categoriesCacheAt = 0;
+let categoriesInFlight: Promise<Category[]> | null = null;
+
+let brandsCache: Brand[] | null = null;
+let brandsCacheAt = 0;
+let brandsInFlight: Promise<Brand[]> | null = null;
+
+let filterMetadataCache: { colors: ColorOption[], sizes: string[], minPrice: number, maxPrice: number } | null = null;
+let filterMetadataCacheAt = 0;
+let filterMetadataInFlight: Promise<{ colors: ColorOption[], sizes: string[], minPrice: number, maxPrice: number }> | null = null;
 
 export const setApiToken = (token: string | null) => {
     apiToken = token;
@@ -93,37 +109,112 @@ async function handleResponse<T>(response: Response): Promise<T> {
 const fixUrl = (url?: string | null) =>
     (url && !url.startsWith('http')) ? `https://sadekabdelsater.com/storage/${url}` : url;
 
-// Helper to calculate price with discount
-function calculateFinalPrice(price: number, discountAmount?: number | null, discountType?: string | null): number {
-    if (!price) return 0;
-    if (!discountAmount) return price;
+function parseDecimal(value: any): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = parseFloat(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+}
 
-    let finalPrice = price;
-    if (discountType === 'percent') {
-        finalPrice = price * (1 - (discountAmount / 100));
-    } else {
-        // Assume fixed
-        finalPrice = price - discountAmount;
+function parseDiscountTargets(value: any): string[] | null {
+    if (value === null || value === undefined || value === '') return null;
+    if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(v => String(v).trim()).filter(Boolean);
+                }
+            } catch {
+                return trimmed.split(',').map(v => v.trim()).filter(Boolean);
+            }
+        }
+        return trimmed.split(',').map(v => v.trim()).filter(Boolean);
     }
-    return Math.max(0, finalPrice);
+    return null;
+}
+
+function transformCategory(c: any): Category {
+    const subCategories = c.sub_categories ?? c.subCategories;
+    const subSubCategories = c.sub_sub_categories ?? c.subSubCategories;
+    return {
+        ...c,
+        thumbnail: fixUrl(c.thumbnail),
+        discount_amount: parseDecimal(c.discount_amount),
+        discount_target_parents: parseDiscountTargets(c.discount_target_parents),
+        sub_categories: Array.isArray(subCategories) ? subCategories.map(transformCategory) : undefined,
+        subCategories: Array.isArray(subCategories) ? subCategories.map(transformCategory) : undefined,
+        sub_sub_categories: Array.isArray(subSubCategories) ? subSubCategories.map(transformCategory) : undefined,
+        subSubCategories: Array.isArray(subSubCategories) ? subSubCategories.map(transformCategory) : undefined,
+    };
+}
+
+function getCategoryChildren(category: Category): Category[] {
+    return [
+        ...(category.sub_categories || []),
+        ...(category.subCategories || []),
+        ...(category.sub_sub_categories || []),
+        ...(category.subSubCategories || []),
+    ];
+}
+
+function findCategoryById(categories: Category[], id?: number | null): Category | undefined {
+    if (id === null || id === undefined) return undefined;
+
+    for (const category of categories) {
+        if (category.id === id) return category;
+
+        const foundInChildren = findCategoryById(getCategoryChildren(category), id);
+        if (foundInChildren) return foundInChildren;
+    }
+
+    return undefined;
 }
 
 // Helper to transform product data (fix images, convert prices)
 function transformProduct(p: any): Product {
     const product = {
         ...p,
-        price: p.price ? parseFloat(p.price) : null,
-        compare_at_price: p.compare_at_price ? parseFloat(p.compare_at_price) : null,
-        cost_price: p.cost_price ? parseFloat(p.cost_price) : null,
-        discount_amount: p.discount_amount ? parseFloat(p.discount_amount) : null,
+        price: parseDecimal(p.price),
+        compare_at_price: parseDecimal(p.compare_at_price),
+        cost_price: parseDecimal(p.cost_price),
+        discount_amount: parseDecimal(p.discount_amount),
+        discount_target_parents: parseDiscountTargets(p.discount_target_parents),
+        flash_sale_discount_amount: parseDecimal(p.flash_sale_discount_amount),
+        flash_sale_price: parseDecimal(p.flash_sale_price),
         main_image: fixUrl(p.main_image),
         // Transform Relations if present
         variants: Array.isArray(p.variants) ? p.variants.map(transformVariant) : [],
         images: Array.isArray(p.images) ? p.images.map(transformImage) : [],
         // Brand logo if loaded
         brand: p.brand ? { ...p.brand, logo: fixUrl(p.brand.logo) } : p.brand,
+        category: p.category ? transformCategory(p.category) : p.category,
+        sub_category: p.sub_category ? transformCategory(p.sub_category) : p.sub_category,
+        subCategory: p.subCategory ? transformCategory(p.subCategory) : p.subCategory,
+        sub_sub_category: p.sub_sub_category ? transformCategory(p.sub_sub_category) : p.sub_sub_category,
+        subSubCategory: p.subSubCategory ? transformCategory(p.subSubCategory) : p.subSubCategory,
+        sub_sub_categories: Array.isArray(p.sub_sub_categories) ? p.sub_sub_categories.map(transformCategory) : p.sub_sub_categories,
+        subSubCategories: Array.isArray(p.subSubCategories) ? p.subSubCategories.map(transformCategory) : p.subSubCategories,
+        flash_sale: p.flash_sale
+            ? {
+                ...p.flash_sale,
+                price: parseDecimal(p.flash_sale.price),
+                sale_price: parseDecimal(p.flash_sale.sale_price),
+                discount_amount: parseDecimal(p.flash_sale.discount_amount),
+                discount_target_parents: parseDiscountTargets(p.flash_sale.discount_target_parents),
+            }
+            : p.flash_sale,
         // Transform Bundle Items if present
         bundle_items: Array.isArray(p.bundle_items) ? p.bundle_items.map(transformProduct) : [],
+        // Transform Custom Bundle Items
+        custom_bundle_items: Array.isArray(p.custom_bundle_items)
+            ? p.custom_bundle_items.map((item: any) => ({
+                ...item,
+                custom_gift_image: fixUrl(item.custom_gift_image)
+            }))
+            : [],
         // NEW: Dynamic Variant System
         product_options: p.product_options || [],
         variant_matrix: p.variant_matrix || {},
@@ -278,7 +369,7 @@ function transformProduct(p: any): Product {
 
                 matrix[key] = {
                     variant_id: v.id,
-                    price: v.price ? parseFloat(v.price) : null,
+                    price: parseDecimal(v.price),
                     stock: variantStock != null ? Number(variantStock) : 0,
                     sku: v.sku
                 };
@@ -300,9 +391,11 @@ function transformVariant(v: any): any {
     const stock = (v.stock_quantity != null) ? v.stock_quantity : ((v.stock != null) ? v.stock : v.quantity);
     return {
         ...v,
-        price: v.price ? parseFloat(v.price) : null,
-        compare_at_price: v.compare_at_price ? parseFloat(v.compare_at_price) : null,
-        cost_price: v.cost_price ? parseFloat(v.cost_price) : null,
+        price: parseDecimal(v.price),
+        compare_at_price: parseDecimal(v.compare_at_price),
+        cost_price: parseDecimal(v.cost_price),
+        discount_amount: parseDecimal(v.discount_amount),
+        discount_target_parents: parseDiscountTargets(v.discount_target_parents),
         image_path: fixUrl(v.image_path),
         stock_quantity: stock != null ? Number(stock) : 0
     };
@@ -345,7 +438,7 @@ export const api = {
     },
 
     async updatePushToken(token: string) {
-        const deviceId = await require('@/utils/device').getDeviceId();
+        const deviceId = await getDeviceId();
         const res = await fetchWithTimeout(`${BASE_URL}/notifications/token`, {
             method: 'POST',
             headers: getHeaders(),
@@ -409,7 +502,11 @@ export const api = {
     async getProduct(id: number | string): Promise<Product> {
         try {
             // 1. Fetch Main Product
-            const productRes = await fetchWithTimeout(`${BASE_URL}/products/${id}`, { headers: getHeaders() });
+            const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
+            const productUrl = new URL(`${BASE_URL}/products/${id}`);
+            productUrl.searchParams.append('with', includeRelations);
+            productUrl.searchParams.append('include', includeRelations);
+            const productRes = await fetchWithTimeout(productUrl.toString(), { headers: getHeaders() });
             const product = await handleResponse<any>(productRes);
 
             // 2. Conditionally Fetch details if missing from main response
@@ -448,7 +545,37 @@ export const api = {
                 }
             }
 
-            return transformProduct(product);
+            const transformed = transformProduct(product);
+
+            // Fallback hydration: if detail endpoint omits category relations,
+            // map them from the cached category tree so hierarchical discounts still apply.
+            if (
+                (!transformed.category && transformed.category_id != null) ||
+                (!transformed.sub_category && transformed.sub_category_id != null) ||
+                (!transformed.subSubCategory && !transformed.sub_sub_category && transformed.sub_sub_category_id != null)
+            ) {
+                try {
+                    const allCategories = await this.getCategories();
+                    const category = findCategoryById(allCategories, transformed.category_id);
+                    const subCategory = findCategoryById(allCategories, transformed.sub_category_id);
+                    const subSubCategory = findCategoryById(allCategories, transformed.sub_sub_category_id);
+
+                    if (!transformed.category && category) transformed.category = category;
+
+                    if (!transformed.sub_category && subCategory) transformed.sub_category = subCategory;
+                    if (!transformed.subCategory && transformed.sub_category) transformed.subCategory = transformed.sub_category;
+
+                    if (!transformed.subSubCategory && subSubCategory) transformed.subSubCategory = subSubCategory;
+                    if (!transformed.sub_sub_category && transformed.subSubCategory) transformed.sub_sub_category = transformed.subSubCategory;
+
+                    if (!transformed.subSubCategories && transformed.subSubCategory) transformed.subSubCategories = [transformed.subSubCategory];
+                    if (!transformed.sub_sub_categories && transformed.sub_sub_category) transformed.sub_sub_categories = [transformed.sub_sub_category];
+                } catch (hydrateErr) {
+                    console.warn(`Category relation hydration failed for product ${id}:`, hydrateErr);
+                }
+            }
+
+            return transformed;
         } catch (err) {
             console.error(`Error fetching product ${id}:`, err);
             if (IS_DEV) {
@@ -530,24 +657,31 @@ export const api = {
 
     // --- Categories ---
     async getCategories(): Promise<Category[]> {
-        try {
-            const res = await fetchWithTimeout(`${BASE_URL}/categories?limit=100`, { headers: getHeaders() });
-            const responseData = await handleResponse<any>(res);
-            const categories: Category[] = Array.isArray(responseData) ? responseData : (responseData.data || []);
-
-            const transformCat = (c: Category): Category => ({
-                ...c,
-                thumbnail: fixUrl(c.thumbnail),
-                sub_categories: Array.isArray(c.sub_categories) ? c.sub_categories.map(transformCat) : undefined,
-                sub_sub_categories: Array.isArray(c.sub_sub_categories) ? c.sub_sub_categories.map(transformCat) : undefined
-            });
-
-            return categories.map(transformCat);
-        } catch (err) {
-            console.error('Error fetching categories:', err);
-            // if (IS_DEV) return MOCK_CATEGORIES as any;
-            throw err;
+        const now = Date.now();
+        if (categoriesCache && (now - categoriesCacheAt) < CATALOG_CACHE_TTL_MS) {
+            return categoriesCache;
         }
+        if (categoriesInFlight) return categoriesInFlight;
+
+        categoriesInFlight = (async () => {
+            try {
+                const res = await fetchWithTimeout(`${BASE_URL}/categories?limit=100`, { headers: getHeaders() });
+                const responseData = await handleResponse<any>(res);
+                const categories: Category[] = Array.isArray(responseData) ? responseData : (responseData.data || []);
+                const transformed = categories.map(transformCategory);
+                categoriesCache = transformed;
+                categoriesCacheAt = Date.now();
+                return transformed;
+            } catch (err) {
+                console.error('Error fetching categories:', err);
+                if (categoriesCache) return categoriesCache;
+                throw err;
+            } finally {
+                categoriesInFlight = null;
+            }
+        })();
+
+        return categoriesInFlight;
     },
 
     // --- Highlight Sections ---
@@ -569,19 +703,34 @@ export const api = {
 
     // --- Brands ---
     async getBrands(): Promise<Brand[]> {
-        try {
-            const res = await fetchWithTimeout(`${BASE_URL}/brands`, { headers: getHeaders() });
-            if (res.status === 404) return [];
-            const brands = await handleResponse<Brand[]>(res);
-            return brands.map(b => ({
-                ...b,
-                logo: fixUrl(b.logo)
-            }));
-        } catch (err) {
-            console.warn('Error fetching brands (using fallback):');
-            // if (IS_DEV) return MOCK_BRANDS as any;
-            return [];
+        const now = Date.now();
+        if (brandsCache && (now - brandsCacheAt) < CATALOG_CACHE_TTL_MS) {
+            return brandsCache;
         }
+        if (brandsInFlight) return brandsInFlight;
+
+        brandsInFlight = (async () => {
+            try {
+                const res = await fetchWithTimeout(`${BASE_URL}/brands`, { headers: getHeaders() });
+                if (res.status === 404) return [];
+                const brands = await handleResponse<Brand[]>(res);
+                const transformed = brands.map(b => ({
+                    ...b,
+                    logo: fixUrl(b.logo)
+                }));
+                brandsCache = transformed;
+                brandsCacheAt = Date.now();
+                return transformed;
+            } catch (err) {
+                console.warn('Error fetching brands (using fallback):');
+                if (brandsCache) return brandsCache;
+                return [];
+            } finally {
+                brandsInFlight = null;
+            }
+        })();
+
+        return brandsInFlight;
     },
 
     // --- Banners ---
@@ -689,6 +838,28 @@ export const api = {
         return { joined: !!json.on_waitlist };
     },
 
+    // --- Notifications ---
+    async getNotifications(page = 1) {
+        const res = await fetchWithTimeout(`${BASE_URL}/notifications?page=${page}`, { headers: getHeaders() });
+        return handleResponse<{ data: Notification[], current_page: number, last_page: number, total: number }>(res);
+    },
+
+    async markNotificationRead(id: string) {
+        const res = await fetchWithTimeout(`${BASE_URL}/notifications/${id}/read`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
+    async markAllNotificationsRead() {
+        const res = await fetchWithTimeout(`${BASE_URL}/notifications/read-all`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse<{ message: string }>(res);
+    },
+
     // --- Products ---
     async getProducts(params: {
         category_id?: number;
@@ -710,6 +881,9 @@ export const api = {
     } = {}): Promise<Product[]> {
         try {
             const url = new URL(`${BASE_URL}/products`);
+            const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
+            url.searchParams.append('with', includeRelations);
+            url.searchParams.append('include', includeRelations);
             if (params.category_id) url.searchParams.append('category_id', params.category_id.toString());
             if (params.brand_id) url.searchParams.append('brand_id', params.brand_id.toString());
 
@@ -767,7 +941,7 @@ export const api = {
                 products = products.filter((p: Product) => {
                     // Price
                     if (params.min_price !== undefined || params.max_price !== undefined) {
-                        const price = calculateFinalPrice(Number(p.price) || 0, p.discount_amount, p.discount_type);
+                        const price = calculateProductPricing(p).finalPrice;
                         if (price < min || price > max) return false;
                     }
                     // Color
@@ -799,8 +973,8 @@ export const api = {
                         let valB: any = b[params.sort_by as keyof Product];
 
                         if (params.sort_by === 'price') {
-                            valA = calculateFinalPrice(Number(a.price) || 0, a.discount_amount, a.discount_type);
-                            valB = calculateFinalPrice(Number(b.price) || 0, b.discount_amount, b.discount_type);
+                            valA = calculateProductPricing(a).finalPrice;
+                            valB = calculateProductPricing(b).finalPrice;
                         } else if (params.sort_by === 'created_at') {
                             valA = new Date(valA).getTime();
                             valB = new Date(valB).getTime();
@@ -832,92 +1006,245 @@ export const api = {
      * This extracts unique values from all product variants
      */
     async getFilterMetadata(): Promise<{ colors: ColorOption[], sizes: string[], minPrice: number, maxPrice: number }> {
+        const now = Date.now();
+        if (filterMetadataCache && (now - filterMetadataCacheAt) < CATALOG_CACHE_TTL_MS) {
+            return filterMetadataCache;
+        }
+        if (filterMetadataInFlight) return filterMetadataInFlight;
+
+        filterMetadataInFlight = (async () => {
+            try {
+                // Fetch multiple pages or large limit to get good metadata range
+                const products = await this.getProducts({ limit: 500 }); // Increase limit for better accuracy
+
+                const colorsMap = new Map<string, string>(); // name -> hex
+                const sizesSet = new Set<string>();
+                let minPrice = Infinity;
+                let maxPrice = 0;
+
+                products.forEach(product => {
+                    // Extract price range using Final Price (Discounted)
+                    if (product.price) {
+                        const price = calculateProductPricing(product).finalPrice;
+
+                        if (price < minPrice) minPrice = price;
+                        if (price > maxPrice) maxPrice = price;
+                    }
+
+                    // Extract colors and sizes from variants
+                    if (product.variants && Array.isArray(product.variants)) {
+                        product.variants.forEach(variant => {
+                            // Check for color in variant
+                            if (variant.color) {
+                                const colorOption = parseColorValue(variant.color);
+                                if (colorOption && !colorsMap.has(colorOption.name)) {
+                                    colorsMap.set(colorOption.name, colorOption.hex);
+                                }
+                            }
+                            // Check for size in variant options
+                            if (variant.size) {
+                                sizesSet.add(variant.size);
+                            }
+                            // Also check variant price
+                            if (variant.price) {
+                                const vPrice = calculateProductPricing(product, { selectedVariant: variant }).finalPrice;
+                                if (vPrice < minPrice) minPrice = vPrice;
+                                if (vPrice > maxPrice) maxPrice = vPrice;
+                            }
+                        });
+                    }
+
+                    // Also check product options for color/size values
+                    if (product.options && Array.isArray(product.options)) {
+                        product.options.forEach(option => {
+                            const optionName = option.name?.toLowerCase();
+                            if (optionName === 'color' || optionName === 'colour') {
+                                if (Array.isArray(option.values)) {
+                                    option.values.forEach((v: any) => {
+                                        const colorOption = parseColorValue(v);
+                                        if (colorOption && !colorsMap.has(colorOption.name)) {
+                                            colorsMap.set(colorOption.name, colorOption.hex);
+                                        }
+                                    });
+                                }
+                            }
+                            if (optionName === 'size') {
+                                if (Array.isArray(option.values)) {
+                                    option.values.forEach((v: string) => sizesSet.add(v));
+                                }
+                            }
+                        });
+                    }
+                });
+
+                const result = {
+                    colors: Array.from(colorsMap.entries()).map(([name, hex]) => ({ name, hex })).sort((a, b) => a.name.localeCompare(b.name)),
+                    sizes: Array.from(sizesSet).sort(),
+                    minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
+                    maxPrice: maxPrice === 0 ? 1000 : Math.ceil(maxPrice)
+                };
+
+                filterMetadataCache = result;
+                filterMetadataCacheAt = Date.now();
+                return result;
+            } catch (err) {
+                console.error('Error fetching filter metadata:', err);
+                if (filterMetadataCache) return filterMetadataCache;
+                return {
+                    colors: [],
+                    sizes: [],
+                    minPrice: 0,
+                    maxPrice: 1000
+                };
+            } finally {
+                filterMetadataInFlight = null;
+            }
+        })();
+
+        return filterMetadataInFlight;
+    },
+
+    // --- Search & Viewed History ---
+    async getSearchHistory(limit: number = 10): Promise<string[]> {
         try {
-            // Fetch multiple pages or large limit to get good metadata range
-            const products = await this.getProducts({ limit: 500 }); // Increase limit for better accuracy
+            const deviceId = await getDeviceId();
+            const url = new URL(`${BASE_URL}/search/history`);
+            url.searchParams.append('limit', String(limit));
+            url.searchParams.append('device_id', deviceId);
 
-            const colorsMap = new Map<string, string>(); // name -> hex
-            const sizesSet = new Set<string>();
-            let minPrice = Infinity;
-            let maxPrice = 0;
+            const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
+            if (res.status === 404) return [];
 
-            products.forEach(product => {
-                // Extract price range using Final Price (Discounted)
-                if (product.price) {
-                    const price = calculateFinalPrice(
-                        typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-                        product.discount_amount,
-                        product.discount_type
-                    );
+            const payload = await handleResponse<any>(res);
+            const list = Array.isArray(payload) ? payload : (payload?.data || []);
 
-                    if (price < minPrice) minPrice = price;
-                    if (price > maxPrice) maxPrice = price;
-                }
+            return list
+                .map((item: any) => {
+                    if (typeof item === 'string') return item;
+                    return item?.query || item?.keyword || item?.search || '';
+                })
+                .map((query: string) => query.trim())
+                .filter(Boolean)
+                .slice(0, limit);
+        } catch (error) {
+            console.warn('Search history endpoint unavailable; using local fallback.', error);
+            return [];
+        }
+    },
 
-                // Extract colors and sizes from variants
-                if (product.variants && Array.isArray(product.variants)) {
-                    product.variants.forEach(variant => {
-                        // Check for color in variant
-                        if (variant.color) {
-                            const colorOption = parseColorValue(variant.color);
-                            if (colorOption && !colorsMap.has(colorOption.name)) {
-                                colorsMap.set(colorOption.name, colorOption.hex);
-                            }
-                        }
-                        // Check for size in variant options
-                        if (variant.size) {
-                            sizesSet.add(variant.size);
-                        }
-                        // Also check variant price
-                        if (variant.price) {
-                            const vPrice = calculateFinalPrice(
-                                typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price,
-                                variant.discount_amount,
-                                variant.discount_type
-                            );
-                            if (vPrice < minPrice) minPrice = vPrice;
-                            if (vPrice > maxPrice) maxPrice = vPrice;
-                        }
-                    });
-                }
+    async getTrendingSearches(limit: number = 10): Promise<string[]> {
+        try {
+            const url = new URL(`${BASE_URL}/search/trending`);
+            url.searchParams.append('limit', String(limit));
 
-                // Also check product options for color/size values
-                if (product.options && Array.isArray(product.options)) {
-                    product.options.forEach(option => {
-                        const optionName = option.name?.toLowerCase();
-                        if (optionName === 'color' || optionName === 'colour') {
-                            if (Array.isArray(option.values)) {
-                                option.values.forEach((v: any) => {
-                                    const colorOption = parseColorValue(v);
-                                    if (colorOption && !colorsMap.has(colorOption.name)) {
-                                        colorsMap.set(colorOption.name, colorOption.hex);
-                                    }
-                                });
-                            }
-                        }
-                        if (optionName === 'size') {
-                            if (Array.isArray(option.values)) {
-                                option.values.forEach((v: string) => sizesSet.add(v));
-                            }
-                        }
-                    });
-                }
+            const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
+            if (res.status === 404) return [];
+
+            const payload = await handleResponse<any>(res);
+            const list = Array.isArray(payload) ? payload : (payload?.data || []);
+
+            return list
+                .map((item: any) => {
+                    if (typeof item === 'string') return item;
+                    return item?.query || item?.keyword || item?.search || '';
+                })
+                .map((query: string) => query.trim())
+                .filter(Boolean)
+                .slice(0, limit);
+        } catch (error) {
+            console.warn('Trending searches endpoint unavailable.', error);
+            return [];
+        }
+    },
+
+    async saveSearchQuery(query: string): Promise<void> {
+        const trimmed = query.trim();
+        if (!trimmed) return;
+
+        try {
+            const deviceId = await getDeviceId();
+            const res = await fetchWithTimeout(`${BASE_URL}/search/history`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    query: trimmed,
+                    device_id: deviceId,
+                }),
+            });
+            if (!res.ok && res.status !== 404) {
+                await handleResponse<any>(res);
+            }
+        } catch (error) {
+            console.warn('Failed to sync search query to backend.', error);
+        }
+    },
+
+    async clearSearchHistory(): Promise<void> {
+        try {
+            const deviceId = await getDeviceId();
+            const url = new URL(`${BASE_URL}/search/history`);
+            url.searchParams.append('device_id', deviceId);
+
+            const res = await fetchWithTimeout(url.toString(), {
+                method: 'DELETE',
+                headers: getHeaders(),
             });
 
-            return {
-                colors: Array.from(colorsMap.entries()).map(([name, hex]) => ({ name, hex })).sort((a, b) => a.name.localeCompare(b.name)),
-                sizes: Array.from(sizesSet).sort(),
-                minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
-                maxPrice: maxPrice === 0 ? 1000 : Math.ceil(maxPrice)
-            };
-        } catch (err) {
-            console.error('Error fetching filter metadata:', err);
-            return {
-                colors: [],
-                sizes: [],
-                minPrice: 0,
-                maxPrice: 1000
-            };
+            if (!res.ok && res.status !== 404) {
+                await handleResponse<any>(res);
+            }
+        } catch (error) {
+            console.warn('Failed to clear search history on backend.', error);
+        }
+    },
+
+    async getRecentlyViewedProducts(limit: number = 10): Promise<Product[]> {
+        try {
+            const deviceId = await getDeviceId();
+            const url = new URL(`${BASE_URL}/products/recently-viewed`);
+            const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
+            url.searchParams.append('limit', String(limit));
+            url.searchParams.append('device_id', deviceId);
+            url.searchParams.append('with', includeRelations);
+            url.searchParams.append('include', includeRelations);
+
+            const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
+            if (res.status === 404) return [];
+
+            const payload = await handleResponse<any>(res);
+            const list = Array.isArray(payload) ? payload : (payload?.data || []);
+
+            return list
+                .map((item: any) => {
+                    if (item?.product && typeof item.product === 'object') return item.product;
+                    return item;
+                })
+                .filter((item: any) => item && typeof item === 'object' && item.id != null)
+                .map((item: any) => transformProduct(item))
+                .slice(0, limit);
+        } catch (error) {
+            console.warn('Recently viewed endpoint unavailable; using local fallback.', error);
+            return [];
+        }
+    },
+
+    async trackProductView(productId: number | string, variantId?: number | string | null): Promise<void> {
+        try {
+            const deviceId = await getDeviceId();
+            const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/view`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({
+                    variant_id: variantId ?? null,
+                    device_id: deviceId,
+                }),
+            });
+
+            if (!res.ok && res.status !== 404) {
+                await handleResponse<any>(res);
+            }
+        } catch (error) {
+            console.warn(`Failed to track product view for product ${productId}.`, error);
         }
     },
 

@@ -5,13 +5,16 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { useCurrency } from '@/hooks/use-currency-context';
 
+import { CustomBundleItem } from '@/types/schema';
+
 interface BundleContentsProps {
     items: Product[];
+    customItems?: CustomBundleItem[];
     selections: Record<number, ProductVariant | null>;
     onSelectionChange: (productId: number, variant: ProductVariant | null) => void;
 }
 
-export function BundleContents({ items, selections, onSelectionChange }: BundleContentsProps) {
+export function BundleContents({ items, customItems, selections, onSelectionChange }: BundleContentsProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { formatPrice } = useCurrency();
@@ -26,12 +29,16 @@ export function BundleContents({ items, selections, onSelectionChange }: BundleC
 
             <View style={styles.list}>
                 {items.map((item, index) => {
-                    // Check strict boolean or length. Ignore has_variants flag if variants array exists and needs selection.
                     const hasVariants = (item.variants && item.variants.length > 0) || !!item.has_variants;
                     const selectedVariant = selections[item.id];
-                    const currentImage = selectedVariant?.image_path || item.main_image;
+
+                    // Pivot customizations (e.g. named gift)
+                    const pivotName = item.pivot?.custom_gift_name;
+                    const pivotImage = item.pivot?.custom_gift_image;
+
+                    const currentImage = pivotImage || selectedVariant?.image_path || item.main_image;
                     const brandName = item.brand?.name || '';
-                    const productName = item.name_en || item.name || '';
+                    const productName = pivotName || item.name_en || item.name || '';
                     const price = selectedVariant
                         ? Number(selectedVariant.price)
                         : Number(item.price);
@@ -82,8 +89,41 @@ export function BundleContents({ items, selections, onSelectionChange }: BundleC
                         </View>
                     );
                 })}
+
+                {/* Render Custom Bundle Items (Gifts) */}
+                {customItems?.map((item, index) => (
+                    <View key={`custom-${item.id}`} style={[
+                        styles.itemContainer,
+                        index !== (customItems.length - 1) && styles.borderBottom, // This simple logic fails if mingled, but works if appended
+                        // Better border logic: check if not last overall
+                        styles.borderBottom, // Always border between types or just rely on spacing
+                        isDark && { borderColor: '#333' }
+                    ]}>
+                        <View style={styles.productRow}>
+                            <Image
+                                source={{ uri: item.custom_gift_image || undefined }}
+                                style={styles.image}
+                                resizeMode="cover"
+                            />
+                            <View style={styles.info}>
+                                <View style={styles.giftBadge}>
+                                    <Text style={styles.giftText}>GIFT</Text>
+                                </View>
+                                <Text style={[styles.productTitle, isDark && { color: '#fff' }]}>
+                                    {item.custom_gift_name || 'Mystery Gift'}
+                                </Text>
+                                <View style={styles.priceRow}>
+                                    <Text style={[styles.price, isDark && { color: '#fff' }]}>
+                                        Included
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                ))}
+
             </View>
-        </View>
+        </View >
     );
 }
 
@@ -156,5 +196,19 @@ const styles = StyleSheet.create({
         marginTop: -16, // Pull selectors up closer to product info if needed, leveraging ProductSelectors padding
         marginLeft: -20, // Negate ProductSelectors internal padding
         marginRight: -20,
+    },
+    giftBadge: {
+        backgroundColor: '#000',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+        marginBottom: 8,
+    },
+    giftText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
     }
 });

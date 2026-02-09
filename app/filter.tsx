@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Platform, Dimensions, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Platform, Dimensions, LayoutAnimation, UIManager } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -383,7 +383,6 @@ export default function FilterPage() {
     const { filters, updateFilter } = useFilters();
     const insets = useSafeAreaInsets();
 
-    const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
 
@@ -496,29 +495,29 @@ export default function FilterPage() {
     // Initialize data
     useEffect(() => {
         const load = async () => {
-            try {
-                const [cats, brs, metadata] = await Promise.all([
-                    api.getCategories(),
-                    api.getBrands(),
-                    api.getFilterMetadata()
-                ]);
+            const catsTask = api.getCategories()
+                .then((cats) => setCategories(cats || []))
+                .catch((err) => console.error('Failed loading categories in filter page:', err));
 
-                setCategories(cats || []);
-                setBrands(brs || []);
-                setAvailableColors(metadata.colors);
-                setAvailableSizes(metadata.sizes);
-                setPriceMin(metadata.minPrice);
-                setPriceMax(metadata.maxPrice);
+            const brandsTask = api.getBrands()
+                .then((brs) => setBrands(brs || []))
+                .catch((err) => console.error('Failed loading brands in filter page:', err));
 
-                // Update price range in context if it's still at default
-                if (filters.priceRange[0] === 0 && filters.priceRange[1] === 1000) {
-                    updateFilter('priceRange', [metadata.minPrice, metadata.maxPrice]);
-                }
-            } catch (err) {
-                console.error('API Failed in FilterModal:', err);
-            } finally {
-                setLoading(false);
-            }
+            const metadataTask = api.getFilterMetadata()
+                .then((metadata) => {
+                    setAvailableColors(metadata.colors);
+                    setAvailableSizes(metadata.sizes);
+                    setPriceMin(metadata.minPrice);
+                    setPriceMax(metadata.maxPrice);
+
+                    // Update price range in context if it's still at default
+                    if (filters.priceRange[0] === 0 && filters.priceRange[1] === 1000) {
+                        updateFilter('priceRange', [metadata.minPrice, metadata.maxPrice]);
+                    }
+                })
+                .catch((err) => console.error('Failed loading filter metadata in filter page:', err));
+
+            await Promise.allSettled([catsTask, brandsTask, metadataTask]);
         };
         // Only load once
         if (categories.length === 0) load();
@@ -543,14 +542,6 @@ export default function FilterPage() {
     }));
 
     const sizesList = availableSizes;
-
-    if (loading) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={isDark ? '#fff' : '#1152d4'} />
-            </View>
-        );
-    }
 
     // Count active filters
     const activeFilterCount = localCategoryIds.length + localBrandIds.length +

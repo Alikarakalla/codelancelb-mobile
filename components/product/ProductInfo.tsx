@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Link } from 'expo-router';
+import { useCurrency } from '@/hooks/use-currency-context';
 
 interface ProductInfoProps {
     brand?: string;
@@ -16,6 +17,7 @@ interface ProductInfoProps {
 export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount, productId }: ProductInfoProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { formatPrice } = useCurrency();
 
     const RatingContent = (
         <View style={styles.ratingRow}>
@@ -45,10 +47,10 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
                     isDark && { color: '#fff' },
                     (originalPrice && originalPrice > price) ? { color: '#ef4444' } : undefined
                 ]}>
-                    $ {price.toFixed(2)}
+                    {formatPrice(price)}
                 </Text>
                 {originalPrice && originalPrice > price ? (
-                    <Text style={styles.originalPrice}>$ {originalPrice.toFixed(2)}</Text>
+                    <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
                 ) : null}
             </View>
 

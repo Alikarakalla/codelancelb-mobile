@@ -59,6 +59,11 @@ export default function ShopScreen() {
         fetchFilters();
     }, []);
 
+    // Warm metadata cache early so Filter screen opens instantly without a blocking loader
+    React.useEffect(() => {
+        api.getFilterMetadata().catch(() => { });
+    }, []);
+
     // Helper to classify Category IDs
     const classifyCategoryIds = (ids: number[], allCategories: Category[]) => {
         const category_ids: number[] = [];
@@ -318,10 +323,13 @@ export default function ShopScreen() {
             <View style={{ flex: 1, paddingTop: 60 + insets.top }}>
                 <ShopFilterBar
                     activeFilters={activeFilters}
-                    onFilterPress={() => router.push({
-                        pathname: '/filter',
-                        params: {}
-                    })}
+                    onFilterPress={() => {
+                        api.getFilterMetadata().catch(() => { });
+                        router.push({
+                            pathname: '/filter',
+                            params: {}
+                        });
+                    }}
                     onSortPress={handleSortPress}
                     onRemoveFilter={handleRemoveFilter}
                 />

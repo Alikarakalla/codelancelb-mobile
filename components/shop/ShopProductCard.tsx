@@ -9,6 +9,8 @@ import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCart } from '@/hooks/use-cart-context';
+import { useCurrency } from '@/hooks/use-currency-context';
+import { calculateProductListingPricing } from '@/utils/pricing';
 
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -31,6 +33,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { addToCart } = useCart();
+    const { formatPrice } = useCurrency();
 
     const { triggerCartAnimation } = useCartAnimation();
 
@@ -40,76 +43,17 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
 
 
 
-    // Find variant with highest discount percentage
-    // Helper to calculate discount details
-    const getVariantDetails = (item: any) => {
-        if (!item) return { price: 0, originalPrice: 0, percent: 0 };
-
-        const rawPrice = Number(item.price) || 0;
-        let finalPrice = rawPrice;
-        let originalPrice = 0;
-        let percent = 0;
-
-        // Check explicit discount fields first
-        if (item.discount_amount && Number(item.discount_amount) > 0) {
-            const discountAmount = Number(item.discount_amount);
-            originalPrice = rawPrice; // The DB price is the 'Old' price
-
-            if (item.discount_type === 'percentage') {
-                percent = discountAmount / 100;
-                finalPrice = rawPrice - (rawPrice * percent);
-            } else {
-                // fixed
-                finalPrice = rawPrice - discountAmount;
-                percent = discountAmount / rawPrice;
-            }
-        } else if (item.compare_at_price && Number(item.compare_at_price) > rawPrice) {
-            // Standard: price is selling, compare_at is original
-            finalPrice = rawPrice;
-            originalPrice = Number(item.compare_at_price);
-            percent = (originalPrice - finalPrice) / originalPrice;
-        }
-
-        return { price: finalPrice, originalPrice, percent };
-    };
-
-    // Find variant with highest discount percentage
-    const maxDiscountVariant = React.useMemo(() => {
-        if (!product.variants) return null;
-        let maxVariant = null;
-        let maxPercent = 0;
-
-        // Check main product baseline
-        const productDetails = getVariantDetails(product);
-        if (productDetails.percent > 0) {
-            maxPercent = productDetails.percent;
-        }
-
-        product.variants.forEach(v => {
-            const details = getVariantDetails(v);
-            if (details.percent > maxPercent) {
-                maxPercent = details.percent;
-                maxVariant = v;
-            }
-        });
-        return maxVariant;
-    }, [product]);
-
-    // Derived state based on selection or defaults
-    const displayItem = selectedVariant || maxDiscountVariant || product;
-    const { price: currentPrice, originalPrice: currentComparePrice } = getVariantDetails(displayItem);
+    const pricing = React.useMemo(
+        () => calculateProductListingPricing(product, { selectedVariant }),
+        [product, selectedVariant]
+    );
 
     // Only switch image if user explicitly selected a variant
     const currentImage = selectedVariant?.image_path || product.main_image || '';
 
     const inWishlist = isInWishlist(product.id);
-    const hasDiscount = currentComparePrice > currentPrice;
-
-    // Calculate discount percentage
-    let discountPercentage = 0;
-    if (hasDiscount && currentComparePrice) {
-        discountPercentage = Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100);
-    }
+    const hasDiscount = pricing.hasDiscount;
+    const discountPercentage = pricing.discountPercent;
 
     const isOutOfStock = React.useMemo(() => {
         // Basic check for simple product
@@ -140,7 +84,7 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
     } else if (hasDiscount) {
         badge = (
             <View style={[styles.badgeContainer, { backgroundColor: '#ef4444' }]}>
-                <Text style={styles.badgeTextSale}>{discountPercentage > 0 ? `-${discountPercentage}%` : 'SALE'}</Text>
+                <Text style={styles.badgeTextSale}>{pricing.badgeText || (discountPercentage > 0 ? `-${discountPercentage}%` : 'SALE')}</Text>
             </View>
         );
     }
@@ -283,11 +227,11 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                     <View>
                         {hasDiscount && (
                             <Text style={styles.originalPrice}>
-                                ${currentComparePrice?.toFixed(2)}
+                                {formatPrice(pricing.originalPrice)}
                             </Text>
                         )}
                         <Text style={[styles.price, hasDiscount ? styles.priceDiscount : undefined, isDark && !hasDiscount && { color: '#fff' }]}>
-                            ${currentPrice.toFixed(2)}
+                            {formatPrice(pricing.finalPrice)}
                         </Text>
                     </View>
 

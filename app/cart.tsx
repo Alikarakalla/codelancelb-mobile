@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { CartItem } from '@/components/cart/CartItem';
 import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
@@ -13,13 +14,14 @@ import { CartFooter } from '@/components/cart/CartFooter';
 import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { api } from '@/services/apiClient';
+import { getCartItemPricing, resolveCartItemVariant } from '@/utils/cartPricing';
 
 export default function CartScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const { items, removeFromCart, updateQuantity } = useCart();
+    const { items, removeFromCart, updateQuantity, recalculateCartPrices } = useCart();
     const { user } = useAuth();
 
     const [storeSettings, setStoreSettings] = useState<any>(null);
@@ -27,6 +29,12 @@ export default function CartScreen() {
     useEffect(() => {
         loadSettings();
     }, []);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            recalculateCartPrices();
+        }, [recalculateCartPrices])
+    );
 
     const loadSettings = async () => {
         try {
@@ -43,19 +51,8 @@ export default function CartScreen() {
 
     // Calculate subtotal with item discounts
     const subtotal = items.reduce((sum, item) => {
-        const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
-        const sourceDiscount = variant || item.product;
-        const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
-        let itemPrice = item.price;
-        if (hasDiscount && sourceDiscount.discount_amount) {
-            const amount = parseFloat(String(sourceDiscount.discount_amount));
-            if (sourceDiscount.discount_type === 'percent') {
-                itemPrice = item.price * (1 - amount / 100);
-            } else if (sourceDiscount.discount_type === 'fixed') {
-                itemPrice = item.price - amount;
-            }
-        }
-        return sum + (itemPrice * item.qty);
+        const pricing = getCartItemPricing(item);
+        return sum + (pricing.unitPrice * item.qty);
     }, 0);
 
     // Shipping
@@ -145,26 +142,9 @@ export default function CartScreen() {
                     <>
                         <View style={styles.list}>
                             {items.map((item) => {
-                                // Debug logging
-                                console.log('Cart Item:', {
-                                    id: item.id,
-                                    variant_key: item.variant_key,
-                                    product_name: item.product?.name_en,
-                                    variants_count: item.product?.variants?.length,
-                                    variant_slugs: item.product?.variants?.map(v => v.slug),
-                                });
-
                                 // Find variant based on key
-                                const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
-
-                                console.log('Found Variant:', {
-                                    found: !!variant,
-                                    variant_id: variant?.id,
-                                    variant_color: variant?.color,
-                                    variant_size: variant?.size,
-                                    variant_image: variant?.image_path,
-                                    variant_discount: variant?.discount_amount,
-                                });
+                                const variant = resolveCartItemVariant(item);
+                                const pricing = getCartItemPricing(item);
 
                                 // Determine image: variant gallery -> variant image -> product images -> main image
                                 let displayImage = '';
@@ -227,46 +207,15 @@ export default function CartScreen() {
                                     }
                                 }
 
-                                // Calculate discount - check variant first, then product
-                                const sourceDiscount = variant || item.product;
-                                const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
-                                let displayPrice = item.price; // Default to cart price
-                                let originalPrice: number | undefined;
-                                let discountPercent: number | undefined;
-
-                                if (hasDiscount && sourceDiscount.discount_amount) {
-                                    const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
-
-                                    // Cart stores ORIGINAL price, we need to calculate DISCOUNTED price
-                                    originalPrice = item.price; // Original price (before discount)
-
-                                    if (sourceDiscount.discount_type === 'percent') {
-                                        displayPrice = item.price * (1 - discountAmount / 100);
-                                        discountPercent = discountAmount;
-                                    } else if (sourceDiscount.discount_type === 'fixed') {
-                                        displayPrice = item.price - discountAmount;
-                                        discountPercent = Math.round((discountAmount / item.price) * 100);
-                                    }
-                                }
-
-                                console.log('Discount Calc:', {
-                                    hasDiscount,
-                                    cartStoredPrice: item.price,
-                                    displayPrice,
-                                    originalPrice,
-                                    discountPercent,
-                                    source: variant ? 'variant' : 'product',
-                                });
-
                                 return (
                                     <CartItem
                                         key={item.id}
                                         id={item.id}
                                         name={item.product?.name_en || item.product?.name || ''}
                                         details={details}
-                                        price={displayPrice}
-                                        originalPrice={originalPrice}
-                                        discountPercent={discountPercent}
+                                        price={pricing.unitPrice}
+                                        originalPrice={pricing.originalPrice}
+                                        discountPercent={pricing.discountPercent}
                                         image={displayImage}
                                         quantity={item.qty}
                                         onRemove={() => removeFromCart(item.id)}

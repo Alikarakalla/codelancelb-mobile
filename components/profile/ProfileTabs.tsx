@@ -7,7 +7,7 @@ interface ProfileTabsProps {
     onTabChange: (tab: string) => void;
 }
 
-const TABS = ['Details', 'Orders', 'Addresses', 'Loyalty', 'Security'];
+const TABS = ['Details', 'Orders', 'Addresses', 'Notifications', 'Loyalty', 'Security'];
 
 export function ProfileTabs({ activeTab, onTabChange }: ProfileTabsProps) {
     const colorScheme = useColorScheme();

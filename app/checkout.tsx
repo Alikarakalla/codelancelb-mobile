@@ -11,15 +11,17 @@ import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { api } from '@/services/apiClient';
+import { useFocusEffect } from '@react-navigation/native';
 import PhoneInput from 'react-native-phone-input';
 import { parsePhoneNumber } from 'libphonenumber-js';
+import { getCartItemPricing, resolveCartItemVariant } from '@/utils/cartPricing';
 
 export default function CheckoutScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const insets = useSafeAreaInsets();
-    const { items, cartTotal, clearCart } = useCart();
+    const { items, clearCart, recalculateCartPrices } = useCart();
     const { user, isAuthenticated } = useAuth();
     const { formatPrice, currency } = useCurrency();
 
@@ -71,6 +73,12 @@ export default function CheckoutScreen() {
             loadMyRewards();
         }
     }, [isAuthenticated, user]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            recalculateCartPrices();
+        }, [recalculateCartPrices])
+    );
 
     // Sync phone number with selected address
     useEffect(() => {
@@ -167,21 +175,8 @@ export default function CheckoutScreen() {
 
     // Calculations - Calculate subtotal with discounts applied
     const subtotal = items.reduce((sum, item) => {
-        const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
-        const sourceDiscount = variant || item.product;
-        const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
-        let itemPrice = item.price;
-
-        if (hasDiscount && sourceDiscount.discount_amount) {
-            const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
-            if (sourceDiscount.discount_type === 'percent') {
-                itemPrice = item.price * (1 - discountAmount / 100);
-            } else if (sourceDiscount.discount_type === 'fixed') {
-                itemPrice = item.price - discountAmount;
-            }
-        }
-
-        return sum + (itemPrice * item.qty);
+        const pricing = getCartItemPricing(item);
+        return sum + (pricing.unitPrice * item.qty);
     }, 0);
 
     // Calculate Discount Amount (from coupon)
@@ -312,21 +307,8 @@ export default function CheckoutScreen() {
 
                 items: items.map(item => {
                     // Find the variant by slug to get its numeric ID
-                    const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
-
-                    // Calculate discounted price for this item
-                    const sourceDiscount = variant || item.product;
-                    const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
-                    let itemPrice = item.price;
-
-                    if (hasDiscount && sourceDiscount.discount_amount) {
-                        const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
-                        if (sourceDiscount.discount_type === 'percent') {
-                            itemPrice = item.price * (1 - discountAmount / 100);
-                        } else if (sourceDiscount.discount_type === 'fixed') {
-                            itemPrice = item.price - discountAmount;
-                        }
-                    }
+                    const variant = resolveCartItemVariant(item);
+                    const pricing = getCartItemPricing(item);
 
                     // Simplify options - especially for bundle products
                     let simplifiedOptions: Record<string, any> | null = null;
@@ -358,7 +340,7 @@ export default function CheckoutScreen() {
                         product_id: item.product_id || item.id,
                         variant_id: variant?.id || null,
                         quantity: item.qty,
-                        price: parseFloat(itemPrice.toFixed(2)),
+                        price: parseFloat(pricing.unitPrice.toFixed(2)),
                         options: simplifiedOptions,
                     };
                 }),
@@ -499,7 +481,8 @@ export default function CheckoutScreen() {
                             <View style={styles.cartItems}>
                                 {items.map((item) => {
                                     // Find variant details for display
-                                    const variant = item.product?.variants?.find(v => v.slug === item.variant_key);
+                                    const variant = resolveCartItemVariant(item);
+                                    const pricing = getCartItemPricing(item);
 
                                     // Use variant gallery first for image
                                     const image = variant?.gallery?.[0] || variant?.image_path || item.product?.main_image || '';
@@ -511,19 +494,8 @@ export default function CheckoutScreen() {
                                         details = Object.values(item.options).join(' / ');
                                     }
 
-                                    // Calculate discount - same logic as cart
-                                    const sourceDiscount = variant || item.product;
-                                    const hasDiscount = sourceDiscount?.discount_amount && sourceDiscount?.discount_type;
-                                    let displayPrice = item.price;
-
-                                    if (hasDiscount && sourceDiscount.discount_amount) {
-                                        const discountAmount = parseFloat(String(sourceDiscount.discount_amount));
-                                        if (sourceDiscount.discount_type === 'percent') {
-                                            displayPrice = item.price * (1 - discountAmount / 100);
-                                        } else if (sourceDiscount.discount_type === 'fixed') {
-                                            displayPrice = item.price - discountAmount;
-                                        }
-                                    }
+                                    const lineTotal = pricing.unitPrice * item.qty;
+                                    const lineOriginalTotal = pricing.originalPrice ? (pricing.originalPrice * item.qty) : undefined;
 
                                     return (
                                         <View key={item.id} style={styles.cartItem}>
@@ -539,9 +511,16 @@ export default function CheckoutScreen() {
                                                 </Text>
                                                 <Text style={[styles.itemVariant, isDark && styles.textGrayDark]}>{details}</Text>
                                             </View>
-                                            <Text style={[styles.itemPrice, isDark && styles.textDark]}>
-                                                {formatPrice(displayPrice * item.qty)}
-                                            </Text>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                {lineOriginalTotal && lineOriginalTotal > lineTotal && (
+                                                    <Text style={[styles.itemVariant, isDark && styles.textGrayDark, { textDecorationLine: 'line-through' }]}>
+                                                        {formatPrice(lineOriginalTotal)}
+                                                    </Text>
+                                                )}
+                                                <Text style={[styles.itemPrice, isDark && styles.textDark]}>
+                                                    {formatPrice(lineTotal)}
+                                                </Text>
+                                            </View>
                                         </View>
                                     )
                                 })}

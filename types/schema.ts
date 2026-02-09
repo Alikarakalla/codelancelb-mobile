@@ -29,6 +29,7 @@ export interface Product {
     id: number;
     category_id: number;
     sub_category_id?: number | null;
+    sub_sub_category_id?: number | null;
     brand_id?: number | null;
     name: string; // fallback
     name_en?: string;
@@ -57,6 +58,31 @@ export interface Product {
     height?: number | null;
     discount_amount?: number | null;
     discount_type?: 'fixed' | 'percent' | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+    discount_target_parents?: string[] | null;
+    flash_sale_discount_amount?: number | null;
+    flash_sale_discount_type?: 'fixed' | 'percent' | null;
+    flash_sale_start_date?: string | null;
+    flash_sale_end_date?: string | null;
+    flash_sale_price?: number | null;
+    flash_sale?: {
+        id?: number;
+        is_active?: boolean;
+        active?: boolean;
+        status?: string;
+        price?: number | null;
+        sale_price?: number | null;
+        discount_amount?: number | null;
+        discount_type?: 'fixed' | 'percent' | null;
+        discount_start_date?: string | null;
+        discount_end_date?: string | null;
+        start_date?: string | null;
+        end_date?: string | null;
+        starts_at?: string | null;
+        ends_at?: string | null;
+        discount_target_parents?: string[] | null;
+    } | null;
     published_at?: string | null; // timestamp
     created_at?: string;
     updated_at?: string;
@@ -68,6 +94,12 @@ export interface Product {
     reviews?: ProductReview[];
     brand?: Brand;
     category?: Category;
+    sub_category?: Category;
+    subCategory?: Category;
+    sub_sub_category?: Category;
+    subSubCategory?: Category;
+    sub_sub_categories?: Category[];
+    subSubCategories?: Category[];
     type?: 'standard' | 'bundle';
     bundle_items?: Product[];
     tags?: Tag[];
@@ -75,6 +107,10 @@ export interface Product {
     // NEW: Dynamic Variant System
     product_options?: DynamicProductOption[];
     variant_matrix?: Record<string, VariantMatrixEntry>;
+
+    // NEW: Bundles & Gifts
+    custom_bundle_items?: CustomBundleItem[];
+    pivot?: BundlePivot;
 }
 
 export interface ProductVariant {
@@ -94,6 +130,9 @@ export interface ProductVariant {
     cost_price?: number | null;
     discount_amount?: number | null;
     discount_type?: 'fixed' | 'percent' | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+    discount_target_parents?: string[] | null;
     stock_quantity: number;
     is_visible: boolean;
     prevent_listing: boolean;
@@ -137,11 +176,18 @@ export interface Category {
     description?: string;
     description_en?: string;
     description_ar?: string;
+    discount_amount?: number | null;
+    discount_type?: 'fixed' | 'percent' | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+    discount_target_parents?: string[] | null;
     is_active: boolean;
     show_in_header: boolean;
     sort_order: number;
     sub_categories?: Category[];
+    subCategories?: Category[];
     sub_sub_categories?: Category[];
+    subSubCategories?: Category[];
 }
 
 export interface HighlightSection {
@@ -358,3 +404,48 @@ export interface HomeSection {
 export interface HomeResponse {
     sections: HomeSection[];
 }
+
+export interface SearchHistoryItem {
+    id?: number;
+    query: string;
+    searched_at?: string;
+    count?: number;
+}
+
+export interface Notification {
+    id: string; // or number, usually UUIDs or IDs. User said ID marks as read, so likely ID.
+    type: string;
+    notifiable_type: string;
+    notifiable_id: number;
+    data: {
+        title: string;
+        body: string;
+        image?: string;
+        action_url?: string;
+        // add other data fields as needed based on Laravel notification structure
+        [key: string]: any;
+    };
+    read_at?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface BundlePivot {
+    product_id: number;
+    related_product_id?: number | null; // child_product_id
+    quantity: number;
+    is_gift: boolean; // boolean or 0/1
+    custom_gift_name?: string | null;
+    custom_gift_image?: string | null;
+}
+
+export interface CustomBundleItem {
+    id: number;
+    parent_product_id: number;
+    child_product_id?: number | null;
+    quantity: number;
+    is_gift: boolean;
+    custom_gift_name?: string | null;
+    custom_gift_image?: string | null;
+}
+

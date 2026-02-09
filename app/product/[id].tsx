@@ -22,6 +22,8 @@ import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCart } from '@/hooks/use-cart-context';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { calculateProductPricing } from '@/utils/pricing';
+import { saveLocalRecentlyViewedProduct } from '@/utils/searchStorage';
 
 export default function ProductDetailsScreen() {
     const { id, initialImage } = useLocalSearchParams();
@@ -51,6 +53,14 @@ export default function ProductDetailsScreen() {
                     const productId = Array.isArray(id) ? id[0] : id;
                     const data = await api.getProduct(productId);
                     setProduct(data);
+
+                    // Keep search "recently viewed" fast locally, then sync to backend.
+                    saveLocalRecentlyViewedProduct(data).catch((storageError) => {
+                        console.warn('Failed to persist recently viewed product locally:', storageError);
+                    });
+                    api.trackProductView(data.id).catch((trackError) => {
+                        console.warn('Failed to track product view on backend:', trackError);
+                    });
 
                     // If it's a simple product with variants but no options (unlikely now)
                     if (data.variants?.length && !data.product_options?.length) {
@@ -174,34 +184,13 @@ export default function ProductDetailsScreen() {
 
     // Calculate effective price (handling discounts)
     const priceData = useMemo(() => {
-        // Use variant-specific price from matrix if available
-        const variantPrice = selectedVariantData?.price;
-        const target = selectedVariant || product;
-        if (!target) return { price: 0, originalPrice: undefined };
-
-        const rawPrice = variantPrice !== undefined && variantPrice !== null ? Number(variantPrice) : (Number(target.price) || 0);
-        let finalPrice = rawPrice;
-        let originalPrice = undefined;
-
-        // Apply discount if present on the target (product or variant object)
-        if (target.discount_amount && Number(target.discount_amount) > 0) {
-            const discountAmount = Number(target.discount_amount);
-            originalPrice = rawPrice;
-
-            if ((target.discount_type as string) === 'percent' || (target.discount_type as string) === 'percentage') {
-                const percent = discountAmount / 100;
-                finalPrice = rawPrice - (rawPrice * percent);
-            } else {
-                finalPrice = Math.max(0, rawPrice - discountAmount);
-            }
-        } else if (target.compare_at_price && Number(target.compare_at_price) > rawPrice) {
-            finalPrice = rawPrice;
-            originalPrice = Number(target.compare_at_price);
-        }
-
+        const pricing = calculateProductPricing(product, {
+            selectedVariant,
+            selectedVariantPrice: selectedVariantData?.price ?? null,
+        });
         return {
-            price: finalPrice,
-            originalPrice: originalPrice
+            price: pricing.finalPrice,
+            originalPrice: pricing.originalPrice,
         };
     }, [product, selectedVariant, selectedVariantData]);
 
@@ -508,6 +497,7 @@ export default function ProductDetailsScreen() {
                             <Animated.View entering={FadeInDown.delay(700).duration(600).damping(12)}>
                                 <BundleContents
                                     items={product.bundle_items}
+                                    customItems={product.custom_bundle_items}
                                     selections={bundleSelections}
                                     onSelectionChange={(itemId, variant) => setBundleSelections(prev => ({ ...prev, [itemId]: variant }))}
                                 />
