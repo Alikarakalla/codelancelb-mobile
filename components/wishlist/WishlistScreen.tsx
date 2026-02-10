@@ -1,29 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
-import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useRouter } from 'expo-router';
-import { Product } from '@/types/schema';
 
 export default function WishlistScreen() {
     const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const router = useRouter();
-    const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
     const { wishlist } = useWishlist();
-
-    const handleProductPress = (product: Product) => {
-        router.push({
-            pathname: '/product/[id]',
-            params: { id: product.id, initialImage: product.main_image || '' }
-        });
-    };
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
@@ -44,7 +34,6 @@ export default function WishlistScreen() {
                                 key={item.id}
                                 product={item}
                                 style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
-                                onQuickView={() => setQuickViewProduct(item)}
                             />
                         ))}
                     </View>
@@ -58,14 +47,6 @@ export default function WishlistScreen() {
                     </View>
                 )}
             </ScrollView>
-
-            <ProductQuickViewModal
-                visible={!!quickViewProduct}
-                product={quickViewProduct}
-                onClose={() => setQuickViewProduct(null)}
-                onAddToCart={(params) => console.log('Add to cart:', params)}
-                onViewDetails={handleProductPress}
-            />
         </View>
     );
 }

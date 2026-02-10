@@ -16,6 +16,14 @@ interface AuthContextType {
     isLoading: boolean;
     reloadUser: () => Promise<void>;
     loginWithGoogle: (token: string) => Promise<void>;
+    loginWithApple: (payload: {
+        identityToken: string;
+        authorizationCode?: string | null;
+        user?: string | null;
+        email?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+    }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,6 +96,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const loginWithApple = async (payload: {
+        identityToken: string;
+        authorizationCode?: string | null;
+        user?: string | null;
+        email?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+    }) => {
+        setIsLoading(true);
+        try {
+            const data = await api.appleLogin(payload);
+            await saveAuthSession(data.user, data.access_token);
+        } catch (error) {
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const register = async (userData: any) => {
         setIsLoading(true);
         try {
@@ -135,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             logout,
             isLoading,
             reloadUser,
-            loginWithGoogle
+            loginWithGoogle,
+            loginWithApple
         }}>
             {children}
         </AuthContext.Provider>

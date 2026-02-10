@@ -12,6 +12,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -29,9 +30,10 @@ export default function LoginScreen() {
         }
     });
 
-    const { login, loginWithGoogle, isAuthenticated } = useAuth();
+    const { login, loginWithGoogle, loginWithApple, isAuthenticated } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [appleAvailable, setAppleAvailable] = useState(false);
 
     const [request, response, promptAsync] = Google.useAuthRequest({
         clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
@@ -52,6 +54,23 @@ export default function LoginScreen() {
         }
     }, [response]);
 
+    React.useEffect(() => {
+        const checkAppleAvailability = async () => {
+            if (Platform.OS !== 'ios') {
+                setAppleAvailable(false);
+                return;
+            }
+            try {
+                const available = await AppleAuthentication.isAvailableAsync();
+                setAppleAvailable(available);
+            } catch {
+                setAppleAvailable(false);
+            }
+        };
+
+        checkAppleAvailability();
+    }, []);
+
     const handleGoogleLogin = async (token: string) => {
         setLoading(true);
         try {
@@ -62,6 +81,45 @@ export default function LoginScreen() {
             Alert.alert(
                 'Google Login Failed',
                 'Something went wrong with Google Login. Please try again.'
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        if (Platform.OS !== 'ios') return;
+
+        setLoading(true);
+        try {
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+
+            if (!credential.identityToken) {
+                throw new Error('Missing Apple identity token');
+            }
+
+            await loginWithApple({
+                identityToken: credential.identityToken,
+                authorizationCode: credential.authorizationCode ?? null,
+                user: credential.user ?? null,
+                email: credential.email ?? null,
+                firstName: credential.fullName?.givenName ?? null,
+                lastName: credential.fullName?.familyName ?? null,
+            });
+            router.back();
+        } catch (error: any) {
+            if (error?.code === 'ERR_REQUEST_CANCELED') {
+                return;
+            }
+            console.error(error);
+            Alert.alert(
+                'Apple Login Failed',
+                'Something went wrong with Apple Sign In. Please try again.'
             );
         } finally {
             setLoading(false);
@@ -200,11 +258,21 @@ export default function LoginScreen() {
                                 <Pressable
                                     style={styles.socialButton}
                                     onPress={() => promptAsync()}
-                                    disabled={!request}
+                                    disabled={!request || loading}
                                 >
                                     <IconSymbol name="person.circle" size={20} color={isDark ? "#fff" : "#000"} />
                                     <Text style={styles.socialButtonText}>GOOGLE</Text>
                                 </Pressable>
+                                {appleAvailable && (
+                                    <Pressable
+                                        style={styles.socialButton}
+                                        onPress={handleAppleSignIn}
+                                        disabled={loading}
+                                    >
+                                        <IconSymbol name="apple.logo" size={20} color={isDark ? "#fff" : "#000"} />
+                                        <Text style={styles.socialButtonText}>APPLE</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         </View>
 

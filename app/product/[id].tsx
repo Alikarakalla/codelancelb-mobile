@@ -44,6 +44,7 @@ export default function ProductDetailsScreen() {
     const { addToCart, cartCount } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user } = useAuth();
+    const storageScopeKey = user?.id ? `user:${user.id}` : 'guest';
 
     useEffect(() => {
         if (id) {
@@ -55,7 +56,7 @@ export default function ProductDetailsScreen() {
                     setProduct(data);
 
                     // Keep search "recently viewed" fast locally, then sync to backend.
-                    saveLocalRecentlyViewedProduct(data).catch((storageError) => {
+                    saveLocalRecentlyViewedProduct(data, 10, storageScopeKey).catch((storageError) => {
                         console.warn('Failed to persist recently viewed product locally:', storageError);
                     });
                     api.trackProductView(data.id).catch((trackError) => {
@@ -92,10 +93,20 @@ export default function ProductDetailsScreen() {
             };
             fetchProduct();
         }
-    }, [id]);
+    }, [id, storageScopeKey]);
 
     const handleNotifyMe = async () => {
         if (!product) return;
+
+        // Guest users need at least one contact channel for waitlist follow-up.
+        if (!user?.email && !expoPushToken) {
+            Alert.alert(
+                'Enable Notifications',
+                'To get back-in-stock alerts as a guest, please allow push notifications or log in with an email address.'
+            );
+            return;
+        }
+
         try {
             await api.joinWaitlist({
                 product_id: product.id,
@@ -107,7 +118,24 @@ export default function ProductDetailsScreen() {
             setWaitlistRefreshTrigger(prev => prev + 1); // Force re-check to confirm backend state
             Alert.alert('Success', 'You have been added to the waiting list. We will notify you as soon as this item is back in stock!');
         } catch (error: any) {
-            Alert.alert('Error', error.status === 401 ? 'Please log in to join the waiting list.' : 'Failed to join the waiting list. Please try again.');
+            const rawMessage = String(error?.message || '');
+            const statusMatch = rawMessage.match(/API Error:\s*(\d+)/i);
+            const statusCode = statusMatch ? Number(statusMatch[1]) : null;
+
+            if (statusCode === 401) {
+                Alert.alert('Login Required', 'Please log in to join the waiting list.');
+                return;
+            }
+
+            if (!user && statusCode && statusCode >= 500) {
+                Alert.alert(
+                    'Guest Waitlist Unavailable',
+                    'We could not join the waitlist as a guest right now. Please log in and try again.'
+                );
+                return;
+            }
+
+            Alert.alert('Error', 'Failed to join the waiting list. Please try again.');
         }
     };
 

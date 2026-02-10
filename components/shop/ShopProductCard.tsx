@@ -2,17 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { FavouriteIcon, ShoppingBag01Icon } from '@/components/ui/icons';
+import { FavouriteIcon } from '@/components/ui/icons';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
-import { useCart } from '@/hooks/use-cart-context';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { calculateProductListingPricing } from '@/utils/pricing';
 
-import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
@@ -20,10 +17,9 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 interface ShopProductCardProps {
     product: Product;
     style?: ViewStyle;
-    onQuickView?: (product: Product) => void;
 }
 
-export function ShopProductCard({ product, style, onQuickView }: ShopProductCardProps) {
+export function ShopProductCard({ product, style }: ShopProductCardProps) {
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
     useEffect(() => {
@@ -32,12 +28,8 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
 
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-    const { addToCart } = useCart();
     const { formatPrice } = useCurrency();
 
-    const { triggerCartAnimation } = useCartAnimation();
-
-    const cartButtonRef = React.useRef<View>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
@@ -120,11 +112,6 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
         } as any);
     };
 
-    const handleQuickView = (e?: any) => {
-        e?.stopPropagation && e.stopPropagation();
-        if (onQuickView) onQuickView(product);
-    };
-
     const handleToggleWishlist = (e?: any) => {
         e?.stopPropagation && e.stopPropagation();
 
@@ -134,26 +121,6 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
             addToWishlist(product);
         }
     };
-
-    const handleAddToCart = (e?: any) => {
-        e?.stopPropagation && e.stopPropagation();
-        const productToAdd = selectedVariant ? { ...product, price: selectedVariant.price, image: selectedVariant.image_path } : product;
-
-        if (cartButtonRef.current) {
-            requestAnimationFrame(() => {
-                cartButtonRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    triggerCartAnimation(
-                        { x: pageX + width / 2, y: pageY + height / 2 },
-                        () => addToCart(productToAdd as Product) // Casting for now, ensuring compatibility
-                    );
-                });
-            });
-        } else {
-            addToCart(productToAdd as Product);
-        }
-    };
-
-    const menuIconColor = isDark ? '#fff' : '#1f2937';
 
     return (
         <View style={[styles.container, isDark && styles.containerDark, style]}>
@@ -234,23 +201,6 @@ export function ShopProductCard({ product, style, onQuickView }: ShopProductCard
                             {formatPrice(pricing.finalPrice)}
                         </Text>
                     </View>
-
-                    <Pressable
-                        style={[
-                            styles.cartButton,
-                            isDark && { backgroundColor: '#fff' },
-                            isOutOfStock && { backgroundColor: '#E5E7EB', opacity: 0.8 }
-                        ]}
-                        onPress={isOutOfStock ? undefined : handleQuickView}
-                        ref={cartButtonRef}
-                        disabled={isOutOfStock}
-                    >
-                        <HugeiconsIcon
-                            icon={ShoppingBag01Icon}
-                            size={20}
-                            color={isOutOfStock ? '#9CA3AF' : (isDark ? '#000' : '#fff')}
-                        />
-                    </Pressable>
                 </View>
             </View>
         </View>
@@ -372,7 +322,7 @@ const styles = StyleSheet.create({
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
         marginTop: 'auto',
         paddingTop: 8,
     },
@@ -388,14 +338,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#9CA3AF',
         textDecorationLine: 'line-through',
-    },
-    cartButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#000',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     outOfStockOverlay: {
         ...StyleSheet.absoluteFillObject,

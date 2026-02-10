@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, ActionSheetIOS, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -7,7 +7,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { ShopFilterBar, FilterChip } from '@/components/shop/ShopFilterBar';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
-import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 
 import { Product, Category, Brand } from '@/types/schema';
 import { api } from '@/services/apiClient';
@@ -27,7 +26,6 @@ export default function ShopScreen() {
     const [categories, setCategories] = React.useState<Category[]>([]);
     const [brands, setBrands] = React.useState<Brand[]>([]);
     const [loading, setLoading] = React.useState(true);
-    const [quickViewProduct, setQuickViewProduct] = React.useState<Product | null>(null);
     const [page, setPage] = React.useState(1);
     const [hasMore, setHasMore] = React.useState(true);
     const [loadingMore, setLoadingMore] = React.useState(false);
@@ -111,28 +109,9 @@ export default function ShopScreen() {
         }
     };
 
-    const handleSortPress = () => {
-        ActionSheetIOS.showActionSheetWithOptions(
-            {
-                options: ['Cancel', 'Newest', 'Price: Low to High', 'Price: High to Low', 'Name: A to Z', 'Name: Z to A'],
-                cancelButtonIndex: 0,
-                userInterfaceStyle: isDark ? 'dark' : 'light',
-                title: 'Sort Products',
-                message: 'Choose a sorting option'
-            },
-            buttonIndex => {
-                if (buttonIndex === 0) return; // Cancel
-                let newSort = 'newest';
-                if (buttonIndex === 1) newSort = 'newest';
-                if (buttonIndex === 2) newSort = 'price_asc';
-                if (buttonIndex === 3) newSort = 'price_desc';
-                if (buttonIndex === 4) newSort = 'name_asc';
-                if (buttonIndex === 5) newSort = 'name_desc';
-
-                updateFilter('sortInfo', newSort);
-            }
-        );
-    };
+    const handleSortSelect = React.useCallback((newSort: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc') => {
+        updateFilter('sortInfo', newSort);
+    }, [updateFilter]);
 
     // Main Product Fetch Effect
     React.useEffect(() => {
@@ -237,13 +216,6 @@ export default function ShopScreen() {
         else if (type === 'sort' || filterId === 'sort-info') updateFilter('sortInfo', 'newest');
     };
 
-    const handleProductPress = (product: Product) => {
-        router.push({
-            pathname: '/product/[id]',
-            params: { id: product.id, initialImage: product.main_image || '' }
-        });
-    };
-
     const [refreshing, setRefreshing] = React.useState(false);
 
     const handleRefresh = async () => {
@@ -330,7 +302,8 @@ export default function ShopScreen() {
                             params: {}
                         });
                     }}
-                    onSortPress={handleSortPress}
+                    currentSort={filters.sortInfo}
+                    onSortSelect={handleSortSelect}
                     onRemoveFilter={handleRemoveFilter}
                 />
 
@@ -348,7 +321,6 @@ export default function ShopScreen() {
                             <ShopProductCard
                                 product={item}
                                 style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
-                                onQuickView={() => setQuickViewProduct(item)}
                             />
                         )}
                         ListHeaderComponent={() => (
@@ -375,13 +347,6 @@ export default function ShopScreen() {
                 )}
             </View>
 
-            <ProductQuickViewModal
-                visible={!!quickViewProduct}
-                product={quickViewProduct}
-                onClose={() => setQuickViewProduct(null)}
-                onAddToCart={(params) => console.log('Add to cart:', params)}
-                onViewDetails={(product) => handleProductPress(product)}
-            />
         </View>
     );
 }

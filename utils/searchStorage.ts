@@ -10,6 +10,10 @@ interface TrendingSearchCache {
     fetchedAt: number;
 }
 
+function scopedStorageKey(baseKey: string, scopeKey: string): string {
+    return `${baseKey}:${scopeKey || 'guest'}`;
+}
+
 function normalizeQuery(query: string): string {
     return query.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -28,9 +32,9 @@ function uniqProductsById(products: Product[]): Product[] {
     return result;
 }
 
-export async function getLocalRecentSearches(limit = 10): Promise<string[]> {
+export async function getLocalRecentSearches(limit = 10, scopeKey: string = 'guest'): Promise<string[]> {
     try {
-        const raw = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+        const raw = await AsyncStorage.getItem(scopedStorageKey(RECENT_SEARCHES_KEY, scopeKey));
         if (!raw) return [];
 
         const parsed = JSON.parse(raw);
@@ -46,7 +50,7 @@ export async function getLocalRecentSearches(limit = 10): Promise<string[]> {
     }
 }
 
-export async function setLocalRecentSearches(searches: string[], limit = 10): Promise<string[]> {
+export async function setLocalRecentSearches(searches: string[], limit = 10, scopeKey: string = 'guest'): Promise<string[]> {
     const normalizedSet = new Set<string>();
     const deduped = searches
         .map((item) => String(item).trim())
@@ -60,7 +64,7 @@ export async function setLocalRecentSearches(searches: string[], limit = 10): Pr
         .slice(0, limit);
 
     try {
-        await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(deduped));
+        await AsyncStorage.setItem(scopedStorageKey(RECENT_SEARCHES_KEY, scopeKey), JSON.stringify(deduped));
     } catch (error) {
         console.warn('Failed to persist local recent searches:', error);
     }
@@ -68,31 +72,31 @@ export async function setLocalRecentSearches(searches: string[], limit = 10): Pr
     return deduped;
 }
 
-export async function saveLocalRecentSearch(query: string, limit = 10): Promise<string[]> {
+export async function saveLocalRecentSearch(query: string, limit = 10, scopeKey: string = 'guest'): Promise<string[]> {
     const trimmed = query.trim();
-    if (!trimmed) return getLocalRecentSearches(limit);
+    if (!trimmed) return getLocalRecentSearches(limit, scopeKey);
 
-    const existing = await getLocalRecentSearches(limit);
+    const existing = await getLocalRecentSearches(limit, scopeKey);
     const normalized = normalizeQuery(trimmed);
     const next = [
         trimmed,
         ...existing.filter((item) => normalizeQuery(item) !== normalized),
     ].slice(0, limit);
 
-    return setLocalRecentSearches(next, limit);
+    return setLocalRecentSearches(next, limit, scopeKey);
 }
 
-export async function clearLocalRecentSearches(): Promise<void> {
+export async function clearLocalRecentSearches(scopeKey: string = 'guest'): Promise<void> {
     try {
-        await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+        await AsyncStorage.removeItem(scopedStorageKey(RECENT_SEARCHES_KEY, scopeKey));
     } catch (error) {
         console.warn('Failed to clear local recent searches:', error);
     }
 }
 
-export async function getLocalRecentlyViewedProducts(limit = 10): Promise<Product[]> {
+export async function getLocalRecentlyViewedProducts(limit = 10, scopeKey: string = 'guest'): Promise<Product[]> {
     try {
-        const raw = await AsyncStorage.getItem(RECENTLY_VIEWED_PRODUCTS_KEY);
+        const raw = await AsyncStorage.getItem(scopedStorageKey(RECENTLY_VIEWED_PRODUCTS_KEY, scopeKey));
         if (!raw) return [];
 
         const parsed = JSON.parse(raw);
@@ -105,24 +109,24 @@ export async function getLocalRecentlyViewedProducts(limit = 10): Promise<Produc
     }
 }
 
-export async function setLocalRecentlyViewedProducts(products: Product[], limit = 10): Promise<Product[]> {
+export async function setLocalRecentlyViewedProducts(products: Product[], limit = 10, scopeKey: string = 'guest'): Promise<Product[]> {
     const deduped = uniqProductsById(products).slice(0, limit);
     try {
-        await AsyncStorage.setItem(RECENTLY_VIEWED_PRODUCTS_KEY, JSON.stringify(deduped));
+        await AsyncStorage.setItem(scopedStorageKey(RECENTLY_VIEWED_PRODUCTS_KEY, scopeKey), JSON.stringify(deduped));
     } catch (error) {
         console.warn('Failed to persist local recently viewed products:', error);
     }
     return deduped;
 }
 
-export async function saveLocalRecentlyViewedProduct(product: Product, limit = 10): Promise<Product[]> {
+export async function saveLocalRecentlyViewedProduct(product: Product, limit = 10, scopeKey: string = 'guest'): Promise<Product[]> {
     if (!product || typeof product.id !== 'number') {
-        return getLocalRecentlyViewedProducts(limit);
+        return getLocalRecentlyViewedProducts(limit, scopeKey);
     }
 
-    const existing = await getLocalRecentlyViewedProducts(limit);
+    const existing = await getLocalRecentlyViewedProducts(limit, scopeKey);
     const next = [product, ...existing.filter((item) => item.id !== product.id)].slice(0, limit);
-    return setLocalRecentlyViewedProducts(next, limit);
+    return setLocalRecentlyViewedProducts(next, limit, scopeKey);
 }
 
 export async function getLocalTrendingSearches(

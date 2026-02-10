@@ -17,7 +17,6 @@ interface ProductGridItemProps {
     onPress?: () => void;
     onAddToCart?: () => void;
     onToggleWishlist?: () => void;
-    onQuickView?: () => void;
     hideActions?: boolean;
 }
 
@@ -27,7 +26,6 @@ export const ProductGridItem = ({
     onPress,
     onAddToCart,
     onToggleWishlist,
-    onQuickView,
     hideActions = false
 }: ProductGridItemProps) => {
 

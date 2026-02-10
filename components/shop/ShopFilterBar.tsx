@@ -1,7 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { MenuView } from '@react-native-menu/menu';
+import {
+    BottomSheetBackdrop,
+    BottomSheetBackdropProps,
+    BottomSheetModal,
+    BottomSheetView,
+} from '@gorhom/bottom-sheet';
 
 export interface FilterChip {
     id: string;
@@ -12,18 +19,59 @@ export interface FilterChip {
 interface ShopFilterBarProps {
     activeFilters: FilterChip[];
     onFilterPress: () => void;
-    onSortPress: () => void;
+    currentSort?: string;
+    onSortSelect: (sort: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc') => void;
     onRemoveFilter: (filterId: string) => void;
 }
+
+const SORT_OPTIONS: { value: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc'; label: string }[] = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' },
+    { value: 'name_asc', label: 'Name: A to Z' },
+    { value: 'name_desc', label: 'Name: Z to A' },
+];
 
 export function ShopFilterBar({
     activeFilters,
     onFilterPress,
-    onSortPress,
+    currentSort = 'newest',
+    onSortSelect,
     onRemoveFilter
 }: ShopFilterBarProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const sortSheetRef = React.useRef<BottomSheetModal>(null);
+    const sortSnapPoints = React.useMemo(() => ['44%'], []);
+
+    const openAndroidSortPicker = () => {
+        sortSheetRef.current?.present();
+    };
+
+    const handleAndroidSortSelect = (sort: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc') => {
+        onSortSelect(sort);
+        sortSheetRef.current?.dismiss();
+    };
+
+    const renderBackdrop = React.useCallback(
+        (props: BottomSheetBackdropProps) => (
+            <BottomSheetBackdrop
+                {...props}
+                appearsOnIndex={0}
+                disappearsOnIndex={-1}
+                pressBehavior="close"
+                opacity={0.35}
+            />
+        ),
+        []
+    );
+
+    const sortButtonContent = (
+        <>
+            <MaterialIcons name="swap-vert" size={20} color={isDark ? '#fff' : '#000'} />
+            <Text style={[styles.buttonText, isDark && { color: '#fff' }]}>SORT</Text>
+        </>
+    );
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#111', borderBottomColor: '#222' }]}>
@@ -42,13 +90,33 @@ export function ShopFilterBar({
                     )}
                 </Pressable>
 
-                <Pressable
-                    style={[styles.actionButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
-                    onPress={onSortPress}
-                >
-                    <MaterialIcons name="swap-vert" size={20} color={isDark ? '#fff' : '#000'} />
-                    <Text style={[styles.buttonText, isDark && { color: '#fff' }]}>SORT</Text>
-                </Pressable>
+                {Platform.OS === 'ios' ? (
+                    <MenuView
+                        style={{ flex: 1 }}
+                        shouldOpenOnLongPress={false}
+                        title="Sort Products"
+                        actions={SORT_OPTIONS.map(option => ({
+                            id: option.value,
+                            title: option.label,
+                            state: currentSort === option.value ? 'on' : 'off',
+                        }))}
+                        onPressAction={({ nativeEvent }) => {
+                            const selectedSort = nativeEvent.event as 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
+                            onSortSelect(selectedSort);
+                        }}
+                    >
+                        <Pressable style={[styles.actionButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}>
+                            {sortButtonContent}
+                        </Pressable>
+                    </MenuView>
+                ) : (
+                    <Pressable
+                        style={[styles.actionButton, isDark && { backgroundColor: '#222', borderColor: '#333' }]}
+                        onPress={openAndroidSortPicker}
+                    >
+                        {sortButtonContent}
+                    </Pressable>
+                )}
             </View>
 
             {/* Bottom Row: Active Filter Chips */}
@@ -71,6 +139,54 @@ export function ShopFilterBar({
                         ))}
                     </ScrollView>
                 </View>
+            )}
+
+            {Platform.OS === 'android' && (
+                <BottomSheetModal
+                    ref={sortSheetRef}
+                    snapPoints={sortSnapPoints}
+                    index={0}
+                    enablePanDownToClose
+                    backdropComponent={renderBackdrop}
+                    handleIndicatorStyle={[styles.sheetHandle, isDark && { backgroundColor: '#555' }]}
+                    backgroundStyle={[styles.sheetBackground, isDark && { backgroundColor: '#141414' }]}
+                >
+                    <BottomSheetView style={styles.sheetContent}>
+                        <Text style={[styles.sheetTitle, isDark && { color: '#fff' }]}>Sort Products</Text>
+                        <Text style={[styles.sheetSubtitle, isDark && { color: '#94A3B8' }]}>Choose a sorting option</Text>
+
+                        <View style={styles.sortOptionList}>
+                            {SORT_OPTIONS.map((option) => {
+                                const isSelected = currentSort === option.value;
+                                return (
+                                    <Pressable
+                                        key={option.value}
+                                        style={[
+                                            styles.sortOptionRow,
+                                            isDark && { borderColor: '#252525', backgroundColor: '#0f0f10' },
+                                            isSelected && styles.sortOptionRowSelected,
+                                            isSelected && isDark && styles.sortOptionRowSelectedDark,
+                                        ]}
+                                        onPress={() => handleAndroidSortSelect(option.value)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.sortOptionText,
+                                                isDark && { color: '#e5e7eb' },
+                                                isSelected && styles.sortOptionTextSelected,
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                        {isSelected && (
+                                            <MaterialIcons name="check-circle" size={20} color={isDark ? '#fff' : '#0f172a'} />
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </BottomSheetView>
+                </BottomSheetModal>
             )}
         </View>
     );
@@ -149,5 +265,60 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#334155',
+    },
+    sheetBackground: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+    },
+    sheetHandle: {
+        backgroundColor: '#d1d5db',
+        width: 40,
+    },
+    sheetContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+    },
+    sheetTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0f172a',
+    },
+    sheetSubtitle: {
+        marginTop: 4,
+        marginBottom: 16,
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    sortOptionList: {
+        gap: 10,
+    },
+    sortOptionRow: {
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    sortOptionRowSelected: {
+        borderColor: '#0f172a',
+        backgroundColor: '#f8fafc',
+    },
+    sortOptionRowSelectedDark: {
+        borderColor: '#fff',
+        backgroundColor: '#1f2937',
+    },
+    sortOptionText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0f172a',
+    },
+    sortOptionTextSelected: {
+        fontWeight: '900',
     },
 });

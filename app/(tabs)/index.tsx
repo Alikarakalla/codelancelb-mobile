@@ -16,7 +16,6 @@ import { StorefrontBanner } from '@/components/home/StorefrontBanner';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
 import { CategoryCompositeSection } from '@/components/home/CategoryCompositeSection';
 import { Product, HomeSection } from '@/types/schema';
-import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler
@@ -29,7 +28,6 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -266,14 +264,6 @@ export default function HomeScreen() {
         </RevealingSection>
       </Animated.ScrollView>
 
-      {/* Quick View Sync */}
-      <ProductQuickViewModal
-        visible={!!quickViewProduct}
-        product={quickViewProduct}
-        onClose={() => setQuickViewProduct(null)}
-        onAddToCart={(params) => console.log('Add to cart from Home:', params)}
-        onViewDetails={(product) => handleProductPress(product)}
-      />
     </View>
   );
 }

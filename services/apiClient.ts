@@ -1,4 +1,4 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse, Notification, CustomBundleItem } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse, HomeSection, Notification, CustomBundleItem } from '@/types/schema';
 import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
 import { calculateProductPricing } from '@/utils/pricing';
 import { getDeviceId } from '@/utils/device';
@@ -115,6 +115,14 @@ function parseDecimal(value: any): number | null {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseId(value: any): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    const integer = Math.trunc(parsed);
+    return integer >= 0 ? integer : null;
+}
+
 function parseDiscountTargets(value: any): string[] | null {
     if (value === null || value === undefined || value === '') return null;
     if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
@@ -139,8 +147,13 @@ function parseDiscountTargets(value: any): string[] | null {
 function transformCategory(c: any): Category {
     const subCategories = c.sub_categories ?? c.subCategories;
     const subSubCategories = c.sub_sub_categories ?? c.subSubCategories;
+    const normalizedId = parseId(c.id);
+    const normalizedParentId = parseId(c.parent_id);
+
     return {
         ...c,
+        id: normalizedId ?? c.id,
+        parent_id: normalizedParentId ?? c.parent_id,
         thumbnail: fixUrl(c.thumbnail),
         discount_amount: parseDecimal(c.discount_amount),
         discount_target_parents: parseDiscountTargets(c.discount_target_parents),
@@ -162,21 +175,92 @@ function getCategoryChildren(category: Category): Category[] {
 
 function findCategoryById(categories: Category[], id?: number | null): Category | undefined {
     if (id === null || id === undefined) return undefined;
+    const normalizedId = parseId(id);
+    if (normalizedId === null) return undefined;
 
     for (const category of categories) {
-        if (category.id === id) return category;
+        const normalizedCategoryId = parseId(category.id);
+        if (normalizedCategoryId !== null && normalizedCategoryId === normalizedId) return category;
 
-        const foundInChildren = findCategoryById(getCategoryChildren(category), id);
+        const foundInChildren = findCategoryById(getCategoryChildren(category), normalizedId);
         if (foundInChildren) return foundInChildren;
     }
 
     return undefined;
 }
 
+function productNeedsCategoryHydration(product: Product): boolean {
+    const relationSubCategory = product.sub_category || product.subCategory;
+    const relationSubSubCategory =
+        product.sub_sub_category ||
+        product.subSubCategory ||
+        (product.sub_sub_categories && product.sub_sub_categories.length ? product.sub_sub_categories[0] : undefined) ||
+        (product.subSubCategories && product.subSubCategories.length ? product.subSubCategories[0] : undefined);
+
+    return (
+        parseId(product.category_id) !== null ||
+        parseId(product.sub_category_id) !== null ||
+        parseId(product.sub_sub_category_id) !== null ||
+        parseId(product.category?.id) !== null ||
+        parseId(relationSubCategory?.id) !== null ||
+        parseId(relationSubSubCategory?.id) !== null
+    );
+}
+
+function hydrateProductCategoryRelations(product: Product, allCategories: Category[]): Product {
+    if (!productNeedsCategoryHydration(product)) return product;
+
+    const relationSubCategory = product.sub_category || product.subCategory;
+    const relationSubSubCategory =
+        product.sub_sub_category ||
+        product.subSubCategory ||
+        (product.sub_sub_categories && product.sub_sub_categories.length ? product.sub_sub_categories[0] : undefined) ||
+        (product.subSubCategories && product.subSubCategories.length ? product.subSubCategories[0] : undefined);
+
+    const normalizedCategoryId = parseId(product.category_id) ?? parseId(product.category?.id);
+    const normalizedSubCategoryId = parseId(product.sub_category_id) ?? parseId(relationSubCategory?.id);
+    const normalizedSubSubCategoryId = parseId(product.sub_sub_category_id) ?? parseId(relationSubSubCategory?.id);
+
+    if (normalizedCategoryId !== null) {
+        (product as any).category_id = normalizedCategoryId;
+        const category = findCategoryById(allCategories, normalizedCategoryId);
+        if (category) product.category = category;
+    }
+
+    if (normalizedSubCategoryId !== null) {
+        (product as any).sub_category_id = normalizedSubCategoryId;
+        const subCategory = findCategoryById(allCategories, normalizedSubCategoryId);
+        if (subCategory) product.sub_category = subCategory;
+    }
+    if (!product.subCategory && product.sub_category) product.subCategory = product.sub_category;
+    if (product.sub_category && (!product.subCategory || product.subCategory.id !== product.sub_category.id)) {
+        product.subCategory = product.sub_category;
+    }
+
+    if (normalizedSubSubCategoryId !== null) {
+        (product as any).sub_sub_category_id = normalizedSubSubCategoryId;
+        const subSubCategory = findCategoryById(allCategories, normalizedSubSubCategoryId);
+        if (subSubCategory) product.subSubCategory = subSubCategory;
+    }
+    if (!product.sub_sub_category && product.subSubCategory) product.sub_sub_category = product.subSubCategory;
+    if (product.subSubCategory && (!product.sub_sub_category || product.sub_sub_category.id !== product.subSubCategory.id)) {
+        product.sub_sub_category = product.subSubCategory;
+    }
+
+    if (!product.subSubCategories && product.subSubCategory) product.subSubCategories = [product.subSubCategory];
+    if (!product.sub_sub_categories && product.sub_sub_category) product.sub_sub_categories = [product.sub_sub_category];
+
+    return product;
+}
+
 // Helper to transform product data (fix images, convert prices)
 function transformProduct(p: any): Product {
     const product = {
         ...p,
+        category_id: parseId(p.category_id) ?? p.category_id,
+        sub_category_id: parseId(p.sub_category_id) ?? p.sub_category_id,
+        sub_sub_category_id: parseId(p.sub_sub_category_id) ?? p.sub_sub_category_id,
+        brand_id: parseId(p.brand_id) ?? p.brand_id,
         price: parseDecimal(p.price),
         compare_at_price: parseDecimal(p.compare_at_price),
         cost_price: parseDecimal(p.cost_price),
@@ -433,6 +517,32 @@ export const api = {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ token })
+        });
+        return handleResponse<{ message: string; access_token: string; user: User }>(res);
+    },
+
+    async appleLogin(data: {
+        identityToken: string;
+        authorizationCode?: string | null;
+        user?: string | null;
+        email?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+    }) {
+        const payload = {
+            identity_token: data.identityToken,
+            token: data.identityToken, // fallback key for backends reusing Google token handlers
+            authorization_code: data.authorizationCode ?? null,
+            apple_user: data.user ?? null,
+            email: data.email ?? null,
+            first_name: data.firstName ?? null,
+            last_name: data.lastName ?? null,
+        };
+
+        const res = await fetchWithTimeout(`${BASE_URL}/auth/apple`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(payload),
         });
         return handleResponse<{ message: string; access_token: string; user: User }>(res);
     },
@@ -774,7 +884,12 @@ export const api = {
 
     async getHomeData(): Promise<HomeResponse> {
         try {
-            const res = await fetchWithTimeout(`${BASE_URL}/home`, { headers: getHeaders() });
+            const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
+            const homeUrl = new URL(`${BASE_URL}/home`);
+            homeUrl.searchParams.append('with', includeRelations);
+            homeUrl.searchParams.append('include', includeRelations);
+
+            const res = await fetchWithTimeout(homeUrl.toString(), { headers: getHeaders() });
             const data = await handleResponse<HomeResponse>(res);
 
             // Recursively transform products in various sections
@@ -808,6 +923,71 @@ export const api = {
                 return section;
             });
 
+            // Home payloads can omit nested category relations; hydrate from category tree
+            // so hierarchical discounts (sub-sub/sub/category) still work in carousel cards.
+            const sectionContainsProductsMissingRelations = (section: HomeSection): boolean => {
+                if (section.type === 'category_carousels') {
+                    const items = Array.isArray(section.data) ? section.data : [section.data];
+                    return items.some((item: any) =>
+                        Array.isArray(item?.products) &&
+                        item.products.some((product: Product) => productNeedsCategoryHydration(product))
+                    );
+                }
+
+                if (Array.isArray(section.data) && section.data.length > 0) {
+                    return section.data.some((product: Product) => productNeedsCategoryHydration(product));
+                }
+
+                if (section.type === 'featured_new' && section.data && typeof section.data === 'object') {
+                    const featured = Array.isArray(section.data.featured) ? section.data.featured : [];
+                    const newArrivals = Array.isArray(section.data.new_arrivals) ? section.data.new_arrivals : [];
+                    return [...featured, ...newArrivals].some((product: Product) => productNeedsCategoryHydration(product));
+                }
+
+                return false;
+            };
+
+            if (data.sections.some(sectionContainsProductsMissingRelations)) {
+                try {
+                    const allCategories = await this.getCategories();
+                    data.sections = data.sections.map((section) => {
+                        if (section.type === 'category_carousels') {
+                            const items = Array.isArray(section.data) ? section.data : [section.data];
+                            section.data = items.map((item: any) => ({
+                                ...item,
+                                products: Array.isArray(item.products)
+                                    ? item.products.map((product: Product) => hydrateProductCategoryRelations(product, allCategories))
+                                    : [],
+                            }));
+                            return section;
+                        }
+
+                        if (Array.isArray(section.data) && section.data.length > 0) {
+                            section.data = section.data.map((product: Product) => hydrateProductCategoryRelations(product, allCategories));
+                            return section;
+                        }
+
+                        if (section.type === 'featured_new' && section.data && typeof section.data === 'object') {
+                            if (Array.isArray(section.data.featured)) {
+                                section.data.featured = section.data.featured.map((product: Product) =>
+                                    hydrateProductCategoryRelations(product, allCategories)
+                                );
+                            }
+                            if (Array.isArray(section.data.new_arrivals)) {
+                                section.data.new_arrivals = section.data.new_arrivals.map((product: Product) =>
+                                    hydrateProductCategoryRelations(product, allCategories)
+                                );
+                            }
+                            return section;
+                        }
+
+                        return section;
+                    });
+                } catch (hydrateErr) {
+                    console.warn('Home product category hydration failed:', hydrateErr);
+                }
+            }
+
             return data;
 
         } catch (err) {
@@ -818,20 +998,37 @@ export const api = {
     },
 
     // --- Waitlist ---
-    async joinWaitlist(data: { product_id: number | string, product_variant_id?: number | string, email?: string, push_token?: string }) {
+    async joinWaitlist(data: {
+        product_id: number | string;
+        product_variant_id?: number | string;
+        email?: string;
+        push_token?: string;
+        device_id?: string;
+    }) {
+        const payload: Record<string, any> = { ...data };
+        if (!apiToken) {
+            payload.device_id = payload.device_id || await getDeviceId();
+        }
+
         const res = await fetchWithTimeout(`${BASE_URL}/waitlist/join`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
         return handleResponse<{ message: string }>(res);
     },
     async getWaitlistStatus(productId: number | string, variantId?: number | string) {
-        const url = variantId
-            ? `${BASE_URL}/waitlist/status/${productId}/${variantId}`
-            : `${BASE_URL}/waitlist/status/${productId}`;
+        const url = new URL(
+            variantId
+                ? `${BASE_URL}/waitlist/status/${productId}/${variantId}`
+                : `${BASE_URL}/waitlist/status/${productId}`
+        );
+        if (!apiToken) {
+            const deviceId = await getDeviceId();
+            url.searchParams.append('device_id', deviceId);
+        }
 
-        const res = await fetchWithTimeout(url, { headers: getHeaders() });
+        const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
         const json = await handleResponse<{ on_waitlist: boolean }>(res);
 
         // Backend returns "on_waitlist", frontend expects "joined"
@@ -1107,10 +1304,12 @@ export const api = {
     // --- Search & Viewed History ---
     async getSearchHistory(limit: number = 10): Promise<string[]> {
         try {
-            const deviceId = await getDeviceId();
             const url = new URL(`${BASE_URL}/search/history`);
             url.searchParams.append('limit', String(limit));
-            url.searchParams.append('device_id', deviceId);
+            if (!apiToken) {
+                const deviceId = await getDeviceId();
+                url.searchParams.append('device_id', deviceId);
+            }
 
             const res = await fetchWithTimeout(url.toString(), { headers: getHeaders() });
             if (res.status === 404) return [];
@@ -1162,14 +1361,15 @@ export const api = {
         if (!trimmed) return;
 
         try {
-            const deviceId = await getDeviceId();
+            const payload: Record<string, any> = { query: trimmed };
+            if (!apiToken) {
+                const deviceId = await getDeviceId();
+                payload.device_id = deviceId;
+            }
             const res = await fetchWithTimeout(`${BASE_URL}/search/history`, {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({
-                    query: trimmed,
-                    device_id: deviceId,
-                }),
+                body: JSON.stringify(payload),
             });
             if (!res.ok && res.status !== 404) {
                 await handleResponse<any>(res);
@@ -1181,9 +1381,11 @@ export const api = {
 
     async clearSearchHistory(): Promise<void> {
         try {
-            const deviceId = await getDeviceId();
             const url = new URL(`${BASE_URL}/search/history`);
-            url.searchParams.append('device_id', deviceId);
+            if (!apiToken) {
+                const deviceId = await getDeviceId();
+                url.searchParams.append('device_id', deviceId);
+            }
 
             const res = await fetchWithTimeout(url.toString(), {
                 method: 'DELETE',
@@ -1200,11 +1402,13 @@ export const api = {
 
     async getRecentlyViewedProducts(limit: number = 10): Promise<Product[]> {
         try {
-            const deviceId = await getDeviceId();
             const url = new URL(`${BASE_URL}/products/recently-viewed`);
             const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
             url.searchParams.append('limit', String(limit));
-            url.searchParams.append('device_id', deviceId);
+            if (!apiToken) {
+                const deviceId = await getDeviceId();
+                url.searchParams.append('device_id', deviceId);
+            }
             url.searchParams.append('with', includeRelations);
             url.searchParams.append('include', includeRelations);
 
@@ -1230,14 +1434,17 @@ export const api = {
 
     async trackProductView(productId: number | string, variantId?: number | string | null): Promise<void> {
         try {
-            const deviceId = await getDeviceId();
+            const payload: Record<string, any> = {
+                variant_id: variantId ?? null,
+            };
+            if (!apiToken) {
+                const deviceId = await getDeviceId();
+                payload.device_id = deviceId;
+            }
             const res = await fetchWithTimeout(`${BASE_URL}/products/${productId}/view`, {
                 method: 'POST',
                 headers: getHeaders(),
-                body: JSON.stringify({
-                    variant_id: variantId ?? null,
-                    device_id: deviceId,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok && res.status !== 404) {

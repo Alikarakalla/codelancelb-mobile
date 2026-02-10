@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { api } from '@/services/apiClient';
 import { Product, Brand, Category } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth-context';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import {
     clearLocalRecentSearches,
@@ -107,6 +108,8 @@ export default function SearchIndex() {
     const navigation = useNavigation();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { user } = useAuth();
+    const storageScopeKey = user?.id ? `user:${user.id}` : 'guest';
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
@@ -136,7 +139,7 @@ export default function SearchIndex() {
         loadRecentSearches();
         loadTrendingSearches();
         loadRecentlyViewedProducts();
-    }, []);
+    }, [storageScopeKey]);
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
@@ -145,7 +148,7 @@ export default function SearchIndex() {
             loadRecentlyViewedProducts();
         });
         return unsubscribe;
-    }, [navigation]);
+    }, [navigation, storageScopeKey]);
 
     // Debounced search
     useEffect(() => {
@@ -167,7 +170,7 @@ export default function SearchIndex() {
 
     const loadRecentSearches = async () => {
         try {
-            const local = await getLocalRecentSearches(RECENT_SEARCH_LIMIT);
+            const local = await getLocalRecentSearches(RECENT_SEARCH_LIMIT, storageScopeKey);
             if (local.length > 0) {
                 setRecentSearches(local);
             } else {
@@ -178,7 +181,7 @@ export default function SearchIndex() {
             if (remote.length > 0) {
                 const merged = mergeSearches(remote, local, RECENT_SEARCH_LIMIT);
                 setRecentSearches(merged);
-                await setLocalRecentSearches(merged, RECENT_SEARCH_LIMIT);
+                await setLocalRecentSearches(merged, RECENT_SEARCH_LIMIT, storageScopeKey);
             }
         } catch (error) {
             console.error('Error loading recent searches:', error);
@@ -212,7 +215,7 @@ export default function SearchIndex() {
 
     const loadRecentlyViewedProducts = async () => {
         try {
-            const local = await getLocalRecentlyViewedProducts(RECENTLY_VIEWED_LIMIT);
+            const local = await getLocalRecentlyViewedProducts(RECENTLY_VIEWED_LIMIT, storageScopeKey);
             if (local.length > 0) {
                 setRecentlyViewedProducts(local);
             } else {
@@ -223,7 +226,7 @@ export default function SearchIndex() {
             if (remote.length > 0) {
                 const merged = dedupeProductsById([...remote, ...local]).slice(0, RECENTLY_VIEWED_LIMIT);
                 setRecentlyViewedProducts(merged);
-                await setLocalRecentlyViewedProducts(merged, RECENTLY_VIEWED_LIMIT);
+                await setLocalRecentlyViewedProducts(merged, RECENTLY_VIEWED_LIMIT, storageScopeKey);
             }
         } catch (error) {
             console.error('Error loading recently viewed products:', error);
@@ -301,7 +304,7 @@ export default function SearchIndex() {
             const trimmed = query.trim();
             if (trimmed.length < 2) return;
 
-            const updated = await saveLocalRecentSearch(trimmed, RECENT_SEARCH_LIMIT);
+            const updated = await saveLocalRecentSearch(trimmed, RECENT_SEARCH_LIMIT, storageScopeKey);
             setRecentSearches(updated);
             await api.saveSearchQuery(trimmed);
         } catch (error) {
@@ -323,7 +326,7 @@ export default function SearchIndex() {
 
     const clearRecentSearches = async () => {
         try {
-            await clearLocalRecentSearches();
+            await clearLocalRecentSearches(storageScopeKey);
             setRecentSearches([]);
             await api.clearSearchHistory();
         } catch (error) {
