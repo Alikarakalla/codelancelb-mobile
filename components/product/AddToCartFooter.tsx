@@ -1,9 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, Pressable, Platform, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
+import { Button as NativeLiquidButton, Host as NativeSwiftUIHost } from '@expo/ui/swift-ui';
 
 import { useCartAnimation } from '@/components/cart/CartAnimationProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -30,7 +28,7 @@ export function AddToCartFooter({
     originalPrice
 }: AddToCartFooterProps) {
     const [quantity, setQuantity] = React.useState(1);
-    const insets = useSafeAreaInsets();
+    const [nativeCtaWidth, setNativeCtaWidth] = React.useState<number | undefined>(undefined);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
@@ -40,6 +38,44 @@ export function AddToCartFooter({
 
     const increment = () => setQuantity(prev => prev + 1);
     const decrement = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+
+    const ctaText = disabled
+        ? (isJoinedWaitlist ? 'JOINED WAITING LIST' : 'NOTIFY ME WHEN AVAILABLE')
+        : 'ADD TO CART';
+
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+
+    const useNativeLiquidGlassCta =
+        Platform.OS === 'ios' &&
+        iosMajorVersion >= 26 &&
+        !disabled;
+
+    const handlePrimaryCtaPress = () => {
+        if (disabled) {
+            if (!isJoinedWaitlist) onNotifyMe?.();
+            return;
+        }
+
+        if (cartButtonRef.current) {
+            requestAnimationFrame(() => {
+                cartButtonRef.current?.measure((x, y, w, h, px, py) => {
+                    triggerCartAnimation(
+                        { x: px + w / 2, y: py + h / 2 },
+                        () => onAddToCart?.()
+                    );
+                });
+            });
+        } else {
+            onAddToCart?.();
+        }
+    };
+
+    const handleNativeCtaLayout = React.useCallback((event: LayoutChangeEvent) => {
+        const measuredWidth = Math.round(event.nativeEvent.layout.width);
+        setNativeCtaWidth((prev) => (prev === measuredWidth ? prev : measuredWidth));
+    }, []);
 
     return (
         <View style={[styles.outerContainer, isDark && { backgroundColor: '#111' }]}>
@@ -58,49 +94,45 @@ export function AddToCartFooter({
                 )}
 
                 {/* Add to Cart / Notify Me Button */}
-                <Pressable
-                    onPress={() => {
-                        if (disabled) {
-                            if (!isJoinedWaitlist) onNotifyMe?.();
-                            return;
-                        }
-
-                        if (cartButtonRef.current) {
-                            requestAnimationFrame(() => {
-                                cartButtonRef.current?.measure((x, y, w, h, px, py) => {
-                                    triggerCartAnimation(
-                                        { x: px + w / 2, y: py + h / 2 },
-                                        () => onAddToCart?.()
-                                    );
-                                });
-                            });
-                        } else {
-                            onAddToCart?.();
-                        }
-                    }}
-                    disabled={disabled && isJoinedWaitlist}
-                    style={({ pressed }) => [
-                        styles.cartButton,
-                        isDark && { backgroundColor: '#fff' },
-                        pressed && (!disabled || !isJoinedWaitlist) && styles.pressedOpacity,
-                        disabled && !isJoinedWaitlist && styles.notifyButton,
-                        disabled && isJoinedWaitlist && styles.disabledButton,
-                        disabled && isJoinedWaitlist && isDark && { backgroundColor: '#333' }
-                    ]}
-                    ref={cartButtonRef}
-                >
-                    <Text style={[
-                        styles.cartText,
-                        isDark && { color: '#000' },
-                        disabled && isJoinedWaitlist && styles.disabledText,
-                        disabled && isJoinedWaitlist && isDark && { color: '#666' },
-                        disabled && !isJoinedWaitlist && styles.notifyText
-                    ]}>
-                        {disabled
-                            ? (isJoinedWaitlist ? 'JOINED WAITING LIST' : 'NOTIFY ME WHEN AVAILABLE')
-                            : 'ADD TO CART'}
-                    </Text>
-                </Pressable>
+                {useNativeLiquidGlassCta ? (
+                    <View style={styles.nativeGlassButtonWrap} ref={cartButtonRef} onLayout={handleNativeCtaLayout}>
+                        <NativeSwiftUIHost style={styles.nativeGlassHost} useViewportSizeMeasurement>
+                            <NativeLiquidButton
+                                onPress={handlePrimaryCtaPress}
+                                variant="glassProminent"
+                                color="#000000"
+                                controlSize="large"
+                                frame={{ width: nativeCtaWidth, minHeight: 48, maxHeight: 48 }}
+                            >
+                                {ctaText}
+                            </NativeLiquidButton>
+                        </NativeSwiftUIHost>
+                    </View>
+                ) : (
+                    <Pressable
+                        onPress={handlePrimaryCtaPress}
+                        disabled={disabled && isJoinedWaitlist}
+                        style={({ pressed }) => [
+                            styles.cartButton,
+                            isDark && { backgroundColor: '#fff' },
+                            pressed && (!disabled || !isJoinedWaitlist) && styles.pressedOpacity,
+                            disabled && !isJoinedWaitlist && styles.notifyButton,
+                            disabled && isJoinedWaitlist && styles.disabledButton,
+                            disabled && isJoinedWaitlist && isDark && { backgroundColor: '#333' }
+                        ]}
+                        ref={cartButtonRef}
+                    >
+                        <Text style={[
+                            styles.cartText,
+                            isDark && { color: '#000' },
+                            disabled && isJoinedWaitlist && styles.disabledText,
+                            disabled && isJoinedWaitlist && isDark && { color: '#666' },
+                            disabled && !isJoinedWaitlist && styles.notifyText
+                        ]}>
+                            {ctaText}
+                        </Text>
+                    </Pressable>
+                )}
             </View>
         </View>
     );
@@ -148,6 +180,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#1F2937',
         borderRadius: 4,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    nativeGlassButtonWrap: {
+        flex: 2,
+        height: '100%',
+        overflow: 'visible',
+        justifyContent: 'center',
+    },
+    nativeGlassHost: {
+        flex: 1,
+        width: '100%',
         justifyContent: 'center',
     },
     pressedOpacity: {
