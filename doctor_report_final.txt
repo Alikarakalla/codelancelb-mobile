@@ -1,0 +1,4 @@
+﻿env: load .env
+env: export EXPO_PUBLIC_API_URL APP_DEBUG EXPO_PUBLIC_GOOGLE_CLIENT_ID EXPO_PUBLIC_GOOGLE_REDIRECT_URI
+Running 17 checks on your project...
+17/17 checks passed. No issues detected!
