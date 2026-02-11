@@ -1,28 +1,27 @@
-import { View, StyleSheet, Alert, ActivityIndicator, Text, Pressable, Platform, Share } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { useLocalSearchParams, Stack as ExpoStack, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useState, useMemo } from 'react';
-import Constants from 'expo-constants';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
+import Constants from 'expo-constants';
+import { Stack as ExpoStack, useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ProductImageGallery } from '@/components/product/ProductImageGallery';
-import { ProductInfo } from '@/components/product/ProductInfo';
-import { ProductTags } from '@/components/product/ProductTags';
-import { ProductDescription } from '@/components/product/ProductDescription';
-import { ProductSelectors } from '@/components/product/ProductSelectors';
-import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { AddToCartFooter } from '@/components/product/AddToCartFooter';
 import { BundleContents } from '@/components/product/BundleContents';
-import { api } from '@/services/apiClient';
-import { Product, ProductVariant } from '@/types/schema';
-import { useWishlist } from '@/hooks/use-wishlist-context';
+import { ProductDescription } from '@/components/product/ProductDescription';
+import { ProductImageGallery } from '@/components/product/ProductImageGallery';
+import { ProductInfo } from '@/components/product/ProductInfo';
+import { ProductSelectors } from '@/components/product/ProductSelectors';
+import { ProductTags } from '@/components/product/ProductTags';
+import { RelatedProducts } from '@/components/product/RelatedProducts';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCart } from '@/hooks/use-cart-context';
+import { useWishlist } from '@/hooks/use-wishlist-context';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { api } from '@/services/apiClient';
+import { Product, ProductVariant } from '@/types/schema';
 import { calculateProductPricing } from '@/utils/pricing';
 import { saveLocalRecentlyViewedProduct } from '@/utils/searchStorage';
 
@@ -41,6 +40,7 @@ export default function ProductDetailsScreen() {
     const [bundleSelections, setBundleSelections] = useState<Record<number, ProductVariant | null>>({});
     const [isJoinedWaitlist, setIsJoinedWaitlist] = useState(false);
     const [waitlistRefreshTrigger, setWaitlistRefreshTrigger] = useState(0);
+    const [quantity, setQuantity] = useState(1);
     const { expoPushToken } = usePushNotifications();
 
     const { addToCart, cartCount } = useCart();
@@ -257,7 +257,7 @@ export default function ProductDetailsScreen() {
         }
     }, [product, selectedVariant, isOutOfStock, waitlistRefreshTrigger]);
 
-    const handleAddToCart = (productId?: number) => {
+    const handleAddToCart = (productId?: number, quantityToAdd: number = 1) => {
         const resolvedProductId = productId ?? product?.id ?? routeProductId;
         if (!product || !resolvedProductId || product.id !== resolvedProductId) return;
 
@@ -273,7 +273,7 @@ export default function ProductDetailsScreen() {
             }
             // Pass selections. API likely expects { bundle_selections: { [itemId]: variantId } }
             // We'll pass the whole map for the Context to handle or pass to API
-            addToCart(product, null, 1, { bundle_selections: bundleSelections });
+            addToCart(product, null, quantityToAdd, { bundle_selections: bundleSelections });
             Alert.alert('Added to Cart', 'Bundle added to your cart.');
             return;
         }
@@ -282,8 +282,18 @@ export default function ProductDetailsScreen() {
             Alert.alert('Selection Required', 'Please select your options before adding to cart.');
             return;
         }
-        addToCart(product, selectedVariant);
+        addToCart(product, selectedVariant, quantityToAdd);
         Alert.alert('Added to Cart', 'Item added to your cart.');
+    };
+
+    const handleToolbarPrimaryPress = () => {
+        if (isOutOfStock) {
+            if (!isJoinedWaitlist) {
+                handleNotifyMe?.();
+            }
+            return;
+        }
+        handleAddToCart(product?.id, quantity);
     };
 
     const handleToggleWishlist = () => {
@@ -349,7 +359,7 @@ export default function ProductDetailsScreen() {
                     headerTransparent: true,
                     headerTitle: '',
                     ...(supportsNativeZoomTransition ? {
-                        animation: 'zoom' as any,
+                        animation: 'default' as const,
                         animationDuration: 500,
                         fullScreenGestureEnabled: true,
                         animationMatchesGesture: true,
@@ -496,12 +506,53 @@ export default function ProductDetailsScreen() {
 
             {supportsNativeBottomToolbar && (
                 <Stack.Toolbar placement="bottom">
+                    {!isOutOfStock && (
+                        <Stack.Toolbar.View separateBackground>
+                            <View style={styles.toolbarQuantityBox}>
+                                <Pressable
+                                    onPress={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                                    style={styles.toolbarQtyBtn}
+                                >
+                                    <Text style={styles.toolbarQtySign}>−</Text>
+                                </Pressable>
+                                <Text style={styles.toolbarQtyText}>{quantity}</Text>
+                                <Pressable
+                                    onPress={() => setQuantity((prev) => prev + 1)}
+                                    style={styles.toolbarQtyBtn}
+                                >
+                                    <Text style={styles.toolbarQtySign}>+</Text>
+                                </Pressable>
+                            </View>
+                        </Stack.Toolbar.View>
+                    )}
                     <Stack.Toolbar.Spacer />
-                    <Stack.Toolbar.Button
-                        onPress={handleAddToCart}
-                        title="Add to Cart"
-                        systemImage="cart.badge.plus"
-                    />
+                    {isOutOfStock && (
+                        <Stack.Toolbar.View>
+                            {/* Added flex: 1 and justifyContent: 'center' here */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center', 
+                                gap: 6,
+                                flex: 1,                 // Force it to take up available middle space
+                                minWidth: 200            // Optional: Give it a minimum breathing room
+                            }}>
+                                <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: '#EF4444' }} />
+                                <Text
+                                    numberOfLines={1}
+                                    style={styles.toolbarStatusText}
+                                >
+                                    {isJoinedWaitlist ? 'Out of stock · Joined Waiting List' : 'Out of stock · Join Waiting List'}
+                                </Text>
+                            </View>
+                        </Stack.Toolbar.View>
+                    )}
+                    <Stack.Toolbar.Spacer />
+                    <Stack.Toolbar.View separateBackground>
+                        <Pressable onPress={handleToolbarPrimaryPress} style={[styles.toolbarQuantityBoxadd]}>
+                            <IconSymbol name={isOutOfStock ? "bell" : "cart.badge.plus"} size={34} color="#111827" />
+                        </Pressable>
+                    </Stack.Toolbar.View>
                 </Stack.Toolbar>
             )}
 
@@ -546,18 +597,20 @@ export default function ProductDetailsScreen() {
                             />
                         </Animated.View>
 
-                        <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
-                            <AddToCartFooter
-                                onAddToCart={handleAddToCart}
-                                onToggleWishlist={handleToggleWishlist}
-                                onNotifyMe={handleNotifyMe}
-                                isJoinedWaitlist={isJoinedWaitlist}
-                                isWishlisted={isWishlisted}
-                                disabled={isOutOfStock}
-                                price={priceData.price}
-                                originalPrice={priceData.originalPrice}
-                            />
-                        </Animated.View>
+                        {!supportsNativeBottomToolbar && (
+                            <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
+                                <AddToCartFooter
+                                    onAddToCart={handleAddToCart}
+                                    onToggleWishlist={handleToggleWishlist}
+                                    onNotifyMe={handleNotifyMe}
+                                    isJoinedWaitlist={isJoinedWaitlist}
+                                    isWishlisted={isWishlisted}
+                                    disabled={isOutOfStock}
+                                    price={priceData.price}
+                                    originalPrice={priceData.originalPrice}
+                                />
+                            </Animated.View>
+                        )}
 
 
                         {product.type === 'bundle' && product.bundle_items && (
@@ -667,5 +720,54 @@ const styles = StyleSheet.create({
     },
     floatingAddToCartTextDark: {
         color: '#0F172A',
+    },
+    toolbarQuantityBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        // borderWidth: 1,
+        // borderColor: '#D1D5DB',
+        // borderRadius: 999,
+        overflow: 'hidden',
+        minWidth: 90,
+        height: 36,
+        // backgroundColor: '#FFFFFF',
+    },
+
+    toolbarQuantityBoxadd: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        // borderWidth: 1,
+        // borderColor: '#D1D5DB',
+        // borderRadius: 999,
+        overflow: 'hidden',
+        minWidth: 35,
+        height: 36,
+
+    },
+
+    toolbarQtyBtn: {
+        width: 30,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    toolbarQtySign: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#111827',
+        lineHeight: 20,
+    },
+    toolbarQtyText: {
+        minWidth: 30,
+        textAlign: 'center',
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    toolbarStatusText: {
+        color: '#334155',
+        fontSize: 11, // Slightly smaller for better fit
+        fontWeight: '700',
+        flexShrink: 0, // Prevent the text itself from shrinking if the container is wide enough
     },
 });

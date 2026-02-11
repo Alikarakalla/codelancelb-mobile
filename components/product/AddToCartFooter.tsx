@@ -103,9 +103,8 @@ export function AddToCartFooter({
                                 color="#000000"
                                 controlSize="large"
                                 frame={{ width: nativeCtaWidth, minHeight: 48, maxHeight: 48 }}
-                            >
-                                {ctaText}
-                            </NativeLiquidButton>
+                                label={ctaText}
+                            />
                         </NativeSwiftUIHost>
                     </View>
                 ) : (

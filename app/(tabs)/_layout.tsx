@@ -1,7 +1,7 @@
 import { Platform, StyleSheet, View, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -15,28 +15,28 @@ export default function TabLayout() {
     return (
       <NativeTabs backBehavior="history">
         <NativeTabs.Trigger name="index">
-          <Label>Home</Label>
-          <Icon sf="house.fill" />
+          <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="house.fill" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="shop">
-          <Label>Shop</Label>
-          <Icon sf="bag.fill" />
+          <NativeTabs.Trigger.Label>Shop</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="bag.fill" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="wishlist">
-          <Label>Wishlist</Label>
-          <Icon sf="heart.fill" />
+          <NativeTabs.Trigger.Label>Wishlist</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="heart.fill" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="profile">
-          <Label>Profile</Label>
-          <Icon sf="person.fill" />
+          <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="person.fill" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="search" role="search">
-          <Label>Search</Label>
-          <Icon sf="magnifyingglass" />
+          <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="magnifyingglass" />
         </NativeTabs.Trigger>
       </NativeTabs>
     );
