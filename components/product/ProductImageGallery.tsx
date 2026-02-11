@@ -110,7 +110,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                                 source={{ uri: item }}
                                 style={styles.image}
                                 contentFit="contain"
-                                sharedTransitionTag={productId && index === 0 ? `product-image-${productId}` : undefined}
+                                {...(productId && index === 0 ? ({ sharedTransitionTag: `product-${productId}` } as any) : {})}
                             />
                         </View>
                     )}

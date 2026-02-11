@@ -129,7 +129,7 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
                     source={{ uri: currentImage }}
                     style={[styles.image, isOutOfStock && { opacity: 0.6 }]}
                     contentFit="cover"
-                    {...({ sharedTransitionTag: `product-image-${product.id}` } as any)}
+                    {...({ sharedTransitionTag: `product-${product.id}` } as any)}
                 />
 
                 {isOutOfStock && (

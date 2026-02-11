@@ -1,8 +1,9 @@
 import { View, StyleSheet, Alert, ActivityIndicator, Text, Pressable, Platform, Share } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
+import { useLocalSearchParams, Stack as ExpoStack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useMemo } from 'react';
+import Constants from 'expo-constants';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
@@ -26,6 +27,7 @@ import { calculateProductPricing } from '@/utils/pricing';
 import { saveLocalRecentlyViewedProduct } from '@/utils/searchStorage';
 
 export default function ProductDetailsScreen() {
+    const Stack = ExpoStack as any;
     const { id, initialImage } = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -45,6 +47,22 @@ export default function ProductDetailsScreen() {
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { user } = useAuth();
     const storageScopeKey = user?.id ? `user:${user.id}` : 'guest';
+    const routeProductId = useMemo(() => {
+        const rawId = Array.isArray(id) ? id[0] : id;
+        const parsed = Number(rawId);
+        return Number.isFinite(parsed) ? parsed : undefined;
+    }, [id]);
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+    const expoSdkMajor = Number(String(Constants.expoConfig?.sdkVersion || '').split('.')[0] || 0);
+    const supportsNativeZoomTransition = iosMajorVersion >= 18 && expoSdkMajor >= 55;
+    const stackToolbar = (Stack as any)?.Toolbar;
+    const supportsNativeBottomToolbar =
+        Platform.OS === 'ios' &&
+        !!stackToolbar &&
+        !!stackToolbar.Button &&
+        !!stackToolbar.Spacer;
 
     useEffect(() => {
         if (id) {
@@ -239,8 +257,9 @@ export default function ProductDetailsScreen() {
         }
     }, [product, selectedVariant, isOutOfStock, waitlistRefreshTrigger]);
 
-    const handleAddToCart = () => {
-        if (!product) return;
+    const handleAddToCart = (productId?: number) => {
+        const resolvedProductId = productId ?? product?.id ?? routeProductId;
+        if (!product || !resolvedProductId || product.id !== resolvedProductId) return;
 
         if (product.type === 'bundle') {
             // Validate Bundle Selections
@@ -255,6 +274,7 @@ export default function ProductDetailsScreen() {
             // Pass selections. API likely expects { bundle_selections: { [itemId]: variantId } }
             // We'll pass the whole map for the Context to handle or pass to API
             addToCart(product, null, 1, { bundle_selections: bundleSelections });
+            Alert.alert('Added to Cart', 'Bundle added to your cart.');
             return;
         }
 
@@ -263,6 +283,7 @@ export default function ProductDetailsScreen() {
             return;
         }
         addToCart(product, selectedVariant);
+        Alert.alert('Added to Cart', 'Item added to your cart.');
     };
 
     const handleToggleWishlist = () => {
@@ -327,6 +348,13 @@ export default function ProductDetailsScreen() {
                     headerShown: true,
                     headerTransparent: true,
                     headerTitle: '',
+                    ...(supportsNativeZoomTransition ? {
+                        animation: 'zoom' as any,
+                        animationDuration: 500,
+                        fullScreenGestureEnabled: true,
+                        animationMatchesGesture: true,
+                        gestureEnabled: true,
+                    } : {}),
                     // iOS 26 Native Liquid Glass Buttons Logic
                     ...Platform.select({
                         ios: {
@@ -466,6 +494,17 @@ export default function ProductDetailsScreen() {
                 } as any}
             />
 
+            {supportsNativeBottomToolbar && (
+                <Stack.Toolbar placement="bottom">
+                    <Stack.Toolbar.Spacer />
+                    <Stack.Toolbar.Button
+                        onPress={handleAddToCart}
+                        title="Add to Cart"
+                        systemImage="cart.badge.plus"
+                    />
+                </Stack.Toolbar>
+            )}
+
             <Animated.ScrollView
                 contentContainerStyle={{
                     paddingTop: insets.top + (Platform.OS === 'ios' ? 44 : 56), // Start content below the header
@@ -542,6 +581,21 @@ export default function ProductDetailsScreen() {
                     </View>
                 )}
             </Animated.ScrollView>
+
+            {!supportsNativeBottomToolbar && (
+                <Pressable
+                    onPress={() => handleAddToCart(product?.id)}
+                    style={({ pressed }) => [
+                        styles.floatingAddToCartButton,
+                        isDark && styles.floatingAddToCartButtonDark,
+                        pressed && styles.floatingAddToCartButtonPressed,
+                    ]}
+                >
+                    <Text style={[styles.floatingAddToCartText, isDark && styles.floatingAddToCartTextDark]}>
+                        Add to Cart
+                    </Text>
+                </Pressable>
+            )}
         </View>
     );
 }
@@ -588,5 +642,30 @@ const styles = StyleSheet.create({
                 marginHorizontal: 4,
             }
         })
+    },
+    floatingAddToCartButton: {
+        position: 'absolute',
+        right: 16,
+        bottom: 16,
+        backgroundColor: '#0F172A',
+        borderRadius: 999,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        zIndex: 10,
+        elevation: 4,
+    },
+    floatingAddToCartButtonDark: {
+        backgroundColor: '#F8FAFC',
+    },
+    floatingAddToCartButtonPressed: {
+        opacity: 0.88,
+    },
+    floatingAddToCartText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    floatingAddToCartTextDark: {
+        color: '#0F172A',
     },
 });
