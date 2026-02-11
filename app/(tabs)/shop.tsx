@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,7 +19,7 @@ export default function ShopScreen() {
     const isDark = colorScheme === 'dark';
     const router = useRouter();
     const params = useLocalSearchParams();
-    const { filters, updateFilter, setFilters } = useFilters();
+    const { filters, updateFilter } = useFilters();
 
     const [activeFilters, setActiveFilters] = React.useState<FilterChip[]>([]);
     const [products, setProducts] = React.useState<Product[]>([]);
@@ -289,10 +289,10 @@ export default function ShopScreen() {
     };
 
     return (
-        <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
+        <View collapsable={false} style={[styles.container, isDark && { backgroundColor: '#000' }]}>
             <GlobalHeader title="LUXE" />
 
-            <View style={{ flex: 1, paddingTop: 60 + insets.top }}>
+            <View collapsable={false} style={{ flex: 1, paddingTop: 60 + insets.top }}>
                 <ShopFilterBar
                     activeFilters={activeFilters}
                     onFilterPress={() => {
@@ -312,38 +312,43 @@ export default function ShopScreen() {
                         <ActivityIndicator size="large" color={isDark ? "#fff" : "#18181B"} />
                     </View>
                 ) : (
-                    <FlatList
-                        key={Platform.OS === 'ios' && Platform.isPad ? 3 : 2}
-                        data={products}
-                        keyExtractor={(item) => item.id.toString()}
-                        numColumns={Platform.OS === 'ios' && Platform.isPad ? 3 : 2}
-                        renderItem={({ item }) => (
-                            <ShopProductCard
-                                product={item}
-                                style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
-                            />
-                        )}
-                        ListHeaderComponent={() => (
-                            <View style={styles.listHeader}>
-                                <Text style={[styles.resultText, isDark && { color: '#94A3B8' }]}>Showing {products.length} results</Text>
-                            </View>
-                        )}
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
-                        ListFooterComponent={
-                            loadingMore ? (
-                                <View style={{ padding: 20, alignItems: 'center' }}>
-                                    <ActivityIndicator size="small" color={isDark ? "#fff" : "#18181B"} />
-                                </View>
-                            ) : <View style={{ height: 40 }} />
-                        }
-                        contentContainerStyle={styles.listContent}
-                        columnWrapperStyle={styles.columnWrapper}
+                    <ScrollView
+                        collapsable={false}
                         showsVerticalScrollIndicator={false}
+                        scrollEventThrottle={16}
+                        contentContainerStyle={styles.listContent}
+                        onScroll={({ nativeEvent }) => {
+                            const nearBottom =
+                                nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >=
+                                nativeEvent.contentSize.height - 260;
+                            if (nearBottom) {
+                                loadMore();
+                            }
+                        }}
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={isDark ? "#fff" : "#18181B"} />
                         }
-                    />
+                    >
+                        <View style={styles.listHeader}>
+                            <Text style={[styles.resultText, isDark && { color: '#94A3B8' }]}>Showing {products.length} results</Text>
+                        </View>
+
+                        <View style={styles.grid}>
+                            {products.map((item) => (
+                                <ShopProductCard
+                                    key={item.id}
+                                    product={item}
+                                    style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
+                                />
+                            ))}
+                        </View>
+
+                        {loadingMore ? (
+                            <View style={{ padding: 20, alignItems: 'center' }}>
+                                <ActivityIndicator size="small" color={isDark ? "#fff" : "#18181B"} />
+                            </View>
+                        ) : <View style={{ height: 40 }} />}
+                    </ScrollView>
                 )}
             </View>
 
@@ -370,7 +375,9 @@ const styles = StyleSheet.create({
         paddingTop: 8,
         paddingBottom: 100,
     },
-    columnWrapper: {
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
     },
     loadingContainer: {

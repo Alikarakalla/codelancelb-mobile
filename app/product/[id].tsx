@@ -333,6 +333,27 @@ export default function ProductDetailsScreen() {
             <View style={[styles.loadingContainer, isDark && { backgroundColor: '#000' }]}>
                 <Stack.Screen options={{ headerShown: true, title: 'Loading...', headerTransparent: false }} />
                 <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+                {supportsNativeBottomToolbar && (
+                    <Stack.Toolbar placement="bottom">
+                        <Stack.Toolbar.View>
+                            <View style={styles.toolbarLoadingState}>
+                                <ActivityIndicator size="small" color={isDark ? '#94A3B8' : '#334155'} />
+                                <Text style={[styles.toolbarStatusText, isDark && { color: '#94A3B8' }]}>
+                                    Loading product...
+                                </Text>
+                            </View>
+                        </Stack.Toolbar.View>
+                        <Stack.Toolbar.Spacer />
+                        <Stack.Toolbar.View separateBackground>
+                            <Pressable
+                                disabled
+                                style={[styles.toolbarQuantityBoxadd, styles.toolbarPrimaryDisabled]}
+                            >
+                                <IconSymbol name="cart.badge.plus" size={34} color={isDark ? '#94A3B8' : '#9CA3AF'} />
+                            </Pressable>
+                        </Stack.Toolbar.View>
+                    </Stack.Toolbar>
+                )}
             </View>
         );
     }
@@ -769,5 +790,15 @@ const styles = StyleSheet.create({
         fontSize: 11, // Slightly smaller for better fit
         fontWeight: '700',
         flexShrink: 0, // Prevent the text itself from shrinking if the container is wide enough
+    },
+    toolbarLoadingState: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 36,
+    },
+    toolbarPrimaryDisabled: {
+        opacity: 0.5,
     },
 });

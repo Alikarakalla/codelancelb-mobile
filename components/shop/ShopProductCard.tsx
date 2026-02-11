@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { FavouriteIcon } from '@/components/ui/icons';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { calculateProductListingPricing } from '@/utils/pricing';
+import { getColorHex } from '@/utils/colorHelpers';
+import { WishlistHeartButton } from '@/components/ui/WishlistHeartButton';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -138,18 +138,12 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
                     </View>
                 )}
 
-                <Pressable
+                <WishlistHeartButton
+                    isWishlisted={inWishlist}
+                    isDark={isDark}
                     onPress={handleToggleWishlist}
-                    style={[styles.triggerButton, isDark && { backgroundColor: 'rgba(30,30,30,0.9)' }]}
-                    hitSlop={12}
-
-                >
-                    <HugeiconsIcon
-                        icon={FavouriteIcon}
-                        size={20}
-                        color={inWishlist ? '#ef4444' : (isDark ? '#fff' : '#1f2937')}
-                    />
-                </Pressable>
+                    style={styles.triggerButton}
+                />
                 {badge}
             </Pressable>
 
@@ -161,32 +155,37 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
 
                 {colorVariants.length > 0 && (
                     <View style={styles.colorContainer}>
-                        {colorVariants.map((variant) => {
-                            // Cast to any to access the 'code' field which holds the hex
-                            const v = variant as any;
-                            // Prioritize 'code' found in option_values (nested) as per logs, then other fallbacks
-                            const rawColor = v.option_values?.color?.code || v.code || v.hex || v.hex_color || v.color_hex || variant.color;
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            nestedScrollEnabled
+                            contentContainerStyle={styles.colorScrollContent}
+                        >
+                            {colorVariants.map((variant) => {
+                                // Cast to any to access the 'code' field which holds the hex
+                                const v = variant as any;
+                                // Prioritize 'code' found in option_values (nested) as per logs, then other fallbacks
+                                const rawColor = v.option_values?.color?.code || v.code || v.hex || v.hex_color || v.color_hex || variant.color;
 
-                            // Use the same robust hex extraction logic as the product page
-                            const { getColorHex } = require('@/utils/colorHelpers');
-                            const validColor = getValidColor(rawColor) || getColorHex(variant.color || '');
+                                const validColor = getValidColor(rawColor) || getColorHex(variant.color || '');
 
-                            return (
-                                <Pressable
-                                    key={variant.id}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedVariant(variant);
-                                    }}
-                                    style={[
-                                        styles.colorDot,
-                                        { backgroundColor: validColor },
-                                        selectedVariant?.id === variant.id && styles.colorDotSelected,
-                                        selectedVariant?.id === variant.id && isDark && styles.colorDotSelectedDark
-                                    ]}
-                                />
-                            );
-                        })}
+                                return (
+                                    <Pressable
+                                        key={variant.id}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedVariant(variant);
+                                        }}
+                                        style={[
+                                            styles.colorDot,
+                                            { backgroundColor: validColor },
+                                            selectedVariant?.id === variant.id && styles.colorDotSelected,
+                                            selectedVariant?.id === variant.id && isDark && styles.colorDotSelectedDark
+                                        ]}
+                                    />
+                                );
+                            })}
+                        </ScrollView>
                     </View>
                 )}
 
@@ -241,16 +240,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         right: 8,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
         zIndex: 10,
     },
 
@@ -295,10 +284,14 @@ const styles = StyleSheet.create({
         minHeight: 36,
     },
     colorContainer: {
-        flexDirection: 'row',
-        gap: 6,
+        width: '100%',
         marginVertical: 4,
-        flexWrap: 'wrap',
+    },
+    colorScrollContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingRight: 2,
     },
     colorDot: {
         width: 18,
@@ -308,13 +301,13 @@ const styles = StyleSheet.create({
         borderColor: '#d1d5db',
     },
     colorDotSelected: {
-        transform: [{ scale: 1.3 }],
+        borderWidth: 2,
+        borderColor: '#111827',
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.12,
         shadowRadius: 1.41,
         elevation: 2,
-        borderWidth: 0, // Remove border for selected
     },
     colorDotSelectedDark: {
         borderColor: '#fff',

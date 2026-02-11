@@ -16,7 +16,7 @@ export default function WishlistScreen() {
     const { wishlist } = useWishlist();
 
     return (
-        <View style={[styles.container, isDark && styles.containerDark]}>
+        <View collapsable={false} style={[styles.container, isDark && styles.containerDark]}>
             <GlobalHeader title="LUXE" />
 
             <ScrollView

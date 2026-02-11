@@ -1,19 +1,229 @@
-import { Platform, StyleSheet, View, Pressable } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { api } from '@/services/apiClient';
+import { Category } from '@/types/schema';
 import { MaterialIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { BlurView } from 'expo-blur';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEffect, useMemo, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+type DiscountLevel = 'category' | 'sub_category' | 'sub_sub_category';
+
+interface CategoryDiscountEntry {
+  id: number;
+  name: string;
+  amount: number;
+  type: 'fixed' | 'percent' | null | undefined;
+  level: DiscountLevel;
+}
+
+function hasActiveCategoryDiscount(category: Category, nowMs: number): boolean {
+  const amount = Number(category.discount_amount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+
+  const startMs = category.discount_start_date ? new Date(category.discount_start_date).getTime() : null;
+  const endMs = category.discount_end_date ? new Date(category.discount_end_date).getTime() : null;
+
+  if (startMs && nowMs < startMs) return false;
+  if (endMs && nowMs > endMs) return false;
+  return true;
+}
+
+function collectCategoryDiscounts(categories: Category[]): CategoryDiscountEntry[] {
+  const nowMs = Date.now();
+  const entries = new Map<number, CategoryDiscountEntry>();
+
+  const walk = (category: Category, level: DiscountLevel) => {
+    if (hasActiveCategoryDiscount(category, nowMs)) {
+      entries.set(category.id, {
+        id: category.id,
+        name: category.name_en || category.name || 'Category',
+        amount: Number(category.discount_amount ?? 0),
+        type: category.discount_type,
+        level,
+      });
+    }
+
+    const subCategories = category.sub_categories ?? category.subCategories ?? [];
+    subCategories.forEach((sub) => walk(sub, level === 'category' ? 'sub_category' : 'sub_sub_category'));
+
+    const subSubCategories = category.sub_sub_categories ?? category.subSubCategories ?? [];
+    subSubCategories.forEach((subSub) => walk(subSub, 'sub_sub_category'));
+  };
+
+  categories.forEach((category) => walk(category, 'category'));
+  return Array.from(entries.values());
+}
+
+function formatDiscountMessage(entries: CategoryDiscountEntry[]): string | null {
+  if (entries.length === 0) return null;
+
+  const sorted = [...entries].sort((a, b) => b.amount - a.amount);
+  const top = sorted[0];
+  const amountLabel = Number.isInteger(top.amount)
+    ? String(top.amount)
+    : top.amount.toFixed(2).replace(/\.00$/, '');
+  const discountLabel = top.type === 'percent' ? `${amountLabel}%` : amountLabel;
+  return `${discountLabel} Discount on ${top.name}`;
+}
+
+function HomeDiscountAccessory({
+  isDark,
+  message,
+  onPress,
+}: {
+  isDark: boolean;
+  message: string;
+  onPress: () => void;
+}) {
+  const placement = NativeTabs.BottomAccessory.usePlacement();
+  const isInline = placement === 'inline';
+  const marqueeTranslateX = useMemo(() => new Animated.Value(0), []);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [textWidth, setTextWidth] = useState(0);
+  const marqueeGap = 40;
+  const shouldMarquee = textWidth > containerWidth && containerWidth > 0;
+
+  useEffect(() => {
+    if (!shouldMarquee) {
+      marqueeTranslateX.stopAnimation();
+      marqueeTranslateX.setValue(0);
+      return;
+    }
+
+    const distance = textWidth + marqueeGap;
+    const duration = Math.max(6000, Math.round(distance * 32));
+    const loop = Animated.loop(
+      Animated.timing(marqueeTranslateX, {
+        toValue: -distance,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    marqueeTranslateX.setValue(0);
+    loop.start();
+    return () => {
+      loop.stop();
+      marqueeTranslateX.stopAnimation();
+    };
+  }, [marqueeGap, marqueeTranslateX, shouldMarquee, textWidth]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.accessoryWrap,
+        isInline ? styles.accessoryWrapInline : styles.accessoryWrapRegular,
+      ]}
+    >
+      <View
+        style={styles.accessoryTickerViewport}
+        onLayout={(event) => setContainerWidth(Math.round(event.nativeEvent.layout.width))}
+      >
+        {shouldMarquee ? (
+          <Animated.View style={[styles.accessoryTickerTrack, { transform: [{ translateX: marqueeTranslateX }] }]}>
+            <Text
+              onLayout={(event) => setTextWidth(Math.round(event.nativeEvent.layout.width))}
+              style={[
+                styles.accessoryText,
+                isInline ? styles.accessoryTextInline : styles.accessoryTextRegular,
+                isDark ? styles.accessoryTextDark : styles.accessoryTextLight,
+              ]}
+            >
+              {message}
+            </Text>
+            <View style={{ width: marqueeGap }} />
+            <Text
+              style={[
+                styles.accessoryText,
+                isInline ? styles.accessoryTextInline : styles.accessoryTextRegular,
+                isDark ? styles.accessoryTextDark : styles.accessoryTextLight,
+              ]}
+            >
+              {message}
+            </Text>
+          </Animated.View>
+        ) : (
+          <Text
+            numberOfLines={1}
+            onLayout={(event) => setTextWidth(Math.round(event.nativeEvent.layout.width))}
+            style={[
+              styles.accessoryText,
+              styles.accessoryTextCentered,
+              isInline ? styles.accessoryTextInline : styles.accessoryTextRegular,
+              isDark ? styles.accessoryTextDark : styles.accessoryTextLight,
+            ]}
+          >
+            {message}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  );
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const pathname = usePathname();
+  const iosMajorVersion = Platform.OS === 'ios'
+    ? Number(String(Platform.Version).split('.')[0] || 0)
+    : 0;
+  const supportsIos26TabAccessory = Platform.OS === 'ios' && iosMajorVersion >= 26;
+  const [discountMessage, setDiscountMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supportsIos26TabAccessory) return;
+
+    let isMounted = true;
+
+    const loadCategoryDiscounts = async () => {
+      try {
+        const categories = await api.getCategories();
+        const discounts = collectCategoryDiscounts(categories);
+        if (!isMounted) return;
+        setDiscountMessage(formatDiscountMessage(discounts));
+      } catch (error) {
+        console.warn('Failed to load category discounts for tab accessory:', error);
+        if (isMounted) setDiscountMessage(null);
+      }
+    };
+
+    loadCategoryDiscounts();
+    return () => {
+      isMounted = false;
+    };
+  }, [supportsIos26TabAccessory]);
+
+  const isHomeTab = useMemo(
+    () =>
+      pathname === '/' ||
+      pathname === '/index' ||
+      pathname === '/(tabs)' ||
+      pathname.startsWith('/(tabs)/index'),
+    [pathname]
+  );
 
   if (Platform.OS === 'ios') {
     return (
-      <NativeTabs backBehavior="history">
+      <NativeTabs
+        backBehavior="history"
+        minimizeBehavior="onScrollDown"
+      >
+        {supportsIos26TabAccessory && isHomeTab && !!discountMessage && (
+          <NativeTabs.BottomAccessory>
+            <HomeDiscountAccessory
+              isDark={isDark}
+              message={discountMessage}
+              onPress={() => router.push('/shop')}
+            />
+          </NativeTabs.BottomAccessory>
+        )}
+
         <NativeTabs.Trigger name="index">
           <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon sf="house.fill" />
@@ -155,6 +365,53 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  accessoryWrap: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accessoryWrapRegular: {
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    minHeight: 45,
+    justifyContent: 'center',
+  },
+  accessoryWrapInline: {
+    marginBottom: 0,
+    paddingHorizontal: 10,
+    minHeight: 45,
+    justifyContent: 'center',
+  },
+  accessoryText: {
+    fontWeight: '700',
+    textAlignVertical: 'center',
+  },
+  accessoryTextCentered: {
+    textAlign: 'center',
+    width: '100%',
+  },
+  accessoryTextRegular: {
+    fontSize: 15,
+  },
+  accessoryTextInline: {
+    fontSize: 12,
+  },
+  accessoryTextLight: {
+    color: '#0F172A',
+  },
+  accessoryTextDark: {
+    color: '#F8FAFC',
+  },
+  accessoryTickerViewport: {
+    width: '100%',
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  accessoryTickerTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   androidTabBar: {
     position: 'absolute',
     left: 14,

@@ -228,7 +228,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
+    <View collapsable={false} style={[styles.container, isDark && { backgroundColor: '#000' }]}>
       <GlobalHeader title="LUXE" />
 
       <Animated.ScrollView
