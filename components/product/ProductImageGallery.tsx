@@ -1,16 +1,15 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, Pressable, FlatList, ViewToken } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, Dimensions, Pressable, FlatList, ViewToken, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import ImageView from "react-native-image-viewing";
+import { Link } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import Animated from 'react-native-reanimated';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 const { width } = Dimensions.get('window');
-const IMAGE_ASPECT_RATIO = 1; // Square 1:1
-
+const EXPAND_BUTTON_OFFSET = 24;
 interface ProductImageGalleryProps {
     images: string[];
     selectedImage?: string | null;
@@ -18,11 +17,14 @@ interface ProductImageGalleryProps {
 }
 
 export function ProductImageGallery({ images, selectedImage, productId }: ProductImageGalleryProps) {
-    const [visible, setVisible] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+    const supportsAppleZoomTransition = Platform.OS === 'ios' && iosMajorVersion >= 18;
 
     const thumbListRef = useRef<FlatList>(null);
 
@@ -37,18 +39,6 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
         }
     }, [activeIndex, images.length]);
 
-    const formattedImages = images.map(img => ({ uri: img }));
-
-    // Scroll to selected image when it updates
-    React.useEffect(() => {
-        if (selectedImage) {
-            const index = images.findIndex(img => img === selectedImage);
-            if (index !== -1 && index !== activeIndex) {
-                scrollToIndex(index);
-            }
-        }
-    }, [selectedImage, images]);
-
     const isManualScrolling = useRef(false);
 
     // Handle scroll for pagination
@@ -59,7 +49,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
     });
     const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
-    const scrollToIndex = (index: number) => {
+    const scrollToIndex = useCallback((index: number) => {
         if (index >= 0 && index < images.length) {
             isManualScrolling.current = true;
             flatListRef.current?.scrollToIndex({ index, animated: true });
@@ -70,7 +60,30 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                 isManualScrolling.current = false;
             }, 600);
         }
-    };
+    }, [images.length]);
+
+    // Scroll to selected image when it updates
+    React.useEffect(() => {
+        if (selectedImage) {
+            const index = images.findIndex(img => img === selectedImage);
+            if (index !== -1 && index !== activeIndex) {
+                scrollToIndex(index);
+            }
+        }
+    }, [selectedImage, images, activeIndex, scrollToIndex]);
+
+    const activeImage = images[activeIndex] || images[0];
+    const viewerHref = useMemo(
+        () => ({
+            pathname: '/product/image-viewer' as const,
+            params: {
+                images: JSON.stringify(images),
+                index: String(activeIndex),
+                image: activeImage,
+            },
+        }),
+        [activeImage, activeIndex, images]
+    );
 
     if (!images || images.length === 0) return null;
 
@@ -132,9 +145,22 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                 </View>
 
                 {/* Expand Button */}
-                <Pressable style={styles.expandButton} onPress={() => setVisible(true)}>
-                    <Ionicons name="resize" size={20} color="#fff" />
-                </Pressable>
+                <Link href={viewerHref} asChild>
+                    <Pressable style={styles.expandButton}>
+                        {supportsAppleZoomTransition && activeImage ? (
+                            <Link.AppleZoom>
+                                <View pointerEvents="none" style={styles.appleZoomSourceProxy}>
+                                    <Image
+                                        source={{ uri: activeImage }}
+                                        style={styles.appleZoomSourceImage}
+                                        contentFit="contain"
+                                    />
+                                </View>
+                            </Link.AppleZoom>
+                        ) : null}
+                        <Ionicons name="resize" size={20} color="#fff" />
+                    </Pressable>
+                </Link>
             </View>
 
             {/* Thumbnails */}
@@ -176,14 +202,6 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                     />
                 </View>
             )}
-
-            {/* Full Screen Viewer */}
-            <ImageView
-                images={formattedImages}
-                imageIndex={activeIndex}
-                visible={visible}
-                onRequestClose={() => setVisible(false)}
-            />
         </View>
     );
 }
@@ -234,8 +252,8 @@ const styles = StyleSheet.create({
     },
     expandButton: {
         position: 'absolute',
-        bottom: 24,
-        right: 24,
+        bottom: EXPAND_BUTTON_OFFSET,
+        right: EXPAND_BUTTON_OFFSET,
         width: 44,
         height: 44,
         borderRadius: 22,
@@ -244,6 +262,18 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)'
+    },
+    appleZoomSourceProxy: {
+        position: 'absolute',
+        width,
+        height: width,
+        right: -EXPAND_BUTTON_OFFSET,
+        bottom: -EXPAND_BUTTON_OFFSET,
+        opacity: 0.001,
+    },
+    appleZoomSourceImage: {
+        width: '100%',
+        height: '100%',
     },
     thumbnailsContainer: {
         marginTop: 16,

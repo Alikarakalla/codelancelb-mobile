@@ -1,28 +1,36 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Pressable, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect } from '@react-navigation/native';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CartItem } from '@/components/cart/CartItem';
-import { PromoCodeInput } from '@/components/cart/PromoCodeInput';
-import { OrderSummary } from '@/components/cart/OrderSummary';
 import { CartFooter } from '@/components/cart/CartFooter';
+import { CartItem } from '@/components/cart/CartItem';
+import { OrderSummary } from '@/components/cart/OrderSummary';
 
-import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
+import { useCart } from '@/hooks/use-cart-context';
+import { useCurrency } from '@/hooks/use-currency-context';
 import { api } from '@/services/apiClient';
 import { getCartItemPricing, resolveCartItemVariant } from '@/utils/cartPricing';
 
 export default function CartScreen() {
+    const RouteStack = Stack as any;
     const insets = useSafeAreaInsets();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { items, removeFromCart, updateQuantity, recalculateCartPrices } = useCart();
     const { user } = useAuth();
+    const { formatPrice } = useCurrency();
+    const stackToolbar = (RouteStack as any)?.Toolbar;
+    const supportsNativeBottomToolbar =
+        Platform.OS === 'ios' &&
+        !!stackToolbar &&
+        !!stackToolbar.View &&
+        !!stackToolbar.Spacer;
 
     const [storeSettings, setStoreSettings] = useState<any>(null);
 
@@ -76,10 +84,11 @@ export default function CartScreen() {
         discount: 0.00,
         total: subtotal + shipping + tax
     };
+    const totalText = String(formatPrice(totals.total) || `$${totals.total.toFixed(2)}`);
 
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
-            <Stack.Screen
+            <RouteStack.Screen
                 options={{
                     headerShown: true,
                     headerTransparent: true,
@@ -129,7 +138,7 @@ export default function CartScreen() {
             <ScrollView
                 contentContainerStyle={{
                     paddingTop: 60 + insets.top,
-                    paddingBottom: 180,
+                    paddingBottom: supportsNativeBottomToolbar ? 120 : 180,
                     paddingHorizontal: 16
                 }}
                 showsVerticalScrollIndicator={false}
@@ -230,7 +239,41 @@ export default function CartScreen() {
                 )}
             </ScrollView>
 
-            {items.length > 0 && (
+            {items.length > 0 && supportsNativeBottomToolbar && (
+                <RouteStack.Toolbar placement="bottom">
+                    {/* <RouteStack.Toolbar.View style={{ flexShrink: 0, minWidth: 100 }}>
+                        <Pressable></Pressable>
+                        <Text style={styles.toolbarTotalCompactText}>
+                            {`Total ${totalText}`}
+                        </Text>
+                    </RouteStack.Toolbar.View> */}
+
+                    <Stack.Toolbar.View separateBackground>
+                        <View style={styles.toolbarQuantityBox}>
+                            <Pressable>
+                                <Text style={styles.toolbarTotalCompactText}>
+                                    {`Total ${totalText}`}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </Stack.Toolbar.View>
+                    <RouteStack.Toolbar.Spacer />
+                    <RouteStack.Toolbar.View>
+                        <Pressable
+                            onPress={() => router.push('/checkout')}
+                            style={styles.toolbarCheckoutButton}
+                        >
+                            <Text style={[styles.toolbarCheckoutButtonText, isDark && styles.toolbarCheckoutButtonTextDark]}>
+                                Checkout
+                            </Text>
+                        </Pressable>
+                    </RouteStack.Toolbar.View>
+                </RouteStack.Toolbar>
+            )}
+
+
+
+            {items.length > 0 && !supportsNativeBottomToolbar && (
                 <CartFooter
                     total={totals.total}
                     onCheckout={() => router.push('/checkout')}
@@ -283,5 +326,44 @@ const styles = StyleSheet.create({
     },
     emptyTextDark: {
         color: '#94A3B8',
+    },
+     toolbarQuantityBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        // borderWidth: 1,
+        // borderColor: '#D1D5DB',
+        // borderRadius: 999,
+        justifyContent: 'center',
+        overflow: 'hidden',
+        minWidth: 150,
+        height: 36,
+        // backgroundColor: '#FFFFFF',
+    },
+    toolbarTotalCompactText: {
+        minWidth: 124,
+        textAlign: 'center',
+        fontSize: 20,
+        fontWeight: '700',
+        letterSpacing: -0.4,
+        color: '#0F172A',
+    },
+    toolbarTotalCompactTextDark: {
+        color: '#F8FAFC',
+    },
+    toolbarCheckoutButton: {
+        minHeight: 36,
+        minWidth: 122,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    toolbarCheckoutButtonText: {
+        color: '#0F172A',
+        fontSize: 19,
+        fontWeight: '700',
+    },
+    toolbarCheckoutButtonTextDark: {
+        color: '#F8FAFC',
     },
 });
