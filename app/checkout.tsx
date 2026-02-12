@@ -1,22 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, Image, StyleSheet, SafeAreaView, Switch, Platform, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Address, Coupon } from '@/types/schema';
-import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
+import { useCart } from '@/hooks/use-cart-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { api } from '@/services/apiClient';
-import { useFocusEffect } from '@react-navigation/native';
-import PhoneInput from 'react-native-phone-input';
-import { parsePhoneNumber } from 'libphonenumber-js';
 import { getCartItemPricing, resolveCartItemVariant } from '@/utils/cartPricing';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import PhoneInput from 'react-native-phone-input';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CheckoutScreen() {
+    const RouteStack = Stack as any;
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -24,6 +23,12 @@ export default function CheckoutScreen() {
     const { items, clearCart, recalculateCartPrices } = useCart();
     const { user, isAuthenticated } = useAuth();
     const { formatPrice, currency } = useCurrency();
+    const stackToolbar = (RouteStack as any)?.Toolbar;
+    const supportsNativeBottomToolbar =
+        Platform.OS === 'ios' &&
+        !!stackToolbar &&
+        !!stackToolbar.View &&
+        !!stackToolbar.Spacer;
 
     const [paymentMethod, setPaymentMethod] = useState<'cod'>('cod');
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
@@ -232,6 +237,7 @@ export default function CheckoutScreen() {
     const taxRatePercent = storeSettings?.tax?.rate_percent ?? 0;
     const taxes = Math.max(0, subtotal * (taxRatePercent / 100));
     const total = Math.max(0, subtotal - discountAmount - rewardDiscount + shippingCost + taxes);
+    const toolbarAmountText = `${currency?.code || 'USD'} ${total.toFixed(2)}`;
 
     const handlePlaceOrder = async () => {
         // Validation
@@ -455,7 +461,7 @@ export default function CheckoutScreen() {
                     styles.content,
                     {
                         paddingTop: 60 + insets.top,
-                        paddingBottom: 100
+                        paddingBottom: supportsNativeBottomToolbar ? 120 : 100
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
@@ -918,27 +924,54 @@ export default function CheckoutScreen() {
                 </View>
             </ScrollView>
 
-            {/* Sticky Footer */}
-            <View style={[styles.footer, isDark && styles.footerDark, { paddingBottom: insets.bottom || 20 }]}>
-                <Pressable
-                    onPress={handlePlaceOrder}
-                    disabled={placingOrder}
-                    style={({ pressed }) => [styles.payButton, pressed && styles.pressed, placingOrder && { opacity: 0.7 }]}
-                >
-                    {placingOrder ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <>
-                            <Text style={styles.payButtonText}>Place Order</Text>
-                            <Text style={styles.payButtonTotal}>· {formatPrice(total)}</Text>
-                        </>
-                    )}
-                </Pressable>
-                <View style={styles.secureFooter}>
-                    <MaterialIcons name="lock" size={14} color="#9CA3AF" />
-                    <Text style={styles.secureFooterText}>Payments are secure and encrypted</Text>
+            {supportsNativeBottomToolbar ? (
+                <RouteStack.Toolbar placement="bottom">
+                    <RouteStack.Toolbar.View separateBackground>
+                        <View style={styles.toolbarAmountBox}>
+                            <Text style={[styles.toolbarAmountText, isDark && styles.toolbarAmountTextDark]}>
+                                {toolbarAmountText}
+                            </Text>
+                        </View>
+                    </RouteStack.Toolbar.View>
+                    <RouteStack.Toolbar.Spacer />
+                    <RouteStack.Toolbar.View>
+                        <Pressable
+                            onPress={handlePlaceOrder}
+                            disabled={placingOrder}
+                            style={[styles.toolbarPlaceOrderButton, placingOrder && { opacity: 0.7 }]}
+                        >
+                            {placingOrder ? (
+                                <ActivityIndicator color={isDark ? '#F8FAFC' : '#0F172A'} />
+                            ) : (
+                                <Text style={[styles.toolbarPlaceOrderButtonText, isDark && styles.toolbarPlaceOrderButtonTextDark]}>
+                                    Place Order
+                                </Text>
+                            )}
+                        </Pressable>
+                    </RouteStack.Toolbar.View>
+                </RouteStack.Toolbar>
+            ) : (
+                <View style={[styles.footer, isDark && styles.footerDark, { paddingBottom: insets.bottom || 20 }]}>
+                    <Pressable
+                        onPress={handlePlaceOrder}
+                        disabled={placingOrder}
+                        style={({ pressed }) => [styles.payButton, pressed && styles.pressed, placingOrder && { opacity: 0.7 }]}
+                    >
+                        {placingOrder ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <>
+                                <Text style={styles.payButtonText}>Place Order</Text>
+                                <Text style={styles.payButtonTotal}>· {formatPrice(total)}</Text>
+                            </>
+                        )}
+                    </Pressable>
+                    <View style={styles.secureFooter}>
+                        <MaterialIcons name="lock" size={14} color="#9CA3AF" />
+                        <Text style={styles.secureFooterText}>Payments are secure and encrypted</Text>
+                    </View>
                 </View>
-            </View>
+            )}
         </View>
     );
 }
@@ -1353,6 +1386,40 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
+    toolbarAmountBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 150,
+        height: 36,
+    },
+    toolbarAmountText: {
+        minWidth: 124,
+        textAlign: 'center',
+        fontSize: 20,
+        fontWeight: '700',
+        letterSpacing: -0.4,
+        color: '#0F172A',
+    },
+    toolbarAmountTextDark: {
+        color: '#F8FAFC',
+    },
+    toolbarPlaceOrderButton: {
+        minHeight: 36,
+        minWidth: 122,
+        // paddingHorizontal: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    toolbarPlaceOrderButtonText: {
+        color: '#0F172A',
+        fontSize: 17,
+        fontWeight: '600',
+    },
+    toolbarPlaceOrderButtonTextDark: {
+        color: '#F8FAFC',
+    },
     secureFooter: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1475,4 +1542,3 @@ const styles = StyleSheet.create({
         color: '#000',
     }
 });
-
