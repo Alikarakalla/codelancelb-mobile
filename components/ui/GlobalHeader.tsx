@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCart } from '@/hooks/use-cart-context';
 import { useAuth } from '@/hooks/use-auth-context';
@@ -35,7 +36,9 @@ export function GlobalHeader({
     onWishlistPress,
     alwaysShowTitle
 }: GlobalHeaderProps) {
+    const RouteStack = Stack as any;
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation<any>();
     const colorScheme = useColorScheme();
     const router = useRouter();
     const { cartCount } = useCart();
@@ -51,9 +54,26 @@ export function GlobalHeader({
 
     const isDark = colorScheme === 'dark';
     const textColor = isDark ? '#fff' : '#18181B';
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+    const stackToolbar = (RouteStack as any)?.Toolbar;
+    const isStackNavigationContext = navigation?.getState?.()?.type === 'stack';
+    const supportsNativeTopToolbar =
+        Platform.OS === 'ios' &&
+        iosMajorVersion >= 26 &&
+        isStackNavigationContext &&
+        !!stackToolbar &&
+        !!stackToolbar.View;
 
     // If back button is enabled, we assume a "Product/Detail" header style
     const isDetailMode = showBack;
+    const shouldShowCart = showCart || !isDetailMode;
+    const shouldUseNativeToolbarHeader =
+        supportsNativeTopToolbar &&
+        !isDetailMode &&
+        !showShare &&
+        !showWishlist;
 
     const getInitials = (name?: string) => {
         if (!name) return 'U';
@@ -84,6 +104,114 @@ export function GlobalHeader({
         }
     };
 
+    const renderProfileAvatar = () => {
+        if (isAuthenticated) {
+            if (!imageError && avatarSource) {
+                return (
+                    <Image
+                        source={avatarSource}
+                        style={{ width: 32, height: 32, borderRadius: 16 }}
+                        contentFit="cover"
+                        onError={() => setImageError(true)}
+                    />
+                );
+            }
+
+            return (
+                <LinearGradient
+                    colors={['#18181b', '#000000']}
+                    style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+                >
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{getInitials(user?.name)}</Text>
+                </LinearGradient>
+            );
+        }
+
+        return (
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="user" size={18} color={textColor} />
+            </View>
+        );
+    };
+
+    const renderCartButton = (buttonStyle: any = styles.iconButton) => (
+        <Pressable
+            style={buttonStyle}
+            onPress={() => router.push('/cart')}
+            ref={cartIconRef}
+            onLayout={() => {
+                cartIconRef.current?.measure((x, y, width, height, px, py) => {
+                    setCartTargetPoint({
+                        x: px + width / 2,
+                        y: py + height / 2
+                    });
+                });
+            }}
+        >
+            <IconSymbol
+                name="bag"
+                color={textColor}
+                size={24}
+                weight="medium"
+            />
+            {cartCount > 0 && (
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                        {cartCount}
+                    </Text>
+                </View>
+            )}
+        </Pressable>
+    );
+
+    if (shouldUseNativeToolbarHeader) {
+        return (
+            <>
+                <RouteStack.Screen
+                    options={{
+                        headerShown: true,
+                        headerTransparent: true,
+                        headerTitle: '',
+                        headerBackVisible: false,
+                        ...(Platform.OS === 'ios' ? {
+                            unstable_nativeHeaderOptions: {
+                                headerBackground: {
+                                    material: 'glass',
+                                },
+                            }
+                        } : {})
+                    } as any}
+                />
+
+                <RouteStack.Toolbar asChild placement="left">
+                    <View style={styles.nativeToolbarLeftGroup}>
+                        <Pressable onPress={handleProfilePress} style={styles.nativeToolbarProfileButton}>
+                            {renderProfileAvatar()}
+                        </Pressable>
+
+                        {title === 'LUXE' ? (
+                            <Image
+                                source={require('@/assets/images/logo.png')}
+                                style={styles.nativeToolbarLogo}
+                                contentFit="contain"
+                            />
+                        ) : (
+                            <Text style={[styles.title, styles.nativeToolbarTitle, { color: textColor }]}>
+                                {title}
+                            </Text>
+                        )}
+                    </View>
+                </RouteStack.Toolbar>
+
+                {shouldShowCart && (
+                    <RouteStack.Toolbar asChild placement="right">
+                        {renderCartButton(styles.nativeToolbarCartButton)}
+                    </RouteStack.Toolbar>
+                )}
+            </>
+        );
+    }
+
     return (
         <BlurView
             intensity={80}
@@ -102,27 +230,7 @@ export function GlobalHeader({
                             onPress={handleProfilePress}
                             style={[styles.iconButton, { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }]}
                         >
-                            {isAuthenticated ? (
-                                (!imageError && avatarSource) ? (
-                                    <Image
-                                        source={avatarSource}
-                                        style={{ width: 32, height: 32, borderRadius: 16 }}
-                                        contentFit="cover"
-                                        onError={() => setImageError(true)}
-                                    />
-                                ) : (
-                                    <LinearGradient
-                                        colors={['#18181b', '#000000']}
-                                        style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
-                                    >
-                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{getInitials(user?.name)}</Text>
-                                    </LinearGradient>
-                                )
-                            ) : (
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? '#333' : '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Feather name="user" size={18} color={textColor} />
-                                </View>
-                            )}
+                            {renderProfileAvatar()}
                         </Pressable>
                     )}
                 </View>
@@ -163,52 +271,7 @@ export function GlobalHeader({
                         </Pressable>
                     )}
 
-                    {(showCart || !isDetailMode) && (
-                        <Pressable
-                            style={styles.iconButton}
-                            onPress={() => router.push('/cart')}
-                            ref={cartIconRef}
-                            onLayout={() => {
-                                cartIconRef.current?.measure((x, y, width, height, px, py) => {
-                                    setCartTargetPoint({
-                                        x: px + width / 2,
-                                        y: py + height / 2
-                                    });
-                                });
-                            }}
-                        >
-                            <IconSymbol
-                                name="bag"
-                                color={textColor}
-                                size={24}
-                                weight="medium"
-                            />
-                            {cartCount > 0 && (
-                                <View style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    right: 0,
-                                    backgroundColor: '#000',
-                                    borderRadius: 10,
-                                    minWidth: 16,
-                                    height: 16,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderWidth: 1,
-                                    borderColor: '#fff'
-                                }}>
-                                    <Text style={{
-                                        color: '#fff',
-                                        fontSize: 9,
-                                        fontWeight: 'bold',
-                                        paddingHorizontal: 2
-                                    }}>
-                                        {cartCount}
-                                    </Text>
-                                </View>
-                            )}
-                        </Pressable>
-                    )}
+                    {shouldShowCart && renderCartButton()}
                 </View>
             </View>
         </BlurView>
@@ -269,12 +332,12 @@ const styles = StyleSheet.create({
     },
     badge: {
         position: 'absolute',
-        top: 2,
-        right: 2,
+        top: 0,
+        right: 0,
         backgroundColor: '#000',
-        minWidth: 14,
-        height: 14,
-        borderRadius: 7,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -282,8 +345,35 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#fff',
-        fontSize: 8,
+        fontSize: 9,
         fontWeight: 'bold',
+        paddingHorizontal: 2,
+    },
+    nativeToolbarLeftGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 36,
+    },
+    nativeToolbarProfileButton: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    nativeToolbarLogo: {
+        width: 60,
+        height: 28,
+        marginLeft: 8,
+    },
+    nativeToolbarTitle: {
+        marginLeft: 8,
+        letterSpacing: 1,
+        textTransform: 'none',
+    },
+    nativeToolbarCartButton: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
-

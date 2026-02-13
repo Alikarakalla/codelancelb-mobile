@@ -6,14 +6,24 @@ import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { ShopProductCard } from '@/components/shop/ShopProductCard';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 
 export default function WishlistScreen() {
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation<any>();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const router = useRouter();
 
     const { wishlist } = useWishlist();
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+    const usesNativeToolbarHeader =
+        Platform.OS === 'ios' &&
+        iosMajorVersion >= 26 &&
+        navigation?.getState?.()?.type === 'stack';
+    const topPadding = usesNativeToolbarHeader ? 8 : 60 + insets.top;
 
     return (
         <View collapsable={false} style={[styles.container, isDark && styles.containerDark]}>
@@ -21,11 +31,13 @@ export default function WishlistScreen() {
 
             <ScrollView
                 contentContainerStyle={{
-                    paddingTop: 60 + insets.top,
+                    paddingTop: topPadding,
                     paddingBottom: 100,
                     paddingHorizontal: 16,
                 }}
                 showsVerticalScrollIndicator={false}
+                automaticallyAdjustContentInsets={false}
+                contentInsetAdjustmentBehavior="never"
             >
                 {wishlist.length > 0 ? (
                     <View style={styles.grid}>

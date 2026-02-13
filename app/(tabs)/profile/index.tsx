@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Platform, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '@/hooks/use-auth-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Text } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
@@ -23,11 +23,20 @@ import { NotificationsList } from '@/components/profile/NotificationsList';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation<any>();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const [activeTab, setActiveTab] = useState('Details');
     const { isAuthenticated } = useAuth();
     const scrollViewRef = useRef<ScrollView>(null);
+    const iosMajorVersion = Platform.OS === 'ios'
+        ? Number(String(Platform.Version).split('.')[0] || 0)
+        : 0;
+    const usesNativeToolbarHeader =
+        Platform.OS === 'ios' &&
+        iosMajorVersion >= 26 &&
+        navigation?.getState?.()?.type === 'stack';
+    const topPadding = usesNativeToolbarHeader ? 8 : 60 + insets.top;
 
     return (
         <View collapsable={false} style={[styles.container, { backgroundColor: isDark ? '#000000' : '#fff' }]}>
@@ -36,9 +45,11 @@ export default function ProfileScreen() {
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollView}
-                contentContainerStyle={{ paddingTop: 60 + insets.top, paddingBottom: 100 }}
+                contentContainerStyle={{ paddingTop: topPadding, paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
                 stickyHeaderIndices={isAuthenticated ? [1] : []}
+                automaticallyAdjustContentInsets={false}
+                contentInsetAdjustmentBehavior="never"
             >
                 {/* 0: Profile Header */}
                 <ProfileHeader />
