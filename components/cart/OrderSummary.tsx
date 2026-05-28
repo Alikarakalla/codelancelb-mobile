@@ -8,10 +8,22 @@ interface OrderSummaryProps {
     shipping: number;
     tax: number;
     discount?: number;
+    discountCode?: string | null;
+    promotion?: number;
+    promotionLabel?: string | null;
     total: number;
 }
 
-export function OrderSummary({ subtotal, shipping, tax, discount, total }: OrderSummaryProps) {
+export function OrderSummary({
+    subtotal,
+    shipping,
+    tax,
+    discount,
+    discountCode,
+    promotion,
+    promotionLabel,
+    total,
+}: OrderSummaryProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { formatPrice } = useCurrency();
@@ -27,6 +39,17 @@ export function OrderSummary({ subtotal, shipping, tax, discount, total }: Order
                 </Text>
             </View>
 
+            {!!promotion && promotion > 0 && (
+                <View style={styles.row}>
+                    <Text style={styles.discountLabel}>
+                        {promotionLabel || 'Promotion discount'}
+                    </Text>
+                    <Text style={styles.discountValue}>
+                        -{String(formatPrice(promotion) || `$${promotion.toFixed(2)}`)}
+                    </Text>
+                </View>
+            )}
+
             <View style={styles.row}>
                 <Text style={[styles.label, isDark && styles.labelDark]}>Shipping</Text>
                 <Text style={[styles.value, isDark && styles.valueDark]}>
@@ -41,10 +64,14 @@ export function OrderSummary({ subtotal, shipping, tax, discount, total }: Order
                 </Text>
             </View>
 
-            {!!discount && (
+            {!!discount && discount > 0 && (
                 <View style={styles.row}>
-                    <Text style={styles.discountLabel}>Discount (PROMO20)</Text>
-                    <Text style={styles.discountValue}>-{String(formatPrice(discount) || `$${discount.toFixed(2)}`)}</Text>
+                    <Text style={styles.discountLabel}>
+                        {discountCode ? `Discount (${discountCode})` : 'Discount'}
+                    </Text>
+                    <Text style={styles.discountValue}>
+                        -{String(formatPrice(discount) || `$${discount.toFixed(2)}`)}
+                    </Text>
                 </View>
             )}
 

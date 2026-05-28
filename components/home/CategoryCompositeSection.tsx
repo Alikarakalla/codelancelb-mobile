@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, Image, Pressable, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
+import { resolveInternalUrl } from '@/utils/resolveInternalUrl';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
     useSharedValue,
@@ -22,7 +23,7 @@ interface CategorySlide {
     cta_text: string;
     cta_url: string;
     image_desktop?: string;
-    image_mobile: string;
+    image_mobile?: string;
 }
 
 export interface CategorySectionData {
@@ -45,19 +46,16 @@ export function CategoryCompositeSection({ data, onProductPress }: CategoryCompo
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const progress = useSharedValue(0);
+    const hasProducts = !!data?.products?.length;
+    const showBanners = !!data?.slides?.length;
 
-    // Filter out sections where products are missing (if required, though typical API behaviour)
-    // Here we just return null if data is missing
-    if (!data) return null;
-    if (!data.products || data.products.length === 0) {
-        return null;
-    }
-
-    const showBanners = data.slides && data.slides.length > 0;
+    const activeDotProgressStyle = useAnimatedStyle(() => ({
+        width: `${progress.value * 100}%`
+    }));
 
     // Auto-Play Logic
     useEffect(() => {
-        if (!showBanners) return;
+        if (!hasProducts || !showBanners) return;
 
         // Reset progress
         progress.value = 0;
@@ -74,7 +72,14 @@ export function CategoryCompositeSection({ data, onProductPress }: CategoryCompo
         return () => {
             cancelAnimation(progress);
         };
-    }, [activeIndex, showBanners]);
+    }, [activeIndex, hasProducts, showBanners]);
+
+    // Filter out sections where products are missing (if required, though typical API behaviour)
+    // Here we just return null if data is missing
+    if (!data) return null;
+    if (!data.products || data.products.length === 0) {
+        return null;
+    }
 
     const handleNextSlide = () => {
         if (!data.slides || data.slides.length === 0) return;
@@ -98,13 +103,15 @@ export function CategoryCompositeSection({ data, onProductPress }: CategoryCompo
     };
 
     const handlePressBanner = (url: string) => {
-        if (url) {
-            if (url.startsWith('http')) {
-                router.push(url as any);
-            } else {
-                router.push(url as any);
-            }
+        if (!url) return;
+        const resolved = resolveInternalUrl(url);
+        if (resolved) {
+            router.push({ pathname: resolved.pathname as any, params: resolved.params });
+            return;
         }
+        Linking.openURL(url).catch(() => {
+            router.push('/shop');
+        });
     };
 
     const handleViewAll = () => {
@@ -116,7 +123,7 @@ export function CategoryCompositeSection({ data, onProductPress }: CategoryCompo
 
     const renderBanner = ({ item }: { item: CategorySlide }) => (
         <Pressable onPress={() => handlePressBanner(item.cta_url)} style={styles.bannerItem}>
-            <Image source={{ uri: item.image_mobile }} style={styles.bannerImage} resizeMode="cover" />
+            <Image source={{ uri: item.image_mobile || item.image_desktop }} style={styles.bannerImage} resizeMode="cover" />
             <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.7)']}
                 style={styles.gradientOverlay}
@@ -139,18 +146,9 @@ export function CategoryCompositeSection({ data, onProductPress }: CategoryCompo
                     const isActive = index === activeIndex;
 
                     if (isActive) {
-                        // animated style for progress bar width inside pill
-                        // We animate width from 0% to 100% of the container (e.g. 24px)
-                        // Actually, easier to scaleX a view inside
-                        const animatedProgressStyle = useAnimatedStyle(() => {
-                            return {
-                                width: `${progress.value * 100}%`
-                            };
-                        });
-
                         return (
                             <View key={index} style={styles.activeDotContainer}>
-                                <Animated.View style={[styles.activeDotFill, animatedProgressStyle]} />
+                                <Animated.View style={[styles.activeDotFill, activeDotProgressStyle]} />
                             </View>
                         );
                     } else {

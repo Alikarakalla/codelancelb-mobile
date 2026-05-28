@@ -22,14 +22,15 @@ interface ShopFilterBarProps {
     currentSort?: string;
     onSortSelect: (sort: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc') => void;
     onRemoveFilter: (filterId: string) => void;
+    onClearAll?: () => void;
 }
 
-const SORT_OPTIONS: { value: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc'; label: string }[] = [
-    { value: 'newest', label: 'Newest' },
-    { value: 'price_asc', label: 'Price: Low to High' },
-    { value: 'price_desc', label: 'Price: High to Low' },
-    { value: 'name_asc', label: 'Name: A to Z' },
-    { value: 'name_desc', label: 'Name: Z to A' },
+const SORT_OPTIONS: { value: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc'; label: string; short: string }[] = [
+    { value: 'newest', label: 'Newest', short: 'Newest' },
+    { value: 'price_asc', label: 'Price: Low to High', short: 'Price ↑' },
+    { value: 'price_desc', label: 'Price: High to Low', short: 'Price ↓' },
+    { value: 'name_asc', label: 'Name: A to Z', short: 'A–Z' },
+    { value: 'name_desc', label: 'Name: Z to A', short: 'Z–A' },
 ];
 
 export function ShopFilterBar({
@@ -37,19 +38,28 @@ export function ShopFilterBar({
     onFilterPress,
     currentSort = 'newest',
     onSortSelect,
-    onRemoveFilter
+    onRemoveFilter,
+    onClearAll,
 }: ShopFilterBarProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const sortSheetRef = React.useRef<BottomSheetModal>(null);
     const sortSnapPoints = React.useMemo(() => ['44%'], []);
+    const [sortOpen, setSortOpen] = React.useState(false);
+
+    const currentSortLabel = React.useMemo(() => {
+        const match = SORT_OPTIONS.find((o) => o.value === currentSort);
+        return match?.short ?? 'Newest';
+    }, [currentSort]);
 
     const openAndroidSortPicker = () => {
+        setSortOpen(true);
         sortSheetRef.current?.present();
     };
 
     const handleAndroidSortSelect = (sort: 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc') => {
         onSortSelect(sort);
+        setSortOpen(false);
         sortSheetRef.current?.dismiss();
     };
 
@@ -69,7 +79,18 @@ export function ShopFilterBar({
     const sortButtonContent = (
         <>
             <MaterialIcons name="swap-vert" size={20} color={isDark ? '#fff' : '#000'} />
-            <Text style={[styles.buttonText, isDark && { color: '#fff' }]}>SORT</Text>
+            <Text style={[styles.buttonText, isDark && { color: '#fff' }]} numberOfLines={1}>
+                {currentSortLabel.toUpperCase()}
+            </Text>
+            <MaterialIcons
+                name="keyboard-arrow-down"
+                size={18}
+                color={isDark ? '#94A3B8' : '#64748B'}
+                style={[
+                    styles.sortChevron,
+                    sortOpen && styles.sortChevronOpen,
+                ]}
+            />
         </>
     );
 
@@ -137,6 +158,16 @@ export function ShopFilterBar({
                                 <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#94a3b8'} />
                             </Pressable>
                         ))}
+
+                        {onClearAll && activeFilters.length >= 2 && (
+                            <Pressable
+                                onPress={onClearAll}
+                                style={styles.clearAllPill}
+                                hitSlop={6}
+                            >
+                                <Text style={styles.clearAllText}>Clear all</Text>
+                            </Pressable>
+                        )}
                     </ScrollView>
                 </View>
             )}
@@ -147,6 +178,7 @@ export function ShopFilterBar({
                     snapPoints={sortSnapPoints}
                     index={0}
                     enablePanDownToClose
+                    onDismiss={() => setSortOpen(false)}
                     backdropComponent={renderBackdrop}
                     handleIndicatorStyle={[styles.sheetHandle, isDark && { backgroundColor: '#555' }]}
                     backgroundStyle={[styles.sheetBackground, isDark && { backgroundColor: '#141414' }]}
@@ -265,6 +297,26 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#334155',
+    },
+    clearAllPill: {
+        height: 32,
+        paddingHorizontal: 14,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    clearAllText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#EF4444',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+    sortChevron: {
+        marginLeft: -2,
+    },
+    sortChevronOpen: {
+        transform: [{ rotate: '180deg' }],
     },
     sheetBackground: {
         backgroundColor: '#fff',

@@ -4,17 +4,19 @@ import { Stack as ExpoStack, useLocalSearchParams, useRouter } from 'expo-router
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
 import { AddToCartFooter } from '@/components/product/AddToCartFooter';
 import { BundleContents } from '@/components/product/BundleContents';
+import { CompleteCollectionRail } from '@/components/product/CompleteCollectionRail';
+import { FlashSaleBanner } from '@/components/product/FlashSaleBanner';
+import { JerseyCustomization } from '@/components/product/JerseyCustomization';
+import { OrderTimeline } from '@/components/product/OrderTimeline';
 import { ProductDescription } from '@/components/product/ProductDescription';
 import { ProductImageGallery } from '@/components/product/ProductImageGallery';
 import { ProductInfo } from '@/components/product/ProductInfo';
 import { ProductSelectors } from '@/components/product/ProductSelectors';
 import { ProductTags } from '@/components/product/ProductTags';
-import { RelatedProducts } from '@/components/product/RelatedProducts';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/hooks/use-auth-context';
 import { useCart } from '@/hooks/use-cart-context';
@@ -29,7 +31,6 @@ export default function ProductDetailsScreen() {
     const Stack = ExpoStack as any;
     const { id, initialImage } = useLocalSearchParams();
     const router = useRouter();
-    const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const [product, setProduct] = useState<Product | null>(null);
@@ -38,10 +39,21 @@ export default function ProductDetailsScreen() {
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
     const [selectedVariantData, setSelectedVariantData] = useState<any>(null); // From matrix
     const [bundleSelections, setBundleSelections] = useState<Record<number, ProductVariant | null>>({});
+    const [optionSelections, setOptionSelections] = useState<Record<string, string>>({});
+    const [customName, setCustomName] = useState('');
+    const [customNumber, setCustomNumber] = useState('');
+    const [customizationError, setCustomizationError] = useState<string | null>(null);
     const [isJoinedWaitlist, setIsJoinedWaitlist] = useState(false);
     const [waitlistRefreshTrigger, setWaitlistRefreshTrigger] = useState(0);
     const [quantity, setQuantity] = useState(1);
     const { expoPushToken } = usePushNotifications();
+
+    const scrollY = useSharedValue(0);
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event) => {
+            scrollY.value = event.contentOffset.y;
+        },
+    });
 
     const { addToCart, cartCount } = useCart();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
@@ -157,6 +169,32 @@ export default function ProductDetailsScreen() {
         }
     };
 
+    const isCustomizeYes = useMemo(() => {
+        if (!product?.product_options) return false;
+        const customizeOption = product.product_options.find((opt: any) => {
+            const slug = String(opt?.slug || '').toLowerCase();
+            const name = String(opt?.name || '').toLowerCase();
+            return (
+                slug.startsWith('customize') ||
+                slug.startsWith('customise') ||
+                slug.startsWith('customization') ||
+                name === 'customize' ||
+                name === 'customise' ||
+                name === 'customization'
+            );
+        });
+        if (!customizeOption) return false;
+        const selected = optionSelections[customizeOption.name];
+        if (!selected) return false;
+        return String(selected).toLowerCase() === 'yes';
+    }, [product, optionSelections]);
+
+    useEffect(() => {
+        if (!isCustomizeYes) {
+            setCustomizationError(null);
+        }
+    }, [isCustomizeYes]);
+
     // Handle variant change from dynamic selectors
     const handleVariantChange = (variantId: number | null, variantData: any | null) => {
         setSelectedVariantData(variantData);
@@ -177,10 +215,11 @@ export default function ProductDetailsScreen() {
         const fixUrl = (url: string | undefined | null) => {
             if (!url) return null;
             if (url.startsWith('http')) return url;
-            return `https://sadekabdelsater.com/storage/${url}`;
+            return `https://lebazone.shop/storage/${url.replace(/^\/+/, '')}`;
         };
 
         const mainImage = fixUrl(product.main_image);
+        const listingImage = fixUrl((product as any).listing_image);
         const baseImages = product.images?.map(i => fixUrl(i.path)).filter(Boolean) as string[] || [];
         const variantImages = product.variants?.map(v => fixUrl(v.image_path)).filter(Boolean) as string[] || [];
 
@@ -193,7 +232,12 @@ export default function ProductDetailsScreen() {
             return acc;
         }, []) || [];
 
+        // Lead with the image the user just tapped from the shop card. Otherwise it's the
+        // listing_image (what the card displays) so the AppleZoom transition lands without a flash.
+        const entryImage = (initialImage as string | undefined) || listingImage || mainImage;
+
         let list: string[] = [];
+        if (entryImage) list.push(entryImage);
         if (mainImage) list.push(mainImage);
         list = [...list, ...baseImages, ...variantImages, ...allVariantsGalleries];
 
@@ -237,6 +281,8 @@ export default function ProductDetailsScreen() {
         return {
             price: pricing.finalPrice,
             originalPrice: pricing.originalPrice,
+            discountPercent: pricing.discountPercent,
+            source: pricing.source,
         };
     }, [product, selectedVariant, selectedVariantData]);
 
@@ -282,7 +328,33 @@ export default function ProductDetailsScreen() {
             Alert.alert('Selection Required', 'Please select your options before adding to cart.');
             return;
         }
-        addToCart(product, selectedVariant, quantityToAdd);
+
+        let customizationText: string | undefined;
+        if (isCustomizeYes) {
+            const trimmedName = customName.trim();
+            const trimmedNumber = customNumber.trim();
+            if (!trimmedName && !trimmedNumber) {
+                setCustomizationError('Please enter your name and number to personalize your jersey.');
+                return;
+            }
+            if (!trimmedName) {
+                setCustomizationError('Please enter your name for the jersey.');
+                return;
+            }
+            if (!trimmedNumber) {
+                setCustomizationError('Please enter your number for the jersey.');
+                return;
+            }
+            setCustomizationError(null);
+            customizationText = `${trimmedName} #${trimmedNumber}`;
+        }
+
+        addToCart(
+            product,
+            selectedVariant,
+            quantityToAdd,
+            customizationText ? { customization_text: customizationText } : undefined
+        );
         Alert.alert('Added to Cart', 'Item added to your cart.');
     };
 
@@ -308,7 +380,7 @@ export default function ProductDetailsScreen() {
     const handleShare = async () => {
         if (!product) return;
         try {
-            const productUrl = `https://sadekabdelsater.com/product/${product.name_en}`;
+            const productUrl = `https://lebazone.shop/lb/en/product/${product.slug || product.id}`;
             const result = await Share.share({
                 message: Platform.OS === 'ios'
                     ? product.name_en || product.name || ''
@@ -369,6 +441,16 @@ export default function ProductDetailsScreen() {
 
     // Identify ID for tag
     const productIdForTag = product ? product.id : (id ? Number(Array.isArray(id) ? id[0] : id) : undefined);
+    const currentSku = selectedVariantData?.sku || selectedVariant?.sku || product?.sku || null;
+    const productShortDescription =
+        product?.short_description_en ||
+        product?.short_description ||
+        null;
+    const productCategoryLine = [
+        product?.category?.name_en || product?.category?.name,
+        product?.subCategory?.name_en || product?.subCategory?.name || product?.sub_category?.name_en || product?.sub_category?.name,
+        product?.subSubCategory?.name_en || product?.subSubCategory?.name || product?.sub_sub_category?.name_en || product?.sub_sub_category?.name,
+    ].filter(Boolean).join(' / ');
 
     return (
         <View style={[styles.container, isDark && { backgroundColor: '#000' }]}>
@@ -379,12 +461,12 @@ export default function ProductDetailsScreen() {
                     headerShown: true,
                     headerTransparent: true,
                     headerTitle: '',
+                    animation: 'default' as const,
+                    animationDuration: supportsNativeZoomTransition ? 500 : 320,
+                    gestureEnabled: true,
+                    fullScreenGestureEnabled: true,
                     ...(supportsNativeZoomTransition ? {
-                        animation: 'default' as const,
-                        animationDuration: 500,
-                        fullScreenGestureEnabled: true,
                         animationMatchesGesture: true,
-                        gestureEnabled: true,
                     } : {}),
                     // iOS 26 Native Liquid Glass Buttons Logic
                     ...Platform.select({
@@ -579,10 +661,11 @@ export default function ProductDetailsScreen() {
 
             <Animated.ScrollView
                 contentContainerStyle={{
-                    paddingTop: insets.top + (Platform.OS === 'ios' ? 44 : 56), // Start content below the header
                     paddingBottom: 120 // Space for footer
                 }}
                 showsVerticalScrollIndicator={false}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
             >
                 <ProductImageGallery
                     images={allImages}
@@ -592,12 +675,34 @@ export default function ProductDetailsScreen() {
 
                 {product && (
                     <View>
-                        <Animated.View entering={FadeInDown.delay(300).duration(600).damping(12)}>
+                        {priceData.source === 'flash_sale' && priceData.originalPrice && priceData.originalPrice > priceData.price && (
+                            <Animated.View entering={FadeInDown.delay(80).duration(350).damping(14)}>
+                                <FlashSaleBanner
+                                    flashPrice={priceData.price}
+                                    originalPrice={priceData.originalPrice}
+                                    discountPercent={priceData.discountPercent}
+                                    endDate={
+                                        product.flash_sale?.ends_at
+                                            ?? product.flash_sale?.end_date
+                                            ?? product.flash_sale?.discount_end_date
+                                            ?? product.flash_sale_end_date
+                                            ?? null
+                                    }
+                                />
+                            </Animated.View>
+                        )}
+
+                        <Animated.View entering={FadeInDown.delay(100).duration(350).damping(14)}>
                             <ProductInfo
                                 brand={product.brand?.name}
                                 title={product.name_en || product.name || ''}
                                 price={priceData.price}
                                 originalPrice={priceData.originalPrice}
+                                discountPercent={priceData.discountPercent}
+                                discountSource={priceData.source}
+                                stockStatus={isOutOfStock ? 'out_of_stock' : 'in_stock'}
+                                sku={currentSku}
+                                shortDescription={productShortDescription}
                                 rating={product.reviews?.length ? (product.reviews.reduce((acc, r) => acc + r.rating, 0) / product.reviews.length) : 0}
                                 reviewCount={product.reviews?.length || 0}
                                 productId={product.id}
@@ -605,21 +710,65 @@ export default function ProductDetailsScreen() {
                         </Animated.View>
 
                         {product.tags && product.tags.length > 0 && (
-                            <Animated.View entering={FadeInDown.delay(350).duration(600).damping(12)}>
+                            <Animated.View entering={FadeInDown.delay(140).duration(350).damping(14)}>
                                 <ProductTags tags={product.tags} />
                             </Animated.View>
                         )}
 
-                        <Animated.View entering={FadeInDown.delay(400).duration(600).damping(12)}>
+                        <Animated.View entering={FadeInDown.delay(170).duration(350).damping(14)}>
                             <ProductSelectors
                                 productOptions={product.product_options}
                                 variantMatrix={product.variant_matrix}
                                 onVariantChange={handleVariantChange}
+                                onSelectionsChange={setOptionSelections}
                             />
                         </Animated.View>
 
+                        {isCustomizeYes && (
+                            <JerseyCustomization
+                                name={customName}
+                                number={customNumber}
+                                onChangeName={(v) => {
+                                    setCustomName(v);
+                                    if (customizationError) setCustomizationError(null);
+                                }}
+                                onChangeNumber={(v) => {
+                                    setCustomNumber(v);
+                                    if (customizationError) setCustomizationError(null);
+                                }}
+                                errorMessage={customizationError}
+                            />
+                        )}
+
+                        <Animated.View entering={FadeInDown.delay(200).duration(350).damping(14)}>
+                            <View style={[styles.productMetaBlock, isDark && styles.productMetaBlockDark]}>
+                                {!!productCategoryLine && (
+                                    <View style={styles.metaLine}>
+                                        <Text style={[styles.metaLabel, isDark && styles.metaLabelDark]}>Category</Text>
+                                        <Text style={[styles.metaValue, isDark && styles.metaValueDark]}>{productCategoryLine}</Text>
+                                    </View>
+                                )}
+                                {!!product.barcode && (
+                                    <View style={styles.metaLine}>
+                                        <Text style={[styles.metaLabel, isDark && styles.metaLabelDark]}>Barcode</Text>
+                                        <Text style={[styles.metaValue, isDark && styles.metaValueDark]}>{product.barcode}</Text>
+                                    </View>
+                                )}
+                                <View style={styles.benefitRow}>
+                                    <View style={styles.benefitItem}>
+                                        <IconSymbol name="truck.box" size={18} color={isDark ? '#E5E7EB' : '#111827'} />
+                                        <Text style={[styles.benefitText, isDark && styles.benefitTextDark]}>Free worldwide shipping</Text>
+                                    </View>
+                                    <View style={styles.benefitItem}>
+                                        <IconSymbol name="checkmark.shield" size={18} color={isDark ? '#E5E7EB' : '#111827'} />
+                                        <Text style={[styles.benefitText, isDark && styles.benefitTextDark]}>Secure payment</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </Animated.View>
+
                         {!supportsNativeBottomToolbar && (
-                            <Animated.View entering={FadeInDown.delay(500).duration(600).damping(12)}>
+                            <Animated.View entering={FadeInDown.delay(230).duration(350).damping(14)}>
                                 <AddToCartFooter
                                     onAddToCart={handleAddToCart}
                                     onToggleWishlist={handleToggleWishlist}
@@ -635,7 +784,7 @@ export default function ProductDetailsScreen() {
 
 
                         {product.type === 'bundle' && product.bundle_items && (
-                            <Animated.View entering={FadeInDown.delay(700).duration(600).damping(12)}>
+                            <Animated.View entering={FadeInDown.delay(290).duration(350).damping(14)}>
                                 <BundleContents
                                     items={product.bundle_items}
                                     customItems={product.custom_bundle_items}
@@ -645,12 +794,16 @@ export default function ProductDetailsScreen() {
                             </Animated.View>
                         )}
 
-                        <Animated.View entering={FadeInDown.delay(600).duration(600).damping(12)}>
+                        <Animated.View entering={FadeInDown.delay(260).duration(350).damping(14)}>
                             <ProductDescription description={product.description_en || product.description || ''} />
                         </Animated.View>
 
-                        <Animated.View entering={FadeInDown.delay(800).duration(600).damping(12)}>
-                            <RelatedProducts currentProductId={product.id} />
+                        <Animated.View entering={FadeInDown.delay(320).duration(350).damping(14)}>
+                            <OrderTimeline scrollY={scrollY} />
+                        </Animated.View>
+
+                        <Animated.View entering={FadeInDown.delay(350).duration(350).damping(14)}>
+                            <CompleteCollectionRail currentProductId={product.id} />
                         </Animated.View>
                     </View>
                 )}
@@ -741,6 +894,60 @@ const styles = StyleSheet.create({
     },
     floatingAddToCartTextDark: {
         color: '#0F172A',
+    },
+    productMetaBlock: {
+        marginHorizontal: 20,
+        marginTop: 22,
+        paddingTop: 18,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        gap: 12,
+    },
+    productMetaBlockDark: {
+        borderTopColor: '#1F2937',
+    },
+    metaLine: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 14,
+    },
+    metaLabel: {
+        color: '#64748B',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    metaLabelDark: {
+        color: '#94A3B8',
+    },
+    metaValue: {
+        color: '#111827',
+        fontSize: 13,
+        fontWeight: '600',
+        flex: 1,
+        textAlign: 'right',
+    },
+    metaValueDark: {
+        color: '#E5E7EB',
+    },
+    benefitRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 14,
+        paddingTop: 4,
+    },
+    benefitItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        minWidth: '45%',
+    },
+    benefitText: {
+        color: '#111827',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    benefitTextDark: {
+        color: '#E5E7EB',
     },
     toolbarQuantityBox: {
         flexDirection: 'row',

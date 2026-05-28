@@ -71,6 +71,56 @@ function rankProductsByQuery(products: Product[], query: string): Product[] {
     return scored.map(item => item.product);
 }
 
+/**
+ * Minimal Levenshtein distance for the "Did you mean?" fallback.
+ * Returns the minimum number of single-character edits between two strings.
+ */
+function levenshtein(a: string, b: string): number {
+    if (a === b) return 0;
+    if (!a) return b.length;
+    if (!b) return a.length;
+    const m = a.length;
+    const n = b.length;
+    // Two-row optimization to keep memory at O(n).
+    let prev = new Array(n + 1).fill(0).map((_, i) => i);
+    let curr = new Array(n + 1).fill(0);
+    for (let i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            curr[j] = Math.min(
+                curr[j - 1] + 1,           // insertion
+                prev[j] + 1,                // deletion
+                prev[j - 1] + cost          // substitution
+            );
+        }
+        [prev, curr] = [curr, prev];
+    }
+    return prev[n];
+}
+
+/**
+ * Pick the closest match from a pool of candidate strings for "Did you mean?".
+ * Mirrors what web does at header-search.blade.php lines 633-640.
+ */
+function findSpellingSuggestion(query: string, pool: string[]): string | null {
+    const q = normalizeSearchText(query);
+    if (!q || q.length < 3) return null;
+    let best: { value: string; distance: number } | null = null;
+    for (const candidate of pool) {
+        const norm = normalizeSearchText(candidate);
+        if (!norm || norm === q) continue;
+        const distance = levenshtein(q, norm);
+        // Accept fuzzy matches: ≤2 edits for short queries, ≤30% of length for longer ones.
+        const tolerance = Math.max(2, Math.floor(q.length * 0.3));
+        if (distance > tolerance) continue;
+        if (!best || distance < best.distance) {
+            best = { value: candidate, distance };
+        }
+    }
+    return best ? best.value : null;
+}
+
 function dedupeProductsById(products: Product[]): Product[] {
     const seen = new Set<number>();
     const unique: Product[] = [];
@@ -338,6 +388,52 @@ export default function SearchIndex() {
         brandResults.length > 0 ||
         categoryResults.length > 0;
 
+    // Top product-name suggestions — shown as a chip row above the grid so the user
+    // can tap one to refine their query. Mirrors web's "SUGGESTIONS" group
+    // (header-search.blade.php lines 562-576).
+    const productSuggestions = React.useMemo(
+        () => searchResults.slice(0, 5).map((p) => p.name_en || p.name || '').filter(Boolean),
+        [searchResults]
+    );
+
+    // "Did you mean?" fallback — populates only when there are no results.
+    // Pulls candidates from brands, categories, recent + trending searches.
+    const [allBrands, setAllBrands] = useState<Brand[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([api.getBrands(), api.getCategories()])
+            .then(([brs, cats]) => {
+                if (cancelled) return;
+                setAllBrands(brs);
+                setAllCategories(cats);
+            })
+            .catch(() => { });
+        return () => { cancelled = true; };
+    }, []);
+
+    const spellingSuggestion = React.useMemo(() => {
+        if (!searchQuery.trim()) return null;
+        if (hasResults) return null;
+        const pool: string[] = [
+            ...allBrands.map((b) => b.name).filter(Boolean) as string[],
+            ...allCategories.flatMap((c) => [c.name, c.name_en]).filter(Boolean) as string[],
+            ...recentSearches,
+            ...trendingSearches,
+        ];
+        return findSpellingSuggestion(searchQuery, pool);
+    }, [searchQuery, hasResults, allBrands, allCategories, recentSearches, trendingSearches]);
+
+    const handleViewAllResults = React.useCallback(() => {
+        const trimmed = searchQuery.trim();
+        if (!trimmed) return;
+        router.push({ pathname: '/shop' as any, params: { search: trimmed } });
+    }, [searchQuery, router]);
+
+    const handleSuggestionTap = React.useCallback((value: string) => {
+        setSearchQuery(value);
+    }, []);
+
     return (
         <ScrollView
             style={[styles.container, isDark && styles.containerDark]}
@@ -375,6 +471,35 @@ export default function SearchIndex() {
                 </View>
             ) : searchQuery.length > 0 && hasResults ? (
                 <>
+                    {/* Quick-pick suggestion chips (top 5 product names) — matches web
+                        header-search.blade.php "SUGGESTIONS" group at lines 562-576. */}
+                    {productSuggestions.length > 0 && (
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
+                                    Suggestions
+                                </Text>
+                            </View>
+                            <View style={styles.chipContainer}>
+                                {productSuggestions.map((name, idx) => (
+                                    <Pressable
+                                        key={`sugg-${idx}`}
+                                        style={[styles.chip, isDark && styles.chipDark]}
+                                        onPress={() => handleSuggestionTap(name)}
+                                    >
+                                        <Feather name="search" size={14} color={isDark ? '#9CA3AF' : '#666'} />
+                                        <Text
+                                            style={[styles.chipText, isDark && styles.chipTextDark]}
+                                            numberOfLines={1}
+                                        >
+                                            {name}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
                     {/* Brands Results */}
                     {brandResults.length > 0 && (
                         <View style={styles.section}>
@@ -442,6 +567,27 @@ export default function SearchIndex() {
                                     />
                                 ))}
                             </View>
+
+                            {/* View All Results CTA — matches web header-search.blade.php
+                                lines 622-626. Routes to the shop with the search filter
+                                pre-applied so the user can refine with category/brand/price. */}
+                            <Pressable
+                                onPress={handleViewAllResults}
+                                style={({ pressed }) => [
+                                    styles.viewAllButton,
+                                    isDark && styles.viewAllButtonDark,
+                                    pressed && { opacity: 0.85 },
+                                ]}
+                            >
+                                <Text style={[styles.viewAllText, isDark && styles.viewAllTextDark]}>
+                                    View All Results
+                                </Text>
+                                <Feather
+                                    name="arrow-right"
+                                    size={16}
+                                    color={isDark ? '#0F172A' : '#fff'}
+                                />
+                            </Pressable>
                         </View>
                     )}
                 </>
@@ -450,6 +596,45 @@ export default function SearchIndex() {
                     <Text style={[styles.emptyText, isDark && styles.textGrayDark]}>
                         No results found for &quot;{searchQuery}&quot;
                     </Text>
+
+                    {/* "Did you mean?" fallback — matches web header-search.blade.php lines 633-640 */}
+                    {spellingSuggestion && (
+                        <View style={styles.didYouMeanRow}>
+                            <Text style={[styles.didYouMeanLabel, isDark && styles.textGrayDark]}>
+                                Did you mean
+                            </Text>
+                            <Pressable onPress={() => handleSuggestionTap(spellingSuggestion)}>
+                                <Text style={[styles.didYouMeanLink, isDark && styles.didYouMeanLinkDark]}>
+                                    {spellingSuggestion}
+                                </Text>
+                            </Pressable>
+                            <Text style={[styles.didYouMeanLabel, isDark && styles.textGrayDark]}>
+                                ?
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* "Search anyway in the shop" lifeline — sends the user to the shop tab
+                        with the typed query as a search filter, where they can layer
+                        other filters on top. Matches the spirit of web's view-all CTA. */}
+                    <Pressable
+                        onPress={handleViewAllResults}
+                        style={({ pressed }) => [
+                            styles.viewAllButton,
+                            isDark && styles.viewAllButtonDark,
+                            { marginTop: 16 },
+                            pressed && { opacity: 0.85 },
+                        ]}
+                    >
+                        <Text style={[styles.viewAllText, isDark && styles.viewAllTextDark]}>
+                            Search the shop instead
+                        </Text>
+                        <Feather
+                            name="arrow-right"
+                            size={16}
+                            color={isDark ? '#0F172A' : '#fff'}
+                        />
+                    </Pressable>
                 </View>
             ) : (
                 <>
@@ -626,6 +811,7 @@ const styles = StyleSheet.create({
     },
     emptyContainer: {
         paddingVertical: 40,
+        paddingHorizontal: 16,
         alignItems: 'center',
     },
     emptyText: {
@@ -636,5 +822,51 @@ const styles = StyleSheet.create({
     horizontalScroll: {
         gap: 12,
         paddingHorizontal: 16,
+    },
+    didYouMeanRow: {
+        marginTop: 14,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+    },
+    didYouMeanLabel: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    didYouMeanLink: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        textDecorationLine: 'underline',
+    },
+    didYouMeanLinkDark: {
+        color: '#F8FAFC',
+    },
+    viewAllButton: {
+        marginTop: 24,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 22,
+        paddingVertical: 13,
+        borderRadius: 999,
+        backgroundColor: '#0F172A',
+    },
+    viewAllButtonDark: {
+        backgroundColor: '#F8FAFC',
+    },
+    viewAllText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    viewAllTextDark: {
+        color: '#0F172A',
     },
 });

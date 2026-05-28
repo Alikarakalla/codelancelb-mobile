@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { api } from '@/services/apiClient';
+import { applyFieldErrors, parseApiError } from '@/utils/parseApiError';
 
 export default function ForgotPasswordScreen() {
     const insets = useSafeAreaInsets();
@@ -16,7 +17,7 @@ export default function ForgotPasswordScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const { control, handleSubmit, formState: { errors } } = useForm({
+    const { control, handleSubmit, setError, formState: { errors } } = useForm({
         defaultValues: {
             email: '',
         }
@@ -44,15 +45,17 @@ export default function ForgotPasswordScreen() {
             }
         } catch (error: any) {
             console.error('Forgot Password Error:', error);
-            let errorMessage = error.message?.includes('422') || error.message?.includes('404')
-                ? 'WE COULD NOT FIND A USER WITH THAT EMAIL ADDRESS.'
-                : 'SOMETHING WENT WRONG. PLEASE TRY AGAIN.';
-
-            if (error.message?.includes('500') || error.message?.includes('Server Error')) {
-                errorMessage = 'SERVER ERROR. PLEASE TRY AGAIN LATER.';
+            const parsed = parseApiError(error);
+            const applied = applyFieldErrors(parsed, setError as any);
+            if (!applied) {
+                let banner = parsed.message;
+                if (parsed.status === 404 || parsed.status === 422) {
+                    banner = 'We could not find a user with that email address.';
+                } else if (parsed.status && parsed.status >= 500) {
+                    banner = 'Server error. Please try again later.';
+                }
+                Alert.alert('Request Failed', banner);
             }
-
-            Alert.alert('REQUEST FAILED', errorMessage);
         } finally {
             setLoading(false);
         }
@@ -90,11 +93,9 @@ export default function ForgotPasswordScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.content}>
-                        {/* Minimalist Header */}
+                        {/* Header — matches web auth-forgot-password-react.jsx */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>FORGOT</Text>
-                            <Text style={styles.titleBold}>PASSWORD</Text>
-                            <View style={styles.titleUnderline} />
+                            <Text style={styles.title}>Forgot Password</Text>
                             <Text style={styles.subtitle}>ENTER YOUR EMAIL TO RECEIVE A 6-DIGIT CODE</Text>
                         </View>
 
@@ -194,24 +195,11 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         alignItems: 'flex-start',
     },
     title: {
-        fontSize: 36,
-        fontWeight: '300',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-    },
-    titleBold: {
-        fontSize: 42,
-        fontWeight: '900',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-        marginTop: -10,
-    },
-    titleUnderline: {
-        width: 40,
-        height: 6,
-        backgroundColor: isDark ? '#fff' : '#000',
-        marginTop: 4,
-        marginBottom: 16,
+        fontSize: 48,
+        fontWeight: '500',
+        color: isDark ? '#fff' : '#111',
+        letterSpacing: -1.5,
+        lineHeight: 50,
     },
     subtitle: {
         fontSize: 10,
@@ -219,6 +207,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         color: isDark ? '#fff' : '#000',
         opacity: 0.5,
         letterSpacing: 1,
+        marginTop: 12,
     },
     form: {
         gap: 12,

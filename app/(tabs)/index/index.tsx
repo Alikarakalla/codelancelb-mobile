@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Pressable, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
-import { HeroSlider } from '@/components/home/HeroSlider';
-import { HeroCarouselSummary } from '@/components/home/HeroCarouselSummary';
 import { PremiumCategoryGrid } from '@/components/home/PremiumCategoryGrid';
 import { HomeQuickTabs } from '@/components/home/HomeQuickTabs';
 import { HorizontalProductSlider } from '@/components/home/HorizontalProductSlider';
@@ -15,6 +13,10 @@ import { BrandSlider } from '@/components/home/BrandSlider';
 import { StorefrontBanner } from '@/components/home/StorefrontBanner';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
 import { CategoryCompositeSection } from '@/components/home/CategoryCompositeSection';
+import { Carousel2Hero } from '@/components/home/Carousel2Hero';
+import { SubcategoryShowcase } from '@/components/home/SubcategoryShowcase';
+import { ProductCollectionsRow } from '@/components/home/ProductCollectionsRow';
+import { WorldCupCounter } from '@/components/home/WorldCupCounter';
 import { Product, HomeSection } from '@/types/schema';
 import Animated, {
   useSharedValue,
@@ -24,11 +26,9 @@ import { RevealingSection } from '@/components/home/RevealingSection';
 import { api } from '@/services/apiClient';
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<HomeSection[]>([]);
@@ -78,26 +78,35 @@ export default function HomeScreen() {
     );
 
     switch (section.type) {
+      case 'carousel_2':
+      case 'hero_claude':
+        return (
+          <Wrapper key={section.id}>
+            <Carousel2Hero slides={section.data} />
+          </Wrapper>
+        );
+
       case 'hero':
         return (
-          <React.Fragment key={section.id}>
-            <Wrapper>
-              <HeroSlider slides={section.data} onIndexChange={setCurrentHeroIndex} />
-            </Wrapper>
-            {/* Summary is coupled to Hero, usually rendered right after. 
-                            If API sends them together, great. If not, we might need to assume it goes here.
-                            For now, assuming section.data is the slides array. 
-                        */}
-            <RevealingSection scrollY={scrollY} index={index + 0.5} animationType="reveal">
-              <HeroCarouselSummary slides={section.data} activeIndex={currentHeroIndex} />
-            </RevealingSection>
-          </React.Fragment>
+          <Wrapper key={section.id}>
+            <Carousel2Hero slides={section.data} />
+          </Wrapper>
         );
 
       case 'categories':
         return (
           <Wrapper key={section.id} style={{ marginTop: 20 }}>
             <PremiumCategoryGrid scrollY={scrollY} categories={section.data} />
+          </Wrapper>
+        );
+
+      case 'subcategories_showcase':
+        return (
+          <Wrapper key={section.id}>
+            <SubcategoryShowcase
+              items={section.data}
+              title={(section as any).title || (section as any).eyebrow || (section as any).name}
+            />
           </Wrapper>
         );
 
@@ -170,6 +179,7 @@ export default function HomeScreen() {
       // NEW CASES (Mapped to existing components loosely)
       case 'makeup':
       case 'fragrances':
+      case 'bundles':
       case 'product_strip':
         // Horizontal list with a title
         return (
@@ -184,6 +194,32 @@ export default function HomeScreen() {
               products={section.data}
               onProductPress={handleProductPress}
             />
+          </Wrapper>
+        );
+
+      case 'product_collections':
+        // Matches web ProductCollections.jsx — render one banner row showing all collections,
+        // each card linking to /collection/[slug]. (Previously this rendered a separate
+        // product slider per collection, which doesn't match the web design.)
+        return (
+          <Wrapper key={section.id} style={{ marginVertical: 20 }}>
+            <ProductCollectionsRow
+              collections={Array.isArray(section.data) ? section.data : []}
+              heading={(section as any).title || (section as any).eyebrow || 'Shop by Collection'}
+            />
+          </Wrapper>
+        );
+
+      case 'newsletter':
+        return (
+          <Wrapper key={section.id} style={{ marginVertical: 20 }}>
+            <View style={styles.newsletter}>
+              <Text style={styles.newsletterTitle}>Join our world</Text>
+              <Text style={styles.newsletterText}>Get the latest drops, offers, and collection updates.</Text>
+              <Pressable style={styles.newsletterButton} onPress={() => router.push('/shop')}>
+                <Text style={styles.newsletterButtonText}>Explore Now</Text>
+              </Pressable>
+            </View>
           </Wrapper>
         );
 
@@ -208,12 +244,19 @@ export default function HomeScreen() {
       default:
         // If it helps, we can render FeaturesSection at the end if strict mapping isn't found
         // or if it matches a specific type.
-        if (section.type === 'features' || section.id === 'features') { // Assuming type might differ
+        if (section.type === 'features' || section.type === 'store_features' || section.id === 'features') { // Assuming type might differ
           return (
             <Wrapper key={section.id}>
-              <FeaturesSection features={section.data} />
+              <FeaturesSection features={Array.isArray(section.data) ? section.data : section.data?.features} />
             </Wrapper>
           )
+        }
+        if (section.type === 'world_cup_counter') {
+          return (
+            <Wrapper key={section.id}>
+              <WorldCupCounter data={section.data} />
+            </Wrapper>
+          );
         }
         return null;
     }
@@ -229,7 +272,8 @@ export default function HomeScreen() {
 
   return (
     <View collapsable={false} style={[styles.container, isDark && { backgroundColor: '#000' }]}>
-      <GlobalHeader title="LUXE" />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <GlobalHeader title="LUXE" overlayOnHero />
 
       <Animated.ScrollView
         onScroll={scrollHandler}
@@ -237,7 +281,7 @@ export default function HomeScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: 60 + insets.top, paddingBottom: 60 }
+          { paddingBottom: 60 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -258,7 +302,7 @@ export default function HomeScreen() {
               <Text style={[styles.shopAllText, isDark && { color: '#000' }]}>EXPLORE SHOP</Text>
             </Pressable>
             <Text style={[styles.copyright, isDark && { color: '#64748B' }]}>
-              © 2024 SADEK ABDELSATER. ALL RIGHTS RESERVED.
+              © 2026 LEBAZONE. ALL RIGHTS RESERVED.
             </Text>
           </View>
         </RevealingSection>
@@ -282,10 +326,46 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 24,
+    fontWeight: '600',
     color: '#000',
-    letterSpacing: 2,
+  },
+  sectionSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#64748B',
+  },
+  newsletter: {
+    marginHorizontal: 20,
+    padding: 22,
+    borderRadius: 8,
+    backgroundColor: '#f4f4f5',
+  },
+  newsletterTitle: {
+    color: '#000',
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  newsletterText: {
+    marginTop: 8,
+    color: '#52525b',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  newsletterButton: {
+    alignSelf: 'flex-start',
+    minHeight: 42,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    borderRadius: 5,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newsletterButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
     textTransform: 'uppercase',
   },
   footer: {

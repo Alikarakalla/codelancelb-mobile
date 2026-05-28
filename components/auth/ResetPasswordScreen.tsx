@@ -8,6 +8,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { api } from '@/services/apiClient';
+import { applyFieldErrors, parseApiError } from '@/utils/parseApiError';
 
 export default function ResetPasswordScreen() {
     const insets = useSafeAreaInsets();
@@ -22,7 +23,7 @@ export default function ResetPasswordScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const { control, handleSubmit, watch, setValue } = useForm({
+    const { control, handleSubmit, watch, setValue, setError } = useForm({
         defaultValues: {
             email: initialEmail,
             otp: initialToken, // Using otp field
@@ -69,10 +70,19 @@ export default function ResetPasswordScreen() {
             }
         } catch (error: any) {
             console.error('Reset Password Error:', error);
-            const errorMessage = error.message?.includes('422')
-                ? 'INVALID CODE OR PASSWORDS DO NOT MATCH.'
-                : 'SOMETHING WENT WRONG. PLEASE CHECK YOUR CODE AND TRY AGAIN.';
-            Alert.alert('RESET FAILED', errorMessage);
+            const parsed = parseApiError(error);
+            const applied = applyFieldErrors(parsed, setError as any, {
+                password_confirmation: 'confirmPassword',
+                token: 'otp',
+            });
+            if (!applied) {
+                Alert.alert(
+                    'Reset Failed',
+                    parsed.status === 422
+                        ? 'Invalid code or passwords do not match.'
+                        : parsed.message,
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -133,11 +143,9 @@ export default function ResetPasswordScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.content}>
-                        {/* Minimalist Header */}
+                        {/* Header — matches web auth-forgot-password-react.jsx (verify step) */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>VERIFY</Text>
-                            <Text style={styles.titleBold}>ACCOUNT</Text>
-                            <View style={styles.titleUnderline} />
+                            <Text style={styles.title}>Verify Account</Text>
                             <Text style={styles.subtitle}>PLEASE ENTER THE 6-DIGIT CODE SENT TO YOUR EMAIL</Text>
                         </View>
 
@@ -298,24 +306,11 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         alignItems: 'flex-start',
     },
     title: {
-        fontSize: 36,
-        fontWeight: '300',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-    },
-    titleBold: {
-        fontSize: 42,
-        fontWeight: '900',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-        marginTop: -10,
-    },
-    titleUnderline: {
-        width: 40,
-        height: 6,
-        backgroundColor: isDark ? '#fff' : '#000',
-        marginTop: 4,
-        marginBottom: 16,
+        fontSize: 48,
+        fontWeight: '500',
+        color: isDark ? '#fff' : '#111',
+        letterSpacing: -1.5,
+        lineHeight: 50,
     },
     subtitle: {
         fontSize: 10,
@@ -323,6 +318,7 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         color: isDark ? '#fff' : '#000',
         opacity: 0.5,
         letterSpacing: 1,
+        marginTop: 12,
     },
     form: {
         gap: 12,

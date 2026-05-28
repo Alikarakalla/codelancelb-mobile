@@ -46,14 +46,21 @@ export default function RootLayout() {
   const preloadAppData = async () => {
     try {
       // Preload essential data
-      const [settings, slides] = await Promise.all([
+      const [settings, homeData] = await Promise.all([
         api.getStoreSettings(),
-        api.getCarouselSlides(),
+        api.getHomeData(),
       ]);
 
-      // Prefetch slide images if available
-      if (slides && slides.length > 0) {
-        const imagesToPrefetch = slides.flatMap(s => [s.image_mobile, s.image_desktop]).filter((url): url is string => typeof url === 'string' && url.startsWith('http'));
+      if (settings?.store?.logo) {
+        await Image.prefetch(settings.store.logo);
+      }
+
+      const heroSection = homeData.sections.find(section => section.type === 'carousel_2' || section.type === 'hero' || section.type === 'hero_claude');
+      const heroSlides = Array.isArray(heroSection?.data) ? heroSection.data : [];
+      if (heroSlides.length > 0) {
+        const imagesToPrefetch = heroSlides
+          .flatMap(s => [s.image_mobile, s.image_desktop])
+          .filter((url): url is string => typeof url === 'string' && url.startsWith('http'));
         await Promise.all(imagesToPrefetch.map(url => Image.prefetch(url)));
       }
 
@@ -89,6 +96,8 @@ export default function RootLayout() {
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                         <Stack.Screen name="product" options={{ presentation: 'card', headerShown: false }} />
+                        <Stack.Screen name="collection" options={{ presentation: 'card', headerShown: false }} />
+                        <Stack.Screen name="category" options={{ presentation: 'card', headerShown: false }} />
                         <Stack.Screen name="cart" options={{ presentation: 'card', headerShown: false }} />
                         <Stack.Screen name="checkout" options={{ presentation: 'card', headerShown: false }} />
                         <Stack.Screen

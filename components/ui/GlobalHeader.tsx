@@ -14,6 +14,9 @@ import { Share08Icon, FavouriteIcon } from '@/components/ui/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { api } from '@/services/apiClient';
+import { GlassEffectContainer, Host, HStack, RNHostView } from '@expo/ui/swift-ui';
+import { frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 interface GlobalHeaderProps {
     title?: string;
@@ -24,6 +27,52 @@ interface GlobalHeaderProps {
     isWishlisted?: boolean;
     onWishlistPress?: () => void;
     alwaysShowTitle?: boolean;
+    overlayOnHero?: boolean;
+}
+
+function NativeLiquidGlassSurface({
+    children,
+    width,
+    height,
+    borderRadius,
+    shape = 'capsule',
+    style,
+}: {
+    children: React.ReactElement;
+    width: number;
+    height: number;
+    borderRadius?: number;
+    shape?: 'capsule' | 'circle' | 'roundedRectangle';
+    style?: any;
+}) {
+    const modifiers = [
+        frame({ width, height }),
+        glassEffect({
+            glass: { variant: 'regular', interactive: true },
+            shape,
+            cornerRadius: borderRadius,
+        }),
+    ];
+
+    if (Platform.OS === 'ios') {
+        return (
+            <Host style={[{ width, height }, style]}>
+                <GlassEffectContainer>
+                    <HStack modifiers={modifiers}>
+                        <RNHostView matchContents>
+                            {children}
+                        </RNHostView>
+                    </HStack>
+                </GlassEffectContainer>
+            </Host>
+        );
+    }
+
+    return (
+        <View style={[{ width, height, borderRadius, overflow: 'hidden' }, styles.heroOverlayFallbackGlass, style]}>
+            {children}
+        </View>
+    );
 }
 
 export function GlobalHeader({
@@ -34,7 +83,8 @@ export function GlobalHeader({
     showCart,
     isWishlisted,
     onWishlistPress,
-    alwaysShowTitle
+    alwaysShowTitle,
+    overlayOnHero
 }: GlobalHeaderProps) {
     const RouteStack = Stack as any;
     const insets = useSafeAreaInsets();
@@ -46,14 +96,36 @@ export function GlobalHeader({
     const { setCartTargetPoint } = useCartAnimation();
     const cartIconRef = React.useRef<View>(null);
     const [imageError, setImageError] = React.useState(false);
+    const [storeLogo, setStoreLogo] = React.useState<string | null>(null);
+    const [logoError, setLogoError] = React.useState(false);
 
     // Reset error when avatar changes
     React.useEffect(() => {
         setImageError(false);
     }, [user?.avatar]);
 
+    React.useEffect(() => {
+        let isMounted = true;
+
+        api.getStoreSettings()
+            .then(settings => {
+                const logo = settings.store?.logo;
+                if (isMounted && logo) {
+                    setStoreLogo(logo);
+                    setLogoError(false);
+                }
+            })
+            .catch(error => {
+                console.warn('Failed to load store logo:', error);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     const isDark = colorScheme === 'dark';
-    const textColor = isDark ? '#fff' : '#18181B';
+    const textColor = overlayOnHero ? '#18181B' : (isDark ? '#fff' : '#18181B');
     const iosMajorVersion = Platform.OS === 'ios'
         ? Number(String(Platform.Version).split('.')[0] || 0)
         : 0;
@@ -71,6 +143,7 @@ export function GlobalHeader({
     const shouldShowCart = showCart || !isDetailMode;
     const shouldUseNativeToolbarHeader =
         supportsNativeTopToolbar &&
+        !overlayOnHero &&
         !isDetailMode &&
         !showShare &&
         !showWishlist;
@@ -103,6 +176,10 @@ export function GlobalHeader({
             router.push('/login');
         }
     };
+
+    const logoSource = storeLogo && !logoError
+        ? { uri: storeLogo }
+        : require('@/assets/images/logo.png');
 
     const renderProfileAvatar = () => {
         if (isAuthenticated) {
@@ -191,9 +268,10 @@ export function GlobalHeader({
 
                         {title === 'LUXE' ? (
                             <Image
-                                source={require('@/assets/images/logo.png')}
+                                source={logoSource}
                                 style={styles.nativeToolbarLogo}
                                 contentFit="contain"
+                                onError={() => setLogoError(true)}
                             />
                         ) : (
                             <Text style={[styles.title, styles.nativeToolbarTitle, { color: textColor }]}>
@@ -209,6 +287,44 @@ export function GlobalHeader({
                     </RouteStack.Toolbar>
                 )}
             </>
+        );
+    }
+
+    if (overlayOnHero && !isDetailMode && !showShare && !showWishlist) {
+        return (
+            <View style={[styles.heroOverlayContainer, { paddingTop: insets.top + 10 }]}>
+                <View style={styles.heroOverlayContent}>
+                    <NativeLiquidGlassSurface width={144} height={46} borderRadius={23} style={styles.heroOverlayGlassShadow}>
+                        <View style={styles.heroOverlayLeftPillContent}>
+                            <Pressable
+                                onPress={handleProfilePress}
+                                style={[styles.iconButton, styles.heroOverlayProfileButton]}
+                            >
+                                {renderProfileAvatar()}
+                            </Pressable>
+
+                            {title === 'LUXE' ? (
+                                <Image
+                                    source={logoSource}
+                                    style={styles.heroOverlayLogo}
+                                    contentFit="contain"
+                                    onError={() => setLogoError(true)}
+                                />
+                            ) : (
+                                <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+                            )}
+                        </View>
+                    </NativeLiquidGlassSurface>
+
+                    {shouldShowCart && (
+                        <NativeLiquidGlassSurface width={52} height={52} borderRadius={26} shape="circle" style={styles.heroOverlayGlassShadow}>
+                            <View style={styles.heroOverlayCartContent}>
+                                {renderCartButton(styles.heroOverlayCartPressable)}
+                            </View>
+                        </NativeLiquidGlassSurface>
+                    )}
+                </View>
+            </View>
         );
     }
 
@@ -240,9 +356,10 @@ export function GlobalHeader({
                     {(!isDetailMode || alwaysShowTitle) && (
                         title === 'LUXE' ? (
                             <Image
-                                source={require('@/assets/images/logo.png')}
+                                source={logoSource}
                                 style={{ width: 60, height: 28 }}
                                 contentFit="contain"
+                                onError={() => setLogoError(true)}
                             />
                         ) : (
                             <Text style={[styles.title, { color: textColor }]}>{title}</Text>
@@ -373,6 +490,66 @@ const styles = StyleSheet.create({
     nativeToolbarCartButton: {
         width: 36,
         height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroOverlayContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        paddingHorizontal: 18,
+        pointerEvents: 'box-none',
+    },
+    heroOverlayContent: {
+        height: 52,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    heroOverlayFallbackGlass: {
+        backgroundColor: 'rgba(255,255,255,0.42)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.44)',
+    },
+    heroOverlayGlassShadow: {
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 4,
+    },
+    heroOverlayLeftPillContent: {
+        height: 46,
+        width: 144,
+        paddingLeft: 6,
+        paddingRight: 14,
+        borderRadius: 23,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        overflow: 'hidden',
+    },
+    heroOverlayProfileButton: {
+        width: 36,
+        height: 36,
+    },
+    heroOverlayLogo: {
+        width: 82,
+        height: 26,
+    },
+    heroOverlayCartContent: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    heroOverlayCartPressable: {
+        width: 52,
+        height: 52,
         alignItems: 'center',
         justifyContent: 'center',
     },

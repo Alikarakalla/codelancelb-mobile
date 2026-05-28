@@ -20,11 +20,16 @@ export function PromoBanner({ progress, section }: Props) {
     // Fallback data if no section provided
     const data = section || {
         id: 0,
+        title: 'Dragon Diffusion',
         title_en: 'Dragon Diffusion',
+        title_ar: 'Dragon Diffusion',
+        eyebrow: 'Just Landed',
         eyebrow_en: 'Just Landed',
-        subtitle_en: 'Introducing Dragon Diffusion, a brand redefining craftsmanship with its iconic hand-woven leather bags. Each piece is made entirely by hand, using traditional braiding techniques and naturally vegetable-dyed leather for an authentic, lived-in feel.',
+        subtitle: 'Introducing Dragon Diffusion, a brand redefining craftsmanship with its iconic hand-woven leather bags.',
+        subtitle_en: 'Introducing Dragon Diffusion, a brand redefining craftsmanship with its iconic hand-woven leather bags.',
+        cta_text: 'SHOP NOW',
         cta_text_en: 'SHOP NOW',
-        image: 'https://sadekabdelsater.com/storage/highlights/69532125375e1_1767055653.webp',
+        image: 'https://lebazone.shop/storage/highlights/69532125375e1_1767055653.webp',
         image_position: 'left',
         is_active: true,
         sort_order: 1
@@ -84,22 +89,22 @@ export function PromoBanner({ progress, section }: Props) {
 
             <View style={styles.content}>
                 <Animated.View style={titleStyle}>
-                    <Text style={[styles.title, isDark && { color: '#fff' }]}>{data.title_en}</Text>
+                    <Text style={[styles.title, isDark && { color: '#fff' }]}>{data.title || data.title_en}</Text>
                 </Animated.View>
 
                 <Animated.View style={subtitleStyle}>
-                    <Text style={styles.subtitle}>{data.eyebrow_en}</Text>
+                    <Text style={styles.subtitle}>{data.eyebrow || data.eyebrow_en}</Text>
                 </Animated.View>
 
                 <Animated.View style={descStyle}>
                     <Text style={[styles.description, isDark && { color: '#94A3B8' }]}>
-                        {data.subtitle_en}
+                        {data.subtitle || data.subtitle_en}
                     </Text>
                 </Animated.View>
 
                 <Animated.View style={buttonStyle}>
                     <Pressable style={styles.shopNowButton}>
-                        <Text style={[styles.shopNowText, isDark && { color: '#fff' }]}>{data.cta_text_en || 'SHOP NOW'}</Text>
+                        <Text style={[styles.shopNowText, isDark && { color: '#fff' }]}>{data.cta_text || data.cta_text_en || 'SHOP NOW'}</Text>
                         <View style={[styles.underline, isDark && { backgroundColor: '#fff' }]} />
                     </Pressable>
                 </Animated.View>

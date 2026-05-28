@@ -1,15 +1,14 @@
-import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse, HomeSection, Notification, CustomBundleItem } from '@/types/schema';
+import { Product, CartItem, User, WishlistItem, CarouselSlide, Category, HighlightSection, Brand, Banner, CMSFeature, ProductReview, Order, Coupon, Currency, VariantMatrixEntry, HomeResponse, HomeSection, Notification, CustomBundleItem, StoreSettings } from '@/types/schema';
 import { parseColorValue, ColorOption } from '@/utils/colorHelpers';
 import { calculateProductPricing } from '@/utils/pricing';
 import { getDeviceId } from '@/utils/device';
 
 
-// 1. CHANGE THIS in your .env file
 const ENV_URL = process.env.EXPO_PUBLIC_API_URL;
-// If env url is placeholder or missing, use the real one
-const BASE_URL = (!ENV_URL || ENV_URL.includes('your-website.com'))
-    ? 'https://sadekabdelsater.com/api/v1'
-    : ENV_URL;
+const ENV_API_KEY = process.env.EXPO_PUBLIC_API_KEY;
+const FALLBACK_BASE_URL = 'https://lebazone.shop/api/v1/';
+const BASE_URL = ((!ENV_URL || ENV_URL.includes('your-website.com')) ? FALLBACK_BASE_URL : ENV_URL).replace(/\/+$/, '');
+const STORAGE_BASE_URL = BASE_URL.replace(/\/api\/v\d+$/i, '');
 
 console.log('API Client Initialized with BASE_URL:', BASE_URL);
 
@@ -32,6 +31,11 @@ let filterMetadataCache: { colors: ColorOption[], sizes: string[], minPrice: num
 let filterMetadataCacheAt = 0;
 let filterMetadataInFlight: Promise<{ colors: ColorOption[], sizes: string[], minPrice: number, maxPrice: number }> | null = null;
 
+let storeSettingsCache: StoreSettings | null = null;
+let storeSettingsInFlight: Promise<StoreSettings> | null = null;
+let homeDataCache: HomeResponse | null = null;
+let homeDataInFlight: Promise<HomeResponse> | null = null;
+
 export const setApiToken = (token: string | null) => {
     apiToken = token;
 };
@@ -49,8 +53,10 @@ function getHeaders(extraHeaders: Record<string, string> = {}) {
         'Accept-Language': currentLocale,
         'X-Requested-With': 'XMLHttpRequest',
         ...extraHeaders,
-        'X-API-Key': 'sk_kiTY7EJfsNncJ4UNJowb5jkfibZXiK7iDtXVMdRDw5ROvE03'.trim(),
     };
+    if (ENV_API_KEY) {
+        headers['X-API-Key'] = ENV_API_KEY.trim();
+    }
     if (apiToken) {
         headers['Authorization'] = `Bearer ${apiToken}`;
     }
@@ -107,7 +113,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // Helper to fix image URL
 const fixUrl = (url?: string | null) =>
-    (url && !url.startsWith('http')) ? `https://sadekabdelsater.com/storage/${url}` : url;
+    (url && !url.startsWith('http')) ? `${STORAGE_BASE_URL}/storage/${url.replace(/^\/+/, '')}` : url;
 
 function parseDecimal(value: any): number | null {
     if (value === null || value === undefined || value === '') return null;
@@ -269,6 +275,8 @@ function transformProduct(p: any): Product {
         flash_sale_discount_amount: parseDecimal(p.flash_sale_discount_amount),
         flash_sale_price: parseDecimal(p.flash_sale_price),
         main_image: fixUrl(p.main_image),
+        listing_image: fixUrl(p.listing_image),
+        listing_hover_image: fixUrl(p.listing_hover_image),
         // Transform Relations if present
         variants: Array.isArray(p.variants) ? p.variants.map(transformVariant) : [],
         images: Array.isArray(p.images) ? p.images.map(transformImage) : [],
@@ -481,6 +489,7 @@ function transformVariant(v: any): any {
         discount_amount: parseDecimal(v.discount_amount),
         discount_target_parents: parseDiscountTargets(v.discount_target_parents),
         image_path: fixUrl(v.image_path),
+        gallery: Array.isArray(v.gallery) ? v.gallery.map(fixUrl).filter(Boolean) : v.gallery,
         stock_quantity: stock != null ? Number(stock) : 0
     };
 }
@@ -698,6 +707,25 @@ export const api = {
         }
     },
 
+    async getProductCollection(slug: string): Promise<{
+        id: number;
+        slug: string;
+        title: string;
+        subtitle: string | null;
+        image: string | null;
+        image_mobile: string | null;
+        products: Product[];
+    }> {
+        const res = await fetchWithTimeout(`${BASE_URL}/product-collections/${encodeURIComponent(slug)}`, {
+            headers: getHeaders(),
+        });
+        const data = await handleResponse<any>(res);
+        return {
+            ...data,
+            products: Array.isArray(data.products) ? data.products.map(transformProduct) : [],
+        };
+    },
+
     async getRelatedProducts(productId: number | string): Promise<Product[]> {
         try {
             // 1. Try Dedicated Related Products Endpoint
@@ -755,10 +783,10 @@ export const api = {
             ...slide,
             image_desktop: slide.image_desktop?.startsWith('http')
                 ? slide.image_desktop
-                : `https://sadekabdelsater.com/storage/${slide.image_desktop}`,
+                : fixUrl(slide.image_desktop),
             image_mobile: slide.image_mobile?.startsWith('http')
                 ? slide.image_mobile
-                : `https://sadekabdelsater.com/storage/${slide.image_mobile}`
+                : fixUrl(slide.image_mobile)
         }));
 
         (global as any).cachedSlides = transformedData;
@@ -802,7 +830,7 @@ export const api = {
             const highlights = await handleResponse<HighlightSection[]>(res);
             return highlights.map(h => ({
                 ...h,
-                image: h.image?.startsWith('http') ? h.image : `https://sadekabdelsater.com/storage/${h.image}`
+                image: fixUrl(h.image)
             }));
         } catch (err) {
             console.error('Error fetching highlights:', err);
@@ -851,8 +879,8 @@ export const api = {
             const banners = await handleResponse<Banner[]>(res);
             return banners.map(b => ({
                 ...b,
-                image: b.image?.startsWith('http') ? b.image : `https://sadekabdelsater.com/storage/${b.image}`,
-                image_mobile: b.image_mobile?.startsWith('http') ? b.image_mobile : `https://sadekabdelsater.com/storage/${b.image_mobile}`
+                image: fixUrl(b.image) || '',
+                image_mobile: fixUrl(b.image_mobile) || ''
             }));
         } catch (err) {
             console.error('Error fetching banners:', err);
@@ -883,14 +911,18 @@ export const api = {
 
 
     async getHomeData(): Promise<HomeResponse> {
-        try {
-            const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
-            const homeUrl = new URL(`${BASE_URL}/home`);
-            homeUrl.searchParams.append('with', includeRelations);
-            homeUrl.searchParams.append('include', includeRelations);
+        if (homeDataCache) return homeDataCache;
+        if (homeDataInFlight) return homeDataInFlight;
 
-            const res = await fetchWithTimeout(homeUrl.toString(), { headers: getHeaders() });
-            const data = await handleResponse<HomeResponse>(res);
+        homeDataInFlight = (async () => {
+            try {
+                const includeRelations = 'category,sub_category,subCategory,sub_sub_category,subSubCategory,sub_sub_categories,subSubCategories';
+                const homeUrl = new URL(`${BASE_URL}/home`);
+                homeUrl.searchParams.append('with', includeRelations);
+                homeUrl.searchParams.append('include', includeRelations);
+
+                const res = await fetchWithTimeout(homeUrl.toString(), { headers: getHeaders() });
+                const data = await handleResponse<HomeResponse>(res);
 
             // Recursively transform products in various sections
             data.sections = data.sections.map(section => {
@@ -920,6 +952,14 @@ export const api = {
                     return section;
                 }
 
+                if (section.type === 'product_collections' && Array.isArray(section.data)) {
+                    section.data = section.data.map((collection: any) => ({
+                        ...collection,
+                        products: Array.isArray(collection.products) ? collection.products.map(transformProduct) : [],
+                    }));
+                    return section;
+                }
+
                 return section;
             });
 
@@ -942,6 +982,13 @@ export const api = {
                     const featured = Array.isArray(section.data.featured) ? section.data.featured : [];
                     const newArrivals = Array.isArray(section.data.new_arrivals) ? section.data.new_arrivals : [];
                     return [...featured, ...newArrivals].some((product: Product) => productNeedsCategoryHydration(product));
+                }
+
+                if (section.type === 'product_collections' && Array.isArray(section.data)) {
+                    return section.data.some((collection: any) =>
+                        Array.isArray(collection?.products) &&
+                        collection.products.some((product: Product) => productNeedsCategoryHydration(product))
+                    );
                 }
 
                 return false;
@@ -981,6 +1028,16 @@ export const api = {
                             return section;
                         }
 
+                        if (section.type === 'product_collections' && Array.isArray(section.data)) {
+                            section.data = section.data.map((collection: any) => ({
+                                ...collection,
+                                products: Array.isArray(collection.products)
+                                    ? collection.products.map((product: Product) => hydrateProductCategoryRelations(product, allCategories))
+                                    : [],
+                            }));
+                            return section;
+                        }
+
                         return section;
                     });
                 } catch (hydrateErr) {
@@ -988,13 +1045,19 @@ export const api = {
                 }
             }
 
-            return data;
+                homeDataCache = data;
+                return data;
 
-        } catch (err) {
-            console.error('Error fetching home data:', err);
-            // Return empty structure on failure so UI handles it gracefully
-            return { sections: [] };
-        }
+            } catch (err) {
+                console.error('Error fetching home data:', err);
+                // Return empty structure on failure so UI handles it gracefully
+                return { sections: [] };
+            } finally {
+                homeDataInFlight = null;
+            }
+        })();
+
+        return homeDataInFlight;
     },
 
     // --- Waitlist ---
@@ -1459,7 +1522,7 @@ export const api = {
     // Assuming you use a session token or auth token stored in the device
     async getCart(sessionId: string): Promise<CartItem[]> {
         const res = await fetchWithTimeout(`${BASE_URL}/cart`, {
-            headers: { 'X-Session-ID': sessionId }
+            headers: getHeaders({ 'X-Session-ID': sessionId })
         });
         return handleResponse<CartItem[]>(res);
     },
@@ -1467,10 +1530,7 @@ export const api = {
     async addToCart(sessionId: string, productId: number, qty: number, variantId?: number | null, options?: any) {
         const res = await fetchWithTimeout(`${BASE_URL}/cart`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Session-ID': sessionId
-            },
+            headers: getHeaders({ 'X-Session-ID': sessionId }),
             body: JSON.stringify({
                 product_id: productId,
                 quantity: qty,
@@ -1491,7 +1551,7 @@ export const api = {
         if (sessionId) headers['X-Session-ID'] = sessionId;
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetchWithTimeout(`${BASE_URL}/wishlist`, { headers });
+        const res = await fetchWithTimeout(`${BASE_URL}/wishlist`, { headers: getHeaders(headers) });
         return handleResponse<WishlistItem[]>(res);
     },
 
@@ -1508,7 +1568,7 @@ export const api = {
     async createOrder(orderData: any): Promise<Order> {
         const res = await fetchWithTimeout(`${BASE_URL}/orders`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify(orderData)
         });
         return handleResponse<Order>(res);
@@ -1690,12 +1750,24 @@ export const api = {
     },
 
     // --- Config ---
-    async getStoreSettings() {
-        const res = await fetchWithTimeout(`${BASE_URL}/config/store-settings`, {
-            method: 'GET',
-            headers: getHeaders(),
-        });
-        return handleResponse<any>(res);
+    async getStoreSettings(): Promise<StoreSettings> {
+        if (storeSettingsCache) return storeSettingsCache;
+        if (storeSettingsInFlight) return storeSettingsInFlight;
+
+        storeSettingsInFlight = (async () => {
+            try {
+                const res = await fetchWithTimeout(`${BASE_URL}/config/store-settings`, {
+                    method: 'GET',
+                    headers: getHeaders(),
+                });
+                storeSettingsCache = await handleResponse<StoreSettings>(res);
+                return storeSettingsCache;
+            } finally {
+                storeSettingsInFlight = null;
+            }
+        })();
+
+        return storeSettingsInFlight;
     },
 
     // --- Currencies ---

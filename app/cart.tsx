@@ -7,7 +7,8 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartFooter } from '@/components/cart/CartFooter';
-import { CartItem } from '@/components/cart/CartItem';
+import { CartItem, CartItemBundleEntry } from '@/components/cart/CartItem';
+import { FreeShippingProgress } from '@/components/cart/FreeShippingProgress';
 import { OrderSummary } from '@/components/cart/OrderSummary';
 
 import { useAuth } from '@/hooks/use-auth-context';
@@ -144,77 +145,115 @@ export default function CartScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {items.length === 0 ? (
-                    <View style={styles.emptyContainer}>
+                    <View style={[styles.emptyContainer, isDark && styles.emptyContainerDark]}>
                         <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>Your cart is empty.</Text>
+                        <Pressable
+                            onPress={() => router.push('/shop' as any)}
+                            style={({ pressed }) => [
+                                styles.emptyCta,
+                                isDark && styles.emptyCtaDark,
+                                pressed && { opacity: 0.85 },
+                            ]}
+                        >
+                            <Text style={[styles.emptyCtaText, isDark && styles.emptyCtaTextDark]}>
+                                Start Shopping
+                            </Text>
+                        </Pressable>
                     </View>
                 ) : (
                     <>
+                        <FreeShippingProgress subtotal={subtotal} threshold={freeThreshold} />
                         <View style={styles.list}>
                             {items.map((item) => {
                                 // Find variant based on key
                                 const variant = resolveCartItemVariant(item);
                                 const pricing = getCartItemPricing(item);
 
-                                // Determine image: variant gallery -> variant image -> product images -> main image
+                                // Image fallback — also fixes legacy snapshots stored before the API
+                                // started normalizing listing_image. If the value is a relative path
+                                // (`products/abc.jpg`), prepend the storage URL like apiClient does.
+                                const fixImg = (u: any): string => {
+                                    if (!u || typeof u !== 'string') return '';
+                                    if (u.startsWith('http')) return u;
+                                    return `https://lebazone.shop/storage/${u.replace(/^\/+/, '')}`;
+                                };
+                                const pAny = item.product as any;
                                 let displayImage = '';
                                 if (variant?.gallery && variant.gallery.length > 0) {
-                                    // Use first image from variant's gallery
-                                    displayImage = variant.gallery[0];
+                                    displayImage = fixImg(variant.gallery[0]);
                                 } else if (variant?.image_path) {
-                                    displayImage = variant.image_path;
+                                    displayImage = fixImg(variant.image_path);
+                                } else if (pAny?.listing_image) {
+                                    displayImage = fixImg(pAny.listing_image);
+                                } else if (item.product?.main_image) {
+                                    displayImage = fixImg(item.product.main_image);
                                 } else if (item.product?.images && item.product.images.length > 0) {
-                                    // Try to get different image from product images array
-                                    const variantIndex = item.product.variants?.findIndex(v => v.slug === item.variant_key) || 0;
-                                    displayImage = item.product.images[Math.min(variantIndex, item.product.images.length - 1)]?.path || item.product.main_image || '';
-                                } else {
-                                    displayImage = item.product?.main_image || '';
+                                    displayImage = fixImg(item.product.images[0]?.path || '');
                                 }
 
-                                // Determine details text
+                                // Build variant label exactly like web ProductShow.php line 479:
+                                // join the selected option VALUES with " / ", no key prefix.
+                                // e.g. "Black / 43" not "Color: Black • Sizes-ESly: 43".
                                 let details = '';
-                                if (variant) {
-                                    const parts = [];
-                                    if (variant.color) parts.push(`Color: ${variant.color}`);
-                                    if (variant.size) parts.push(`Size: ${variant.size}`);
-                                    details = parts.join(' • ');
-                                } else if (item.options) {
-                                    // Handle bundle selections specifically to avoid [object Object]
-                                    if (item.options.bundle_selections) {
-                                        const selectionsMap = item.options.bundle_selections as Record<string, any>;
-                                        const bundleItems = item.product?.bundle_items || [];
+                                let bundleEntries: CartItemBundleEntry[] | undefined;
 
-                                        const lines = Object.entries(selectionsMap).map(([pid, variant]) => {
-                                            if (!variant) return null;
-
-                                            // Find sub-product name using ID from key
-                                            const subProduct = bundleItems.find(p => p.id === Number(pid));
-                                            const subName = subProduct?.name_en || subProduct?.name || 'Item';
-                                            // Truncate long names
-                                            const truncatedName = subName.length > 18 ? subName.substring(0, 18) + '...' : subName;
-
-                                            // Format attributes
-                                            const attrs = [];
-                                            if (variant.size) attrs.push(variant.size);
-                                            if (variant.color) attrs.push(variant.color);
-
-                                            const attrStr = attrs.join(', ');
-                                            return `${truncatedName}${attrStr ? ': ' + attrStr : ''}`;
-                                        }).filter(Boolean);
-
-                                        details = lines.length > 0 ? lines.join('\n') : 'Bundle Configuration Included';
-                                    } else {
-                                        // Fallback to options object if no variant found
-                                        details = Object.entries(item.options)
-                                            .map(([key, val]: any) => {
-                                                if (typeof val === 'object' && val !== null) {
-                                                    return val.name || val.value || '';
-                                                }
-                                                return String(val);
-                                            })
-                                            .filter(Boolean)
-                                            .join(' • ');
+                                const extractValue = (raw: any): string => {
+                                    if (raw == null) return '';
+                                    if (typeof raw === 'object') {
+                                        return String(raw.value || raw.name || raw.label || raw.slug || '');
                                     }
+                                    return String(raw);
+                                };
+
+                                if (variant || (item.options && !item.options.bundle_selections && !item.options.customization_text)) {
+                                    const values: string[] = [];
+                                    // Legacy top-level color/size on the variant itself
+                                    if (variant?.color) values.push(variant.color);
+                                    if (variant?.size) values.push(variant.size);
+                                    // Dynamic variant — option_values on variant OR mirrored on item.options
+                                    const ovSources: any[] = [
+                                        (variant as any)?.option_values,
+                                        item.options,
+                                    ].filter(Boolean);
+                                    const seenKeys = new Set<string>();
+                                    if (variant?.color) seenKeys.add('color');
+                                    if (variant?.size) seenKeys.add('size');
+                                    for (const ov of ovSources) {
+                                        if (typeof ov !== 'object') continue;
+                                        for (const [key, raw] of Object.entries(ov)) {
+                                            const k = key.toLowerCase();
+                                            if (k === 'bundle_selections' || k === 'customization_text') continue;
+                                            if (seenKeys.has(k)) continue;
+                                            const v = extractValue(raw);
+                                            if (v) {
+                                                values.push(v);
+                                                seenKeys.add(k);
+                                            }
+                                        }
+                                    }
+                                    details = values.join(' / ');
+                                } else if (item.options?.bundle_selections) {
+                                    const selectionsMap = item.options.bundle_selections as Record<string, any>;
+                                    const bundleItemsList = item.product?.bundle_items || [];
+                                    bundleEntries = Object.entries(selectionsMap)
+                                        .map(([pid, sel]) => {
+                                            if (!sel) return null;
+                                            const subProduct = bundleItemsList.find(p => p.id === Number(pid));
+                                            const subName = subProduct?.name_en || subProduct?.name || 'Item';
+                                            const attrs: string[] = [];
+                                            if (sel.size) attrs.push(sel.size);
+                                            if (sel.color) attrs.push(sel.color);
+                                            return {
+                                                name: subName,
+                                                variantLabel: attrs.length ? attrs.join(', ') : undefined,
+                                            } as CartItemBundleEntry;
+                                        })
+                                        .filter(Boolean) as CartItemBundleEntry[];
                                 }
+
+                                const customizationText = typeof item.options?.customization_text === 'string'
+                                    ? item.options.customization_text
+                                    : null;
 
                                 return (
                                     <CartItem
@@ -222,6 +261,8 @@ export default function CartScreen() {
                                         id={item.id}
                                         name={item.product?.name_en || item.product?.name || ''}
                                         details={details}
+                                        customizationText={customizationText}
+                                        bundleItems={bundleEntries}
                                         price={pricing.unitPrice}
                                         originalPrice={pricing.originalPrice}
                                         discountPercent={pricing.discountPercent}
@@ -314,18 +355,49 @@ const styles = StyleSheet.create({
         gap: 0,
     },
     emptyContainer: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 64,
+        paddingVertical: 40,
+        paddingHorizontal: 24,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        borderStyle: 'dashed',
+        borderRadius: 8,
+        marginTop: 12,
+        gap: 16,
+    },
+    emptyContainerDark: {
+        borderColor: '#374151',
     },
     emptyText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#64748B',
         fontWeight: '500',
+        textAlign: 'center',
     },
     emptyTextDark: {
         color: '#94A3B8',
+    },
+    emptyCta: {
+        backgroundColor: '#0F172A',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 6,
+        minWidth: 160,
+        alignItems: 'center',
+    },
+    emptyCtaDark: {
+        backgroundColor: '#F8FAFC',
+    },
+    emptyCtaText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    emptyCtaTextDark: {
+        color: '#0F172A',
     },
      toolbarQuantityBox: {
         flexDirection: 'row',

@@ -12,12 +12,32 @@ interface ProductInfoProps {
     rating: number;
     reviewCount: number;
     productId?: number;
+    discountPercent?: number;
+    discountSource?: string;
+    stockStatus?: 'in_stock' | 'out_of_stock';
+    sku?: string | null;
+    shortDescription?: string | null;
 }
 
-export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rating, reviewCount, productId }: ProductInfoProps) {
+export function ProductInfo({
+    brand = 'BRAND',
+    title,
+    price,
+    originalPrice,
+    rating,
+    reviewCount,
+    productId,
+    discountPercent = 0,
+    discountSource = 'none',
+    stockStatus,
+    sku,
+    shortDescription,
+}: ProductInfoProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const { formatPrice } = useCurrency();
+    const hasDiscount = !!originalPrice && originalPrice > price;
+    const isFlashSale = discountSource === 'flash_sale';
 
     const RatingContent = (
         <View style={styles.ratingRow}>
@@ -39,20 +59,56 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
 
     return (
         <View style={styles.container}>
-            <Text style={[styles.brand, isDark && { color: '#94A3B8' }]}>{brand}</Text>
+            <View style={styles.metaRow}>
+                {!!brand && <Text style={[styles.brand, isDark && { color: '#94A3B8' }]}>{brand}</Text>}
+                {stockStatus && (
+                    <View style={[
+                        styles.stockBadge,
+                        stockStatus === 'out_of_stock' ? styles.stockBadgeDanger : styles.stockBadgeSuccess,
+                    ]}>
+                        <Text style={[
+                            styles.stockBadgeText,
+                            stockStatus === 'out_of_stock' ? styles.stockBadgeTextDanger : styles.stockBadgeTextSuccess,
+                        ]}>
+                            {stockStatus === 'out_of_stock' ? 'OUT OF STOCK' : 'IN STOCK'}
+                        </Text>
+                    </View>
+                )}
+            </View>
             <Text style={[styles.title, isDark && { color: '#fff' }]}>{title}</Text>
+            {!!sku && (
+                <Text style={[styles.sku, isDark && { color: '#64748B' }]}>SKU: {sku}</Text>
+            )}
             <View style={styles.priceContainer}>
                 <Text style={[
                     styles.price,
                     isDark && { color: '#fff' },
-                    (originalPrice && originalPrice > price) ? { color: '#ef4444' } : undefined
+                    hasDiscount ? styles.discountPrice : undefined
                 ]}>
                     {formatPrice(price)}
                 </Text>
-                {originalPrice && originalPrice > price ? (
+                {hasDiscount ? (
                     <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
                 ) : null}
+                {hasDiscount && discountPercent > 0 ? (
+                    <View style={[styles.saleBadge, isFlashSale && styles.flashBadge]}>
+                        <Ionicons
+                            name={isFlashSale ? 'flash' : 'pricetag'}
+                            size={11}
+                            color="#fff"
+                        />
+                        <Text style={styles.saleBadgeText}>
+                            {isFlashSale ? 'FLASH ' : ''}-{discountPercent}%
+                        </Text>
+                    </View>
+                ) : null}
             </View>
+
+            {!!shortDescription && (
+                <Text style={[styles.shortDescription, isDark && { color: '#94A3B8' }]}>
+                    {shortDescription}
+                </Text>
+            )}
 
             {reviewCount > 0 && productId ? (
                 <Link href={`/product/reviews?id=${productId}`} asChild>
@@ -68,8 +124,14 @@ export function ProductInfo({ brand = 'BRAND', title, price, originalPrice, rati
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 20,
-        paddingTop: 20,
-        gap: 4,
+        paddingTop: 18,
+        gap: 6,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
     },
     brand: {
         fontSize: 12,
@@ -79,10 +141,16 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     title: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: '#1F2937',
-        textTransform: 'uppercase',
+        fontSize: 24,
+        lineHeight: 29,
+        fontWeight: '600',
+        color: '#111827',
+        letterSpacing: 0,
+    },
+    sku: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#94A3B8',
     },
     priceContainer: {
         flexDirection: 'row',
@@ -91,15 +159,67 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     price: {
-        fontSize: 20,
+        fontSize: 26,
         fontWeight: '800',
-        color: '#1F2937',
+        color: '#111827',
+    },
+    discountPrice: {
+        color: '#EF4444',
     },
     originalPrice: {
         fontSize: 16,
         color: '#94A3B8',
         textDecorationLine: 'line-through',
         fontWeight: '500',
+    },
+    saleBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#EF4444',
+        borderRadius: 4,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
+    },
+    flashBadge: {
+        backgroundColor: '#111827',
+    },
+    saleBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.2,
+    },
+    stockBadge: {
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+    },
+    stockBadgeSuccess: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#BBF7D0',
+    },
+    stockBadgeDanger: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+    },
+    stockBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    stockBadgeTextSuccess: {
+        color: '#047857',
+    },
+    stockBadgeTextDanger: {
+        color: '#DC2626',
+    },
+    shortDescription: {
+        color: '#64748B',
+        fontSize: 14,
+        lineHeight: 21,
+        marginTop: 6,
     },
     ratingRow: {
         flexDirection: 'row',

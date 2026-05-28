@@ -380,7 +380,7 @@ export default function FilterPage() {
     const params = useLocalSearchParams();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const { filters, updateFilter } = useFilters();
+    const { filters, setFilters, updateFilter } = useFilters();
     const insets = useSafeAreaInsets();
 
     const [categories, setCategories] = useState<Category[]>([]);
@@ -434,32 +434,18 @@ export default function FilterPage() {
         );
     }, []);
 
-    const applyFiltersAndNavigate = useCallback((newFilters: any) => {
-        // Update context - ShopScreen will react to context changes
-        // Merge with existing filters to ensure we don't lose state
-        const updated = {
-            categoryIds: filters.categoryIds,
-            brandIds: filters.brandIds,
-            priceRange: filters.priceRange,
-            color: filters.color,
-            size: filters.size,
-            ...newFilters
-        };
-
-        Object.entries(updated).forEach(([key, value]) => {
-            updateFilter(key as keyof typeof filters, value);
-        });
-    }, [filters, updateFilter]);
-
     const handleApply = () => {
-        // Apply all local state to context
-        applyFiltersAndNavigate({
-            priceRange: localPriceRange,
+        // One atomic update so all five fields land in the same render — avoids the
+        // sequential updateFilter calls that used to race when both context and
+        // chip-removal interacted.
+        setFilters((prev) => ({
+            ...prev,
+            priceRange: localPriceRange as [number, number],
             categoryIds: localCategoryIds,
             brandIds: localBrandIds,
             color: localColor,
-            size: localSize
-        });
+            size: localSize,
+        }));
         router.dismiss();
     };
 

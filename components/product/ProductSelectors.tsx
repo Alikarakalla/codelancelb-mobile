@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Alert, View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { DynamicProductOption, VariantMatrixEntry, ProductOptionValue } from '@/types/schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getColorHex } from '@/utils/colorHelpers';
@@ -8,12 +8,14 @@ interface ProductSelectorsProps {
     productOptions?: DynamicProductOption[];
     variantMatrix?: Record<string, VariantMatrixEntry>;
     onVariantChange?: (variantId: number | null, variantData: VariantMatrixEntry | null) => void;
+    onSelectionsChange?: (selections: Record<string, string>) => void;
 }
 
 export function ProductSelectors({
     productOptions = [],
     variantMatrix = {},
-    onVariantChange
+    onVariantChange,
+    onSelectionsChange,
 }: ProductSelectorsProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -103,6 +105,7 @@ export function ProductSelectors({
         } else {
             onVariantChange?.(null, null);
         }
+        onSelectionsChange?.(selections);
     }, [selections, variantMatrix]);
 
     // Check availability (stock > 0) specifically for styling
@@ -139,13 +142,23 @@ export function ProductSelectors({
                 return (
                     <View key={option.name} style={styles.section}>
                         <View style={styles.optionHeader}>
-                            <Text style={[styles.heading, isDark && { color: '#fff' }]}>
-                                {option.name}
-                            </Text>
-                            {selectedValue && (
-                                <Text style={[styles.selectedLabel, isDark && { color: '#94A3B8' }]}>
-                                    : {selectedValue}
+                            <View style={styles.optionTitleRow}>
+                                <Text style={[styles.heading, isDark && { color: '#fff' }]}>
+                                    {option.name}
                                 </Text>
+                                {selectedValue && (
+                                    <Text style={[styles.selectedLabel, isDark && { color: '#94A3B8' }]}>
+                                        {selectedValue}
+                                    </Text>
+                                )}
+                            </View>
+                            {!isColor && option.name.toLowerCase().includes('size') && (
+                                <Pressable
+                                    style={styles.sizeGuideButton}
+                                    onPress={() => Alert.alert('Size Guide', 'Adult apparel: S 36-38, M 39-41, L 42-44, XL 45-47, 2XL 48-50.')}
+                                >
+                                    <Text style={styles.sizeGuideText}>Size Guide</Text>
+                                </Pressable>
                             )}
                         </View>
 
@@ -257,21 +270,31 @@ export function ProductSelectors({
 
 const styles = StyleSheet.create({
     container: {
-        paddingTop: 16,
-        gap: 24,
+        paddingTop: 20,
+        gap: 22,
     },
     section: {
         paddingHorizontal: 20,
-        gap: 16,
+        gap: 12,
     },
     optionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    optionTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minWidth: 0,
+        flex: 1,
     },
     selectedLabel: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '500',
         color: '#64748B',
+        flexShrink: 1,
     },
     stockStatusContainer: {
         flexDirection: 'row',
@@ -291,39 +314,48 @@ const styles = StyleSheet.create({
         color: '#475569',
     },
     heading: {
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: '700',
-        color: '#1F2937',
-        letterSpacing: -0.2,
+        color: '#111827',
+        letterSpacing: 0,
+    },
+    sizeGuideButton: {
+        paddingVertical: 3,
+    },
+    sizeGuideText: {
+        color: '#6B7280',
+        fontSize: 12,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
     },
     colorsRow: {
-        gap: 12,
+        gap: 8,
         paddingRight: 20,
     },
     colorPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 999,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#E5E7EB',
         backgroundColor: '#fff',
-        gap: 10,
+        gap: 8,
     },
     innerDot: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
     },
     dotBorder: {
         borderWidth: 1,
         borderColor: '#E2E8F0',
     },
     colorName: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '500',
-        color: '#1F2937',
+        color: '#111827',
     },
     colorNameSelectedBold: {
         fontWeight: '700',
@@ -336,21 +368,23 @@ const styles = StyleSheet.create({
     sizesRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12,
+        gap: 8,
     },
     sizeBox: {
-        width: 64,
-        height: 48,
-        borderRadius: 8,
+        width: 45,
+        minWidth: 45,
+        height: 36,
+        borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#E5E7EB',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fff',
     },
     sizeBoxSelected: {
         borderColor: '#000',
-        borderWidth: 2,
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
     },
     sizeBoxDisabled: {
         backgroundColor: '#F9FAFB',
@@ -358,9 +392,9 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     sizeText: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '500',
-        color: '#1F2937',
+        color: '#111827',
     },
     sizeTextSelected: {
         fontWeight: '800',

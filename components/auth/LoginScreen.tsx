@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { useAuth } from '@/hooks/use-auth-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { applyFieldErrors, parseApiError } from '@/utils/parseApiError';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -23,7 +24,7 @@ export default function LoginScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const { control, handleSubmit, formState: { errors } } = useForm({
+    const { control, handleSubmit, setError, formState: { errors } } = useForm({
         defaultValues: {
             email: '',
             password: '',
@@ -140,12 +141,17 @@ export default function LoginScreen() {
             router.back();
         } catch (error: any) {
             console.error(error);
-            Alert.alert(
-                'Login Failed',
-                error.message.includes('422')
-                    ? 'The provided credentials are incorrect.'
-                    : 'Something went wrong. Please try again.'
-            );
+            const parsed = parseApiError(error);
+            const applied = applyFieldErrors(parsed, setError as any);
+            if (!applied) {
+                // 422 with no field-level errors (e.g. throttling) or a non-422 — show a friendly banner.
+                Alert.alert(
+                    'Login Failed',
+                    parsed.status === 422
+                        ? 'The provided credentials are incorrect.'
+                        : parsed.message,
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -183,10 +189,9 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.content}>
-                        {/* Minimalist Header */}
+                        {/* Header — matches web auth-login-react.jsx */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>SIGN IN</Text>
-                            <View style={styles.titleUnderline} />
+                            <Text style={styles.title}>Sign In</Text>
                         </View>
 
                         {/* Form Section */}
@@ -242,9 +247,9 @@ export default function LoginScreen() {
                                 disabled={loading}
                             >
                                 {loading ? (
-                                    <Text style={styles.loginButtonText}>AUTHENTICATING...</Text>
+                                    <Text style={styles.loginButtonText}>LOGGING IN...</Text>
                                 ) : (
-                                    <Text style={styles.loginButtonText}>LOGIN</Text>
+                                    <Text style={styles.loginButtonText}>LOG IN</Text>
                                 )}
                             </Pressable>
 
@@ -324,20 +329,15 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 24,
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 40,
         alignItems: 'flex-start',
     },
     title: {
-        fontSize: 42,
-        fontWeight: '900',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-    },
-    titleUnderline: {
-        width: 40,
-        height: 6,
-        backgroundColor: isDark ? '#fff' : '#000',
-        marginTop: 4,
+        fontSize: 48,
+        fontWeight: '500',
+        color: isDark ? '#fff' : '#111',
+        letterSpacing: -1.5,
+        lineHeight: 50,
     },
     form: {
         gap: 12,

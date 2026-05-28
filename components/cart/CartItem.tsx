@@ -4,6 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCurrency } from '@/hooks/use-currency-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+export interface CartItemBundleEntry {
+    name: string;
+    variantLabel?: string;
+}
+
 interface CartItemProps {
     id: number;
     name: string;
@@ -13,6 +18,8 @@ interface CartItemProps {
     discountPercent?: number;
     image: string;
     quantity: number;
+    customizationText?: string | null;
+    bundleItems?: CartItemBundleEntry[];
     onRemove?: () => void;
     onUpdateQuantity?: (quantity: number) => void;
 }
@@ -30,7 +37,31 @@ export function CartItem(props: CartItemProps) {
                 <View style={styles.header}>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.name, isDark && styles.nameDark]} numberOfLines={2}>{props.name}</Text>
-                        <Text style={[styles.details, isDark && styles.detailsDark]}>{props.details}</Text>
+                        {!!props.details && (
+                            <Text style={[styles.details, isDark && styles.detailsDark]}>{props.details}</Text>
+                        )}
+                        {!!props.customizationText && (
+                            <Text style={[styles.customization, isDark && styles.customizationDark]} numberOfLines={2}>
+                                <Text style={styles.customizationLabel}>Custom: </Text>
+                                {props.customizationText}
+                            </Text>
+                        )}
+                        {props.bundleItems && props.bundleItems.length > 0 && (
+                            <View style={[styles.bundleBox, isDark && styles.bundleBoxDark]}>
+                                <Text style={[styles.bundleLabel, isDark && styles.bundleLabelDark]}>
+                                    BUNDLE ITEMS:
+                                </Text>
+                                {props.bundleItems.map((b, idx) => (
+                                    <Text
+                                        key={`${b.name}-${idx}`}
+                                        style={[styles.bundleLine, isDark && styles.bundleLineDark]}
+                                        numberOfLines={1}
+                                    >
+                                        • {b.name}{b.variantLabel ? ` (${b.variantLabel})` : ''}
+                                    </Text>
+                                ))}
+                            </View>
+                        )}
                     </View>
                     <Pressable style={styles.deleteBtn} onPress={props.onRemove}>
                         <Ionicons name="trash-outline" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
@@ -121,6 +152,47 @@ const styles = StyleSheet.create({
         color: '#64748B',
     },
     detailsDark: {
+        color: '#94A3B8',
+    },
+    customization: {
+        marginTop: 4,
+        fontSize: 12,
+        color: '#64748B',
+    },
+    customizationDark: {
+        color: '#94A3B8',
+    },
+    customizationLabel: {
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    bundleBox: {
+        marginTop: 6,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        gap: 2,
+    },
+    bundleBoxDark: {
+        backgroundColor: '#0B1220',
+    },
+    bundleLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        color: '#64748B',
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    bundleLabelDark: {
+        color: '#94A3B8',
+    },
+    bundleLine: {
+        fontSize: 11,
+        color: '#64748B',
+    },
+    bundleLineDark: {
         color: '#94A3B8',
     },
     deleteBtn: {

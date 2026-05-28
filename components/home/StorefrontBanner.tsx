@@ -29,6 +29,7 @@ export function StorefrontBanner({ scrollY, banner }: Props) {
     const displayBanner = banner || {
         id: 0,
         image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1000&auto=format&fit=crop',
+        button_text: 'SHOP NOW',
         button_text_en: 'SHOP NOW',
         is_active: true,
         sort_order: 1
@@ -64,7 +65,7 @@ export function StorefrontBanner({ scrollY, banner }: Props) {
             <View style={styles.overlay}>
                 <Animated.View style={shopButtonStyle}>
                     <Pressable style={styles.shopButton}>
-                        <Text style={styles.shopText}>{displayBanner.button_text_en || 'SHOP NOW'}</Text>
+                        <Text style={styles.shopText}>{displayBanner.button_text || displayBanner.button_text_en || 'SHOP NOW'}</Text>
                     </Pressable>
                 </Animated.View>
             </View>

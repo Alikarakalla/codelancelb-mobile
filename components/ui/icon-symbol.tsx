@@ -3,7 +3,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
 import { ComponentProps } from 'react';
-import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
+import { OpaqueColorValue, Platform, type StyleProp, type TextStyle } from 'react-native';
 
 type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 type IconMapping = Record<string, MaterialIconName>;
@@ -34,6 +34,8 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'chevron.left': 'arrow-back',
   'square.and.arrow.up': 'share',
+  'truck.box': 'local-shipping',
+  'checkmark.shield': 'verified-user',
   'xmark': 'close',
 } satisfies IconMapping;
 
@@ -54,6 +56,7 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  const resolvedName = (MAPPING[name] || 'help-outline') as MaterialIconName;
+  const iconName = typeof name === 'string' ? name : (name?.[Platform.OS as 'ios' | 'android' | 'web'] ?? name?.ios ?? '');
+  const resolvedName = ((MAPPING as Record<string, MaterialIconName>)[String(iconName)] || 'help-outline') as MaterialIconName;
   return <MaterialIcons color={color} size={size} name={resolvedName} style={style} />;
 }

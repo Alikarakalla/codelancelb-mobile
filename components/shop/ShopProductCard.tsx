@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ViewStyle } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, ViewStyle, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCurrency } from '@/hooks/use-currency-context';
+import { useCart } from '@/hooks/use-cart-context';
 import { calculateProductListingPricing } from '@/utils/pricing';
 import { getColorHex } from '@/utils/colorHelpers';
 import { WishlistHeartButton } from '@/components/ui/WishlistHeartButton';
@@ -21,6 +23,7 @@ interface ShopProductCardProps {
 
 export function ShopProductCard({ product, style }: ShopProductCardProps) {
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+    const [pressed, setPressed] = useState(false);
 
     useEffect(() => {
         setSelectedVariant(null);
@@ -29,19 +32,41 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { formatPrice } = useCurrency();
+    const { addToCart } = useCart();
 
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-
-
 
     const pricing = React.useMemo(
         () => calculateProductListingPricing(product, { selectedVariant }),
         [product, selectedVariant]
     );
 
-    // Only switch image if user explicitly selected a variant
-    const currentImage = selectedVariant?.image_path || product.main_image || '';
+    // Walk the same fallback chain the web ProductCard uses (listing_image → main_image
+    // → images[0] → first variant), so products that ship without main_image still render.
+    const resolvedPrimaryImage = useMemo(() => {
+        if (selectedVariant?.image_path) return selectedVariant.image_path;
+        const p = product as any;
+        if (p.listing_image) return p.listing_image as string;
+        if (product.main_image) return product.main_image;
+        const firstImage = product.images?.[0]?.path;
+        if (firstImage) return firstImage;
+        const defaultVariant = product.variants?.find(v => v.is_default) || product.variants?.[0];
+        if (defaultVariant?.image_path) return defaultVariant.image_path;
+        const firstVariantGalleryImage = defaultVariant?.gallery?.[0];
+        if (firstVariantGalleryImage) return firstVariantGalleryImage;
+        return '';
+    }, [selectedVariant, product]);
+
+    const primaryImage = resolvedPrimaryImage;
+    // Web's "hover image" — show on press-and-hold. Prefer listing_hover_image, then images[1].
+    const secondaryImage = useMemo(() => {
+        const p = product as any;
+        const candidate = p.listing_hover_image || product.images?.[1]?.path;
+        if (!candidate || candidate === primaryImage) return null;
+        return candidate as string;
+    }, [product, primaryImage]);
+    const currentImage = pressed && secondaryImage ? secondaryImage : primaryImage;
 
     const inWishlist = isInWishlist(product.id);
     const hasDiscount = pricing.hasDiscount;
@@ -106,9 +131,12 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
     }, [product.variants]);
 
     const handleCardPress = () => {
+        // Always navigate with the primary image, never the press-state secondary swap —
+        // otherwise the detail page's AppleZoom transition lands on the hover image and
+        // visibly flips to the main image once the gallery mounts.
         router.push({
             pathname: '/product/[id]',
-            params: { id: product.id.toString(), initialImage: currentImage }
+            params: { id: product.id.toString(), initialImage: primaryImage }
         } as any);
     };
 
@@ -122,13 +150,39 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
         }
     };
 
+    const handleQuickAdd = (e?: any) => {
+        e?.stopPropagation && e.stopPropagation();
+        if (isOutOfStock) return;
+        // If the product needs variant selection, route to the detail page instead of guessing.
+        if (product.has_variants && !selectedVariant) {
+            router.push({
+                pathname: '/product/[id]',
+                params: { id: product.id.toString(), initialImage: primaryImage }
+            } as any);
+            return;
+        }
+        addToCart(product, selectedVariant, 1);
+        Alert.alert('Added to Cart', 'Item added to your cart.');
+    };
+
     return (
         <View style={[styles.container, isDark && styles.containerDark, style]}>
-            <Pressable onPress={handleCardPress} style={[styles.imageContainer, isDark && { backgroundColor: '#1a1a1a' }]}>
+            <Pressable
+                onPress={handleCardPress}
+                onPressIn={() => setPressed(true)}
+                onPressOut={() => setPressed(false)}
+                delayLongPress={200}
+                style={({ pressed: btnPressed }) => [
+                    styles.imageContainer,
+                    isDark && { backgroundColor: '#1a1a1a' },
+                    btnPressed && styles.imageContainerPressed,
+                ]}
+            >
                 <AnimatedImage
                     source={{ uri: currentImage }}
                     style={[styles.image, isOutOfStock && { opacity: 0.6 }]}
                     contentFit="cover"
+                    transition={350}
                     {...({ sharedTransitionTag: `product-${product.id}` } as any)}
                 />
 
@@ -145,6 +199,20 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
                     style={styles.triggerButton}
                 />
                 {badge}
+
+                {!isOutOfStock && (
+                    <Pressable
+                        onPress={handleQuickAdd}
+                        hitSlop={10}
+                        style={({ pressed: btnPressed }) => [
+                            styles.quickAddButton,
+                            isDark && styles.quickAddButtonDark,
+                            btnPressed && styles.quickAddButtonPressed,
+                        ]}
+                    >
+                        <Ionicons name="add" size={18} color={isDark ? '#000' : '#fff'} />
+                    </Pressable>
+                )}
             </Pressable>
 
             <View style={styles.details}>
@@ -231,6 +299,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
         position: 'relative',
         zIndex: 1,
+    },
+    imageContainerPressed: {
+        opacity: 0.96,
+        transform: [{ scale: 0.985 }],
     },
     image: {
         width: '100%',
@@ -349,5 +421,29 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 4,
-    }
+    },
+    quickAddButton: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#000',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+        shadowColor: '#000',
+        shadowOpacity: 0.16,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    quickAddButtonDark: {
+        backgroundColor: '#fff',
+    },
+    quickAddButtonPressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.94 }],
+    },
 });

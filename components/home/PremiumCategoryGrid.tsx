@@ -26,9 +26,16 @@ export function PremiumCategoryGrid({ scrollY, categories }: Props) {
     const gridItems = displayCategories.slice(0, 4);
 
     const handleCategoryPress = (cat: Category) => {
+        // Always route through the category page — the home /categories endpoint doesn't
+        // include the sub_categories relation, so we can't decide "has subs?" from here.
+        // The category page itself fetches the full tree via api.getCategories() and
+        // either shows subs or redirects to /shop.
         router.push({
-            pathname: '/shop',
-            params: { category_id: cat.id }
+            pathname: '/category/[slug]' as any,
+            params: {
+                slug: cat.slug || String(cat.id),
+                id: String(cat.id),
+            },
         });
     };
 
@@ -46,10 +53,10 @@ export function PremiumCategoryGrid({ scrollY, categories }: Props) {
                         style={styles.card}
                         onPress={() => handleCategoryPress(cat)}
                     >
-                        <Image source={{ uri: cat.thumbnail || 'https://via.placeholder.com/300' }} style={styles.image} />
+                        <Image source={{ uri: cat.image || cat.thumbnail || 'https://via.placeholder.com/300' }} style={styles.image} />
                         <View style={styles.overlay} />
                         <View style={styles.textContainer}>
-                            <Text style={styles.title}>{cat.name}</Text>
+                            <Text style={styles.title}>{cat.name_en || cat.name}</Text>
                         </View>
                     </Pressable>
                 ))}

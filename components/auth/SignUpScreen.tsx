@@ -11,6 +11,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { FormInput } from '@/components/ui/FormInput';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/hooks/use-auth-context';
+import { applyFieldErrors, parseApiError } from '@/utils/parseApiError';
 
 export default function SignUpScreen() {
     const insets = useSafeAreaInsets();
@@ -19,7 +20,7 @@ export default function SignUpScreen() {
     const isDark = colorScheme === 'dark';
     const styles = getStyles(isDark);
 
-    const { control, handleSubmit, watch, formState: { errors } } = useForm({
+    const { control, handleSubmit, watch, setError, formState: { errors } } = useForm({
         defaultValues: {
             name: '',
             email: '',
@@ -116,7 +117,17 @@ export default function SignUpScreen() {
             ]);
         } catch (error: any) {
             console.error('Registration Error:', error);
-            Alert.alert('Registration Failed', error.message || 'Something went wrong.');
+            const parsed = parseApiError(error);
+            const applied = applyFieldErrors(parsed, setError as any, {
+                // API → react-hook-form field name overrides
+                password_confirmation: 'confirmPassword',
+                referral_code: 'referralCode',
+                phone_country: 'phone',
+            });
+            // Only show a banner if there were no inline field errors to surface.
+            if (!applied) {
+                Alert.alert('Registration Failed', parsed.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -154,10 +165,9 @@ export default function SignUpScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.content}>
-                        {/* Minimalist Header */}
+                        {/* Header — matches web auth-register-react.jsx */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>SIGN UP</Text>
-                            <View style={styles.titleUnderline} />
+                            <Text style={styles.title}>Sign Up</Text>
                         </View>
 
                         {/* Form Section */}
@@ -381,20 +391,15 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         paddingHorizontal: 24,
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 40,
         alignItems: 'flex-start',
     },
     title: {
-        fontSize: 42,
-        fontWeight: '900',
-        color: isDark ? '#fff' : '#000',
-        letterSpacing: -1,
-    },
-    titleUnderline: {
-        width: 40,
-        height: 6,
-        backgroundColor: isDark ? '#fff' : '#000',
-        marginTop: 4,
+        fontSize: 48,
+        fontWeight: '500',
+        color: isDark ? '#fff' : '#111',
+        letterSpacing: -1.5,
+        lineHeight: 50,
     },
     form: {
         gap: 12,

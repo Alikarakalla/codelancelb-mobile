@@ -25,6 +25,32 @@ export interface Tag {
     color: string; // Can be preset name (e.g., 'orange', 'red') or HEX (e.g., '#4f46e5')
 }
 
+export interface StoreSettings {
+    store?: {
+        name?: string | null;
+        logo?: string | null;
+        favicon?: string | null;
+        announcement_text?: string | null;
+    };
+    contact?: {
+        phone?: string | null;
+        email?: string | null;
+        address?: string | null;
+    };
+    social?: Record<string, string | null>;
+    shipping?: {
+        free_threshold?: number | null;
+        flat_fee?: number | null;
+    };
+    tax?: {
+        rate_percent?: number | null;
+    };
+    currency?: {
+        code?: string | null;
+        symbol?: string | null;
+    };
+}
+
 export interface Product {
     id: number;
     category_id: number;
@@ -173,6 +199,9 @@ export interface Category {
     name_ar?: string;
     slug: string;
     thumbnail?: string | null;
+    image?: string | null;
+    parentName?: string | null;
+    products_count?: number;
     description?: string;
     description_en?: string;
     description_ar?: string;
@@ -192,12 +221,16 @@ export interface Category {
 
 export interface HighlightSection {
     id: number;
+    eyebrow?: string | null;
     eyebrow_en?: string | null;
     eyebrow_ar?: string | null;
+    title?: string | null;
     title_en: string;
     title_ar: string;
+    subtitle?: string | null;
     subtitle_en?: string | null;
     subtitle_ar?: string | null;
+    cta_text?: string | null;
     cta_text_en?: string | null;
     cta_text_ar?: string | null;
     cta_url?: string | null;
@@ -221,6 +254,7 @@ export interface Banner {
     id: number;
     image: string;
     image_mobile?: string | null;
+    button_text?: string | null;
     button_text_en?: string | null;
     button_text_ar?: string | null;
     button_url?: string | null;
@@ -289,15 +323,25 @@ export interface WishlistItem {
 
 export interface CarouselSlide {
     id: number;
+    title?: string | null;
     title_en: string;
     title_ar: string;
+    subtitle?: string | null;
     subtitle_en?: string | null;
     subtitle_ar?: string | null;
+    cta_text?: string | null;
     cta_text_en?: string | null;
     cta_text_ar?: string | null;
     cta_url?: string | null;
     image_desktop?: string | null;
     image_mobile?: string | null;
+    eyebrowLogo?: string | null;
+    eyebrowText?: string | null;
+    logo?: string | null;
+    logo_url?: string | null;
+    brand_logo?: string | null;
+    overlay_opacity?: number | string | null;
+    overlay_style?: 'gradient' | 'solid' | string | null;
     is_active: boolean;
     sort_order: number;
 }
@@ -393,15 +437,23 @@ export interface LoyaltyLog {
 
 export interface HomeSection {
     id: string;
-    type: 'hero' | 'flash_sales' | 'categories' | 'featured_new' | 'highlights' | 'makeup' | 'fragrances' | 'must_have_brands' | 'banners' | 'category_carousels' | 'product_strip' | 'features';
-    sort_order: number;
+    type: 'hero' | 'carousel_2' | 'hero_claude' | 'flash_sales' | 'product_collections' | 'categories' | 'subcategories_showcase' | 'featured_new' | 'highlights' | 'makeup' | 'bundles' | 'fragrances' | 'must_have_brands' | 'banners' | 'category_carousels' | 'product_strip' | 'features' | 'store_features' | 'newsletter' | 'world_cup_counter';
+    label?: string;
+    sort_order?: number;
     title?: string;
     subtitle?: string;
     show_header?: boolean;
+    settings?: Record<string, any> | null;
     data: any;
 }
 
 export interface HomeResponse {
+    theme?: {
+        id: number;
+        name: string;
+        key: string;
+        meta?: Record<string, any> | null;
+    };
     sections: HomeSection[];
 }
 
@@ -448,4 +500,3 @@ export interface CustomBundleItem {
     custom_gift_name?: string | null;
     custom_gift_image?: string | null;
 }
-

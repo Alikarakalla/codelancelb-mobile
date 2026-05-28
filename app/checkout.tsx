@@ -31,6 +31,7 @@ export default function CheckoutScreen() {
         !!stackToolbar.Spacer;
 
     const [paymentMethod, setPaymentMethod] = useState<'cod'>('cod');
+    const [newsletterSubscribe, setNewsletterSubscribe] = useState(false);
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isUsingSavedAddress, setIsUsingSavedAddress] = useState(true);
     const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
@@ -42,6 +43,12 @@ export default function CheckoutScreen() {
     const [phoneCountry, setPhoneCountry] = useState<any>();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+    // Address fields when entering a new address (mirror web billing_country / billing_city / billing_address).
+    // Country defaults to Lebanon since that's the primary market.
+    const [billingCountry, setBillingCountry] = useState('Lebanon');
+    const [billingCity, setBillingCity] = useState('');
+    const [billingAddress, setBillingAddress] = useState('');
+    const [referralCode, setReferralCode] = useState('');
 
     // Addresses
     const [addresses, setAddresses] = useState<any[]>([]);
@@ -285,27 +292,35 @@ export default function CheckoutScreen() {
                 finalNotes += ` [Redeemed Reward Applied: ${rewardName} (ID: ${appliedReward.id})]`;
             }
 
+            // When entering a new address, use the typed values. When picking a saved one,
+            // pull from selectedAddr. (Mirrors web's billing_country / billing_city / billing_address fields.)
+            const addrCountry = selectedAddr?.country || billingCountry || 'N/A';
+            const addrCity = selectedAddr?.city || billingCity || 'N/A';
+            const addrLine1 = selectedAddr?.address_line_1 || billingAddress || 'N/A';
+
             const orderData = {
                 first_name: firstName || 'Guest',
                 last_name: lastName || 'User',
                 email: email || 'guest@example.com',
                 phone: phone || '',
+                newsletter_subscription: newsletterSubscribe,
+                referral_code: referralCode || null,
 
                 // Shipping address fields (flat structure for backend)
-                shipping_address: selectedAddr?.address_line_1 || 'N/A',
+                shipping_address: addrLine1,
                 shipping_address_2: selectedAddr?.address_line_2 || '',
-                shipping_city: selectedAddr?.city || 'N/A',
+                shipping_city: addrCity,
                 shipping_state: selectedAddr?.state || 'N/A',
                 shipping_zip: selectedAddr?.postal_code || '00000',
-                shipping_country: selectedAddr?.country || 'N/A',
+                shipping_country: addrCountry,
 
                 // Billing address (same as shipping for now)
-                billing_address: selectedAddr?.address_line_1 || 'N/A',
+                billing_address: addrLine1,
                 billing_address_2: selectedAddr?.address_line_2 || '',
-                billing_city: selectedAddr?.city || 'N/A',
+                billing_city: addrCity,
                 billing_state: selectedAddr?.state || 'N/A',
                 billing_zip: selectedAddr?.postal_code || '00000',
-                billing_country: selectedAddr?.country || 'N/A',
+                billing_country: addrCountry,
 
                 // Also send IDs for reference (can be null if new address)
                 billing_address_id: selectedAddressId || null,
@@ -490,15 +505,45 @@ export default function CheckoutScreen() {
                                     const variant = resolveCartItemVariant(item);
                                     const pricing = getCartItemPricing(item);
 
-                                    // Use variant gallery first for image
-                                    const image = variant?.gallery?.[0] || variant?.image_path || item.product?.main_image || '';
+                                    // Image fallback — handles legacy snapshots + listing_image.
+                                    const fixImg = (u: any): string => {
+                                        if (!u || typeof u !== 'string') return '';
+                                        if (u.startsWith('http')) return u;
+                                        return `https://lebazone.shop/storage/${u.replace(/^\/+/, '')}`;
+                                    };
+                                    const pAny = item.product as any;
+                                    let image = '';
+                                    if (variant?.gallery?.[0]) image = fixImg(variant.gallery[0]);
+                                    else if (variant?.image_path) image = fixImg(variant.image_path);
+                                    else if (pAny?.listing_image) image = fixImg(pAny.listing_image);
+                                    else if (item.product?.main_image) image = fixImg(item.product.main_image);
+                                    else if (item.product?.images?.[0]?.path) image = fixImg(item.product.images[0].path);
 
-                                    let details = '';
-                                    if (variant) {
-                                        details = [variant.color, variant.size].filter(Boolean).join(' / ');
-                                    } else if (item.options) {
-                                        details = Object.values(item.options).join(' / ');
+                                    // Variant label — match web ProductShow.php:479 (values joined by " / ")
+                                    const extractValue = (raw: any): string => {
+                                        if (raw == null) return '';
+                                        if (typeof raw === 'object') return String(raw.value || raw.name || raw.label || raw.slug || '');
+                                        return String(raw);
+                                    };
+                                    const values: string[] = [];
+                                    const seenKeys = new Set<string>();
+                                    if (variant?.color) { values.push(variant.color); seenKeys.add('color'); }
+                                    if (variant?.size) { values.push(variant.size); seenKeys.add('size'); }
+                                    const ovSources: any[] = [
+                                        (variant as any)?.option_values,
+                                        item.options,
+                                    ].filter(Boolean);
+                                    for (const ov of ovSources) {
+                                        if (typeof ov !== 'object') continue;
+                                        for (const [key, raw] of Object.entries(ov)) {
+                                            const k = key.toLowerCase();
+                                            if (k === 'bundle_selections' || k === 'customization_text') continue;
+                                            if (seenKeys.has(k)) continue;
+                                            const v = extractValue(raw);
+                                            if (v) { values.push(v); seenKeys.add(k); }
+                                        }
                                     }
+                                    const details = values.join(' / ');
 
                                     const lineTotal = pricing.unitPrice * item.qty;
                                     const lineOriginalTotal = pricing.originalPrice ? (pricing.originalPrice * item.qty) : undefined;
@@ -584,7 +629,7 @@ export default function CheckoutScreen() {
                                     </Text>
                                 </View>
                                 <View style={styles.costRow}>
-                                    <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Estimated Taxes</Text>
+                                    <Text style={[styles.costLabel, isDark && styles.textGrayDark]}>Taxes</Text>
                                     <Text style={[styles.costValue, isDark && styles.textDark]}>{formatPrice(taxes)}</Text>
                                 </View>
                             </View>
@@ -705,7 +750,20 @@ export default function CheckoutScreen() {
 
                 {/* Contact Info */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Contact</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Contact</Text>
+                        {!isAuthenticated && (
+                            <Text style={[styles.contactHint, isDark && styles.contactHintDark]}>
+                                Have an account?{' '}
+                                <Text
+                                    style={styles.contactHintLink}
+                                    onPress={() => router.push('/login' as any)}
+                                >
+                                    Log in
+                                </Text>
+                            </Text>
+                        )}
+                    </View>
                     <View style={styles.inputGroup}>
                         <Text style={[styles.label, isDark && styles.labelDark]}>Email</Text>
                         <TextInput
@@ -742,6 +800,27 @@ export default function CheckoutScreen() {
                             }}
                         />
                     </View>
+
+                    {/* Newsletter checkbox — matches web checkout-page.blade.php lines 138-142 */}
+                    <Pressable
+                        onPress={() => setNewsletterSubscribe(v => !v)}
+                        style={styles.newsletterRow}
+                    >
+                        <View
+                            style={[
+                                styles.newsletterCheckbox,
+                                newsletterSubscribe && styles.newsletterCheckboxChecked,
+                                isDark && (newsletterSubscribe ? styles.newsletterCheckboxCheckedDark : styles.newsletterCheckboxDark),
+                            ]}
+                        >
+                            {newsletterSubscribe && (
+                                <MaterialIcons name="check" size={14} color={isDark ? '#000' : '#fff'} />
+                            )}
+                        </View>
+                        <Text style={[styles.newsletterText, isDark && styles.newsletterTextDark]}>
+                            Email me with news and offers
+                        </Text>
+                    </Pressable>
                 </View>
 
                 {/* Shipping Address */}
@@ -831,70 +910,79 @@ export default function CheckoutScreen() {
                                         />
                                     </View>
                                 </View>
-                                <View style={styles.inputGroup}>
-                                    <Text style={[styles.label, isDark && styles.labelDark]}>Address</Text>
-                                    <View style={styles.inputWrapper}>
-                                        <TextInput
-                                            style={[styles.input, isDark && styles.inputDark, { paddingLeft: 40 }]}
-                                            placeholder="Address"
-                                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
-                                        />
-                                        <MaterialIcons name="search" size={20} color="#9CA3AF" style={styles.inputIcon} />
-                                    </View>
-                                </View>
-                                <View style={styles.inputGroup}>
-                                    <Text style={[styles.label, isDark && styles.labelDark]}>Apartment, suite, etc. (optional)</Text>
-                                    <TextInput
-                                        style={[styles.input, isDark && styles.inputDark]}
-                                        placeholder="Apt 101"
-                                        placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
-                                    />
-                                </View>
+                                {/* Fields here match web checkout-page.blade.php lines 145-177:
+                                    first/last name, country/city (row), address (textarea).
+                                    Web does NOT have Apt/Suite, Zip, or a separate phone in the
+                                    address section (phone is in Contact). */}
                                 <View style={styles.row}>
+                                    <View style={[styles.inputGroup, { flex: 1 }]}>
+                                        <Text style={[styles.label, isDark && styles.labelDark]}>Country</Text>
+                                        <TextInput
+                                            style={[styles.input, isDark && styles.inputDark]}
+                                            placeholder="Country"
+                                            value={billingCountry}
+                                            onChangeText={setBillingCountry}
+                                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                                            autoComplete="country"
+                                        />
+                                    </View>
                                     <View style={[styles.inputGroup, { flex: 1 }]}>
                                         <Text style={[styles.label, isDark && styles.labelDark]}>City</Text>
                                         <TextInput
                                             style={[styles.input, isDark && styles.inputDark]}
-                                            placeholder="New York"
+                                            placeholder="City"
+                                            value={billingCity}
+                                            onChangeText={setBillingCity}
                                             placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
-                                        />
-                                    </View>
-                                    <View style={[styles.inputGroup, { width: 100 }]}>
-                                        <Text style={[styles.label, isDark && styles.labelDark]}>Zip code</Text>
-                                        <TextInput
-                                            style={[styles.input, isDark && styles.inputDark]}
-                                            placeholder="10001"
-                                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                                            autoComplete="postal-address-region"
                                         />
                                     </View>
                                 </View>
                                 <View style={styles.inputGroup}>
-                                    <Text style={[styles.label, isDark && styles.labelDark]}>Country/Region</Text>
-                                    <View style={styles.inputWrapper}>
-                                        <TextInput
-                                            style={[styles.input, isDark && styles.inputDark]}
-                                            value="United States"
-                                            editable={false}
-                                        />
-                                        <MaterialIcons name="expand-more" size={20} color="#9CA3AF" style={[styles.inputIcon, { left: undefined, right: 12 }]} />
-                                    </View>
-                                </View>
-                                <View style={styles.inputGroup}>
-                                    <Text style={[styles.label, isDark && styles.labelDark]}>Phone</Text>
-                                    <View style={styles.inputWrapper}>
-                                        <TextInput
-                                            style={[styles.input, isDark && styles.inputDark, { paddingLeft: 40 }]}
-                                            placeholder="(555) 555-5555"
-                                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
-                                            keyboardType="phone-pad"
-                                        />
-                                        <MaterialIcons name="call" size={20} color="#9CA3AF" style={styles.inputIcon} />
-                                    </View>
+                                    <Text style={[styles.label, isDark && styles.labelDark]}>Address</Text>
+                                    <TextInput
+                                        style={[styles.input, styles.textarea, isDark && styles.inputDark]}
+                                        placeholder="Address"
+                                        value={billingAddress}
+                                        onChangeText={setBillingAddress}
+                                        placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                                        multiline
+                                        numberOfLines={3}
+                                        autoComplete="street-address"
+                                    />
                                 </View>
                             </View>
                         )
                     }
                 </View >
+
+                {/* Shipping method — matches web checkout-page.blade.php lines 212-230 */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Shipping method</Text>
+                    <View style={[styles.shippingOption, isDark && styles.shippingOptionDark]}>
+                        <View style={styles.shippingOptionLeft}>
+                            <View style={styles.shippingRadioOn}>
+                                <View style={styles.shippingRadioDot} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.shippingOptionTitle, isDark && styles.textDark]}>
+                                    {shippingCost === 0 ? 'Free Shipping' : 'Standard Shipping'}
+                                </Text>
+                                <Text style={[styles.shippingOptionDesc, isDark && styles.textGrayDark]}>
+                                    {(() => {
+                                        if ((user?.loyaltyTier as any)?.free_shipping) return 'Loyalty tier benefit';
+                                        if (appliedCoupon?.free_shipping) return 'Coupon benefit';
+                                        if (subtotal >= freeShippingThreshold) return `Orders above ${String(formatPrice(freeShippingThreshold))}`;
+                                        return 'Delivery to your address';
+                                    })()}
+                                </Text>
+                            </View>
+                        </View>
+                        <Text style={[styles.shippingOptionPrice, isDark && styles.textDark]}>
+                            {shippingCost === 0 ? 'Free' : String(formatPrice(shippingCost))}
+                        </Text>
+                    </View>
+                </View>
 
                 {/* Payment */}
                 <View style={styles.section}>
@@ -922,6 +1010,44 @@ export default function CheckoutScreen() {
                         </Pressable>
                     </View>
                 </View>
+
+                {/* Additional information — matches web checkout-page.blade.php lines 251-260 */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Additional information</Text>
+                    <View style={styles.inputGroup}>
+                        <TextInput
+                            style={[styles.input, styles.textarea, isDark && styles.inputDark]}
+                            placeholder="Order notes (optional)"
+                            value={notes}
+                            onChangeText={setNotes}
+                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                            multiline
+                            numberOfLines={3}
+                        />
+                    </View>
+                    <View style={styles.inputGroup}>
+                        <TextInput
+                            style={[styles.input, isDark && styles.inputDark]}
+                            placeholder="Referral code (optional)"
+                            value={referralCode}
+                            onChangeText={setReferralCode}
+                            placeholderTextColor={isDark ? "#64748B" : "#9CA3AF"}
+                            autoCapitalize="characters"
+                        />
+                    </View>
+                </View>
+
+                {/* Back-to-cart affordance — matches web checkout-page.blade.php lines 272-275 */}
+                <Pressable
+                    onPress={() => router.push('/cart' as any)}
+                    style={styles.backToCartRow}
+                    hitSlop={8}
+                >
+                    <MaterialIcons name="chevron-left" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
+                    <Text style={[styles.backToCartText, isDark && styles.backToCartTextDark]}>
+                        Back to cart
+                    </Text>
+                </Pressable>
             </ScrollView>
 
             {supportsNativeBottomToolbar ? (
@@ -1043,6 +1169,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         fontSize: 16,
         color: '#0F172A',
+    },
+    textarea: {
+        height: 88,
+        paddingTop: 12,
+        paddingBottom: 12,
+        textAlignVertical: 'top',
     },
     inputDark: {
         backgroundColor: '#1F2937',
@@ -1475,6 +1607,124 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#9CA3AF',
         fontWeight: '500',
+    },
+    contactHint: {
+        fontSize: 12,
+        color: '#64748B',
+    },
+    contactHintDark: {
+        color: '#94A3B8',
+    },
+    contactHintLink: {
+        color: '#0F172A',
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
+    newsletterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 4,
+        paddingVertical: 4,
+    },
+    newsletterCheckbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 1.5,
+        borderColor: '#CBD5E1',
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    newsletterCheckboxDark: {
+        backgroundColor: '#0B1220',
+        borderColor: '#374151',
+    },
+    newsletterCheckboxChecked: {
+        backgroundColor: '#0F172A',
+        borderColor: '#0F172A',
+    },
+    newsletterCheckboxCheckedDark: {
+        backgroundColor: '#F8FAFC',
+        borderColor: '#F8FAFC',
+    },
+    newsletterText: {
+        fontSize: 13,
+        color: '#0F172A',
+        fontWeight: '500',
+        flexShrink: 1,
+    },
+    newsletterTextDark: {
+        color: '#F8FAFC',
+    },
+    shippingOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#0F172A',
+        backgroundColor: '#FFFFFF',
+    },
+    shippingOptionDark: {
+        backgroundColor: '#0B1220',
+        borderColor: '#F8FAFC',
+    },
+    shippingOptionLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    shippingRadioOn: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1.5,
+        borderColor: '#0F172A',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    shippingRadioDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#0F172A',
+    },
+    shippingOptionTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    shippingOptionDesc: {
+        marginTop: 2,
+        fontSize: 12,
+        color: '#64748B',
+    },
+    shippingOptionPrice: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    backToCartRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingTop: 12,
+        paddingBottom: 24,
+    },
+    backToCartText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    backToCartTextDark: {
+        color: '#94A3B8',
     },
     addressList: {
         paddingRight: 20,
