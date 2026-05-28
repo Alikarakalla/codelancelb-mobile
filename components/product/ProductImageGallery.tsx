@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
         width: SCREEN_WIDTH,
         height: MAIN_HEIGHT,
         position: 'relative',
-        backgroundColor: '#f1f1f1',
+        backgroundColor: '#ffffff',
     },
     mainWrapperDark: {
         backgroundColor: '#0B0B0B',
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'transparent',
-        backgroundColor: '#f1f1f1',
+        backgroundColor: '#ffffff',
     },
     thumbCardDark: {
         backgroundColor: '#0B0B0B',
