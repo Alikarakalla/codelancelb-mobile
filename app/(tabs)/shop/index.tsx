@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, Platform, ScrollView, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -234,34 +234,34 @@ export default function ShopScreen() {
     // URL and re-hydrate stale values on re-render. The one-shot hydration above
     // still covers deep links — that's all we need.
 
+    const buildApiParams = React.useCallback((page: number) => {
+        const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
+        const sortParams = parseSortInfo(filters.sortInfo);
+        return {
+            limit: 12,
+            page,
+            category_ids,
+            sub_category_ids,
+            sub_sub_category_ids,
+            brand_ids: filters.brandIds,
+            min_price: filters.priceRange[0],
+            max_price: filters.priceRange[1],
+            color: filters.color,
+            size: filters.size,
+            search: filters.searchQuery,
+            ...sortParams
+        };
+    }, [filters, categories]);
+
     // Main Product Fetch Effect
     React.useEffect(() => {
         const fetchProducts = async () => {
             setLoading(true);
             try {
-                const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
-                const sortParams = parseSortInfo(filters.sortInfo);
-
-                const apiParams: any = {
-                    limit: 12,
-                    page: 1,
-                    category_ids,
-                    sub_category_ids,
-                    sub_sub_category_ids,
-                    brand_ids: filters.brandIds,
-                    min_price: filters.priceRange[0],
-                    max_price: filters.priceRange[1],
-                    color: filters.color,
-                    size: filters.size,
-                    search: filters.searchQuery,
-                    ...sortParams
-                };
-
-                const data = await api.getProducts(apiParams);
+                const data = await api.getProducts(buildApiParams(1));
                 setProducts(data);
                 setHasMore(data.length >= 12);
                 setPage(1);
-
             } catch (error) {
                 console.error('Error loading shop products:', error);
             } finally {
@@ -379,24 +379,7 @@ export default function ShopScreen() {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
-            const sortParams = parseSortInfo(filters.sortInfo);
-
-            const apiParams: any = {
-                limit: 12,
-                page: 1,
-                category_ids,
-                sub_category_ids,
-                sub_sub_category_ids,
-                brand_ids: filters.brandIds,
-                min_price: filters.priceRange[0],
-                max_price: filters.priceRange[1],
-                color: filters.color,
-                size: filters.size,
-                search: filters.searchQuery,
-                ...sortParams
-            };
-            const data = await api.getProducts(apiParams);
+            const data = await api.getProducts(buildApiParams(1));
             setProducts(data);
             setHasMore(data.length >= 12);
             setPage(1);
@@ -412,24 +395,7 @@ export default function ShopScreen() {
         setLoadingMore(true);
         try {
             const nextPage = page + 1;
-            const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
-            const sortParams = parseSortInfo(filters.sortInfo);
-
-            const apiParams: any = {
-                limit: 12,
-                page: nextPage,
-                category_ids,
-                sub_category_ids,
-                sub_sub_category_ids,
-                brand_ids: filters.brandIds,
-                min_price: filters.priceRange[0],
-                max_price: filters.priceRange[1],
-                color: filters.color,
-                size: filters.size,
-                search: filters.searchQuery,
-                ...sortParams
-            };
-            const data = await api.getProducts(apiParams);
+            const data = await api.getProducts(buildApiParams(nextPage));
             if (data.length > 0) {
                 setProducts(prev => {
                     const existingIds = new Set(prev.map(p => p.id));
@@ -503,7 +469,7 @@ export default function ShopScreen() {
                                     {shopPageTitle}
                                 </Text>
                                 <Text style={[styles.pageCount, isDark && { color: '#64748B' }]}>
-                                    ({products.length})
+                                    ({products.length}{hasMore ? '+' : ''})
                                 </Text>
                             </View>
                             {breadcrumb ? (
@@ -521,17 +487,31 @@ export default function ShopScreen() {
                             ) : null}
                         </View>
 
-                        <View style={styles.grid}>
-                            {products.map((item, idx) => (
-                                <Animated.View
-                                    key={item.id}
-                                    entering={FadeInDown.delay(Math.min(idx, 8) * 45).duration(420)}
-                                    style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
-                                >
-                                    <ShopProductCard product={item} />
-                                </Animated.View>
-                            ))}
-                        </View>
+                        {products.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Text style={[styles.emptyTitle, isDark && { color: '#F8FAFC' }]}>No products found</Text>
+                                <Text style={[styles.emptySubtitle, isDark && { color: '#64748B' }]}>
+                                    Try adjusting your filters
+                                </Text>
+                                {activeFilters.length > 0 && (
+                                    <Pressable onPress={clearFilters} style={styles.clearFiltersButton}>
+                                        <Text style={styles.clearFiltersText}>Clear all filters</Text>
+                                    </Pressable>
+                                )}
+                            </View>
+                        ) : (
+                            <View style={styles.grid}>
+                                {products.map((item, idx) => (
+                                    <Animated.View
+                                        key={item.id}
+                                        entering={FadeInDown.delay(Math.min(idx, 8) * 45).duration(420)}
+                                        style={{ width: Platform.OS === 'ios' && Platform.isPad ? '32%' : '48%' }}
+                                    >
+                                        <ShopProductCard product={item} />
+                                    </Animated.View>
+                                ))}
+                            </View>
+                        )}
 
                         {loadingMore ? (
                             <View style={{ padding: 20, alignItems: 'center' }}>
@@ -612,5 +592,33 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-    }
+    },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        paddingTop: 64,
+        gap: 8,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#64748B',
+    },
+    clearFiltersButton: {
+        marginTop: 16,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+        backgroundColor: '#0F172A',
+    },
+    clearFiltersText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#fff',
+        letterSpacing: 0.5,
+    },
 });

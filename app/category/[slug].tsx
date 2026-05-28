@@ -31,7 +31,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HORIZONTAL_PADDING = 16;
 const GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - GAP) / 2;
-const CARD_HEIGHT = Math.round(CARD_WIDTH * 1.05);
 
 export default function CategoryPage() {
     const router = useRouter();
@@ -223,25 +222,27 @@ export default function CategoryPage() {
                         return (
                             <Animated.View
                                 entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(360)}
-                                style={{ marginBottom: GAP }}
+                                style={{ marginBottom: GAP, width: CARD_WIDTH }}
                             >
                                 <Pressable
                                     onPress={() => handleChildPress(item)}
                                     style={[styles.card, isDark && styles.cardDark]}
                                 >
-                                    {imageUrl ? (
-                                        <Image
-                                            source={{ uri: imageUrl }}
-                                            style={StyleSheet.absoluteFill}
-                                            contentFit="cover"
-                                            transition={250}
-                                        />
-                                    ) : null}
-                                    <View style={styles.cardOverlay} />
-                                    <View style={styles.cardCopy}>
-                                        <Text style={styles.cardTitle} numberOfLines={2}>
+                                    <View style={[styles.cardImage, isDark && styles.cardImageDark]}>
+                                        {imageUrl ? (
+                                            <Image
+                                                source={{ uri: imageUrl }}
+                                                style={StyleSheet.absoluteFill}
+                                                contentFit="cover"
+                                                transition={250}
+                                            />
+                                        ) : null}
+                                    </View>
+                                    <View style={[styles.cardFooter, isDark && styles.cardFooterDark]}>
+                                        <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]} numberOfLines={1}>
                                             {item.name_en || item.name}
                                         </Text>
+                                        <IconSymbol name="chevron.right" size={14} color={isDark ? '#64748B' : '#94A3B8'} />
                                     </View>
                                 </Pressable>
                             </Animated.View>
@@ -326,29 +327,42 @@ const styles = StyleSheet.create({
     },
     card: {
         width: CARD_WIDTH,
-        height: CARD_HEIGHT,
         borderRadius: 12,
         overflow: 'hidden',
-        backgroundColor: '#F4F4F4',
-        justifyContent: 'flex-end',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
     cardDark: {
+        backgroundColor: '#111',
+        borderColor: '#1F2937',
+    },
+    cardImage: {
+        width: '100%',
+        aspectRatio: 1,
+        backgroundColor: '#F4F4F4',
+    },
+    cardImageDark: {
         backgroundColor: '#1F2937',
     },
-    cardOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.18)',
+    cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
     },
-    cardCopy: {
-        position: 'absolute',
-        left: 14,
-        right: 14,
-        bottom: 12,
+    cardFooterDark: {
+        backgroundColor: '#111',
     },
     cardTitle: {
-        color: '#fff',
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: '700',
-        lineHeight: 18,
+        color: '#0F172A',
+        flex: 1,
+    },
+    cardTitleDark: {
+        color: '#F8FAFC',
     },
 });

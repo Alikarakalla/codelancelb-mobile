@@ -159,7 +159,7 @@ export function ShopFilterBar({
                             </Pressable>
                         ))}
 
-                        {onClearAll && activeFilters.length >= 2 && (
+                        {onClearAll && activeFilters.length >= 1 && (
                             <Pressable
                                 onPress={onClearAll}
                                 style={styles.clearAllPill}

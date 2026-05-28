@@ -307,10 +307,7 @@ const CategoryNode = memo(({
     const isSelected = selectedIds.includes(category.id);
     const isExpanded = expandedIds.includes(category.id);
 
-    const children = [
-        ...(category.sub_categories || []),
-        ...(category.sub_sub_categories || [])
-    ];
+    const children = category.sub_categories || [];
     const hasChildren = children.length > 0;
 
     return (
@@ -505,8 +502,9 @@ export default function FilterPage() {
 
             await Promise.allSettled([catsTask, brandsTask, metadataTask]);
         };
-        // Only load once
+        // Only load once — intentional empty deps
         if (categories.length === 0) load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleClear = () => {
