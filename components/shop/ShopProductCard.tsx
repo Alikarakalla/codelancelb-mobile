@@ -1,13 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ViewStyle, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, ScrollView, ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import { Product, ProductVariant } from '@/types/schema';
 import { useWishlist } from '@/hooks/use-wishlist-context';
 import { useCurrency } from '@/hooks/use-currency-context';
-import { useCart } from '@/hooks/use-cart-context';
 import { calculateProductListingPricing } from '@/utils/pricing';
 import { getColorHex } from '@/utils/colorHelpers';
 import { WishlistHeartButton } from '@/components/ui/WishlistHeartButton';
@@ -32,7 +30,6 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
     const router = useRouter();
     const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
     const { formatPrice } = useCurrency();
-    const { addToCart } = useCart();
 
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -150,21 +147,6 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
         }
     };
 
-    const handleQuickAdd = (e?: any) => {
-        e?.stopPropagation && e.stopPropagation();
-        if (isOutOfStock) return;
-        // If the product needs variant selection, route to the detail page instead of guessing.
-        if (product.has_variants && !selectedVariant) {
-            router.push({
-                pathname: '/product/[id]',
-                params: { id: product.id.toString(), initialImage: primaryImage }
-            } as any);
-            return;
-        }
-        addToCart(product, selectedVariant, 1);
-        Alert.alert('Added to Cart', 'Item added to your cart.');
-    };
-
     return (
         <View style={[styles.container, isDark && styles.containerDark, style]}>
             <Pressable
@@ -200,19 +182,6 @@ export function ShopProductCard({ product, style }: ShopProductCardProps) {
                 />
                 {badge}
 
-                {!isOutOfStock && (
-                    <Pressable
-                        onPress={handleQuickAdd}
-                        hitSlop={10}
-                        style={({ pressed: btnPressed }) => [
-                            styles.quickAddButton,
-                            isDark && styles.quickAddButtonDark,
-                            btnPressed && styles.quickAddButtonPressed,
-                        ]}
-                    >
-                        <Ionicons name="add" size={18} color={isDark ? '#000' : '#fff'} />
-                    </Pressable>
-                )}
             </Pressable>
 
             <View style={styles.details}>
@@ -421,29 +390,5 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 4,
-    },
-    quickAddButton: {
-        position: 'absolute',
-        bottom: 8,
-        right: 8,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#000',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-        shadowColor: '#000',
-        shadowOpacity: 0.16,
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: 5,
-        elevation: 3,
-    },
-    quickAddButtonDark: {
-        backgroundColor: '#fff',
-    },
-    quickAddButtonPressed: {
-        opacity: 0.85,
-        transform: [{ scale: 0.94 }],
     },
 });
