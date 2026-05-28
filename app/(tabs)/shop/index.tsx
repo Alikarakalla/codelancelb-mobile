@@ -234,34 +234,34 @@ export default function ShopScreen() {
     // URL and re-hydrate stale values on re-render. The one-shot hydration above
     // still covers deep links — that's all we need.
 
-    const buildApiParams = React.useCallback((page: number) => {
-        const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
-        const sortParams = parseSortInfo(filters.sortInfo);
-        return {
-            limit: 12,
-            page,
-            category_ids,
-            sub_category_ids,
-            sub_sub_category_ids,
-            brand_ids: filters.brandIds,
-            min_price: filters.priceRange[0],
-            max_price: filters.priceRange[1],
-            color: filters.color,
-            size: filters.size,
-            search: filters.searchQuery,
-            ...sortParams
-        };
-    }, [filters, categories]);
-
     // Main Product Fetch Effect
     React.useEffect(() => {
         const fetchProducts = async () => {
             setLoading(true);
             try {
-                const data = await api.getProducts(buildApiParams(1));
+                const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
+                const sortParams = parseSortInfo(filters.sortInfo);
+
+                const apiParams: any = {
+                    limit: 12,
+                    page: 1,
+                    category_ids,
+                    sub_category_ids,
+                    sub_sub_category_ids,
+                    brand_ids: filters.brandIds,
+                    min_price: filters.priceRange[0],
+                    max_price: filters.priceRange[1],
+                    color: filters.color,
+                    size: filters.size,
+                    search: filters.searchQuery,
+                    ...sortParams
+                };
+
+                const data = await api.getProducts(apiParams);
                 setProducts(data);
                 setHasMore(data.length >= 12);
                 setPage(1);
+
             } catch (error) {
                 console.error('Error loading shop products:', error);
             } finally {
@@ -379,7 +379,24 @@ export default function ShopScreen() {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            const data = await api.getProducts(buildApiParams(1));
+            const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
+            const sortParams = parseSortInfo(filters.sortInfo);
+
+            const apiParams: any = {
+                limit: 12,
+                page: 1,
+                category_ids,
+                sub_category_ids,
+                sub_sub_category_ids,
+                brand_ids: filters.brandIds,
+                min_price: filters.priceRange[0],
+                max_price: filters.priceRange[1],
+                color: filters.color,
+                size: filters.size,
+                search: filters.searchQuery,
+                ...sortParams
+            };
+            const data = await api.getProducts(apiParams);
             setProducts(data);
             setHasMore(data.length >= 12);
             setPage(1);
@@ -395,7 +412,24 @@ export default function ShopScreen() {
         setLoadingMore(true);
         try {
             const nextPage = page + 1;
-            const data = await api.getProducts(buildApiParams(nextPage));
+            const { category_ids, sub_category_ids, sub_sub_category_ids } = classifyCategoryIds(filters.categoryIds, categories);
+            const sortParams = parseSortInfo(filters.sortInfo);
+
+            const apiParams: any = {
+                limit: 12,
+                page: nextPage,
+                category_ids,
+                sub_category_ids,
+                sub_sub_category_ids,
+                brand_ids: filters.brandIds,
+                min_price: filters.priceRange[0],
+                max_price: filters.priceRange[1],
+                color: filters.color,
+                size: filters.size,
+                search: filters.searchQuery,
+                ...sortParams
+            };
+            const data = await api.getProducts(apiParams);
             if (data.length > 0) {
                 setProducts(prev => {
                     const existingIds = new Set(prev.map(p => p.id));

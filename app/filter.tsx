@@ -307,7 +307,10 @@ const CategoryNode = memo(({
     const isSelected = selectedIds.includes(category.id);
     const isExpanded = expandedIds.includes(category.id);
 
-    const children = category.sub_categories || [];
+    const children = [
+        ...(category.sub_categories || []),
+        ...(category.sub_sub_categories || [])
+    ];
     const hasChildren = children.length > 0;
 
     return (
