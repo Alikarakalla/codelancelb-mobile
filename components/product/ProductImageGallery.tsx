@@ -10,15 +10,15 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import Animated from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const MAIN_ASPECT_RATIO = 4 / 5; // matches web's mobile breakpoint fallback
-const MAIN_HEIGHT = Math.round(SCREEN_WIDTH / MAIN_ASPECT_RATIO);
+const DEFAULT_ASPECT_RATIO = 4 / 5;
+const DEFAULT_HEIGHT = Math.round(SCREEN_WIDTH / DEFAULT_ASPECT_RATIO);
 const THUMB_SIZE = 86;
 const THUMB_GAP = 8;
 
@@ -32,6 +32,36 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
     const [activeIndex, setActiveIndex] = useState(0);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+
+    // Natural aspect ratios (width/height) keyed by URI, loaded via onLoad
+    const [imageSizes, setImageSizes] = useState<Record<string, number>>({});
+
+    const containerHeight = useSharedValue(DEFAULT_HEIGHT);
+    const containerAnimStyle = useAnimatedStyle(() => ({
+        height: containerHeight.value,
+    }));
+
+    // Animate container height whenever the active image changes or its size loads
+    React.useEffect(() => {
+        const ratio = imageSizes[images[activeIndex]];
+        if (ratio) {
+            containerHeight.value = withTiming(
+                Math.round(SCREEN_WIDTH / ratio),
+                { duration: 220 }
+            );
+        }
+    }, [activeIndex, imageSizes, images, containerHeight]);
+
+    const handleImageLoad = useCallback((uri: string, e: any) => {
+        const { width, height } = e?.source ?? {};
+        if (width && height) {
+            setImageSizes(prev => {
+                const ratio = width / height;
+                if (prev[uri] === ratio) return prev;
+                return { ...prev, [uri]: ratio };
+            });
+        }
+    }, []);
 
     const flatListRef = useRef<FlatList>(null);
     const thumbListRef = useRef<FlatList>(null);
@@ -72,8 +102,6 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
         [images.length]
     );
 
-    // Only sync to selectedImage when it actually changes from outside (e.g. variant selection).
-    // Listening to activeIndex here would fight the user's swipe and snap back to the variant image.
     const lastAppliedSelectedImage = useRef<string | null | undefined>(undefined);
     React.useEffect(() => {
         if (lastAppliedSelectedImage.current === selectedImage) return;
@@ -102,7 +130,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
 
     return (
         <View style={styles.container}>
-            <View style={[styles.mainWrapper, isDark && styles.mainWrapperDark]}>
+            <Animated.View style={[styles.mainWrapper, isDark && styles.mainWrapperDark, containerAnimStyle]}>
                 <FlatList
                     ref={flatListRef}
                     data={images}
@@ -127,31 +155,37 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                             }
                         }, 100);
                     }}
-                    renderItem={({ item, index }) => (
-                        <Link href={viewerHref} asChild>
-                            <Pressable style={styles.slide}>
-                                {supportsAppleZoomTransition && index === activeIndex ? (
-                                    <Link.AppleZoom>
-                                        <View pointerEvents="none" style={styles.appleZoomSourceProxy}>
-                                            <Image
-                                                source={{ uri: item }}
-                                                style={styles.appleZoomSourceImage}
-                                                contentFit="contain"
-                                            />
-                                        </View>
-                                    </Link.AppleZoom>
-                                ) : null}
-                                <AnimatedImage
-                                    source={{ uri: item }}
-                                    style={styles.image}
-                                    contentFit="contain"
-                                    {...(productId && index === 0
-                                        ? ({ sharedTransitionTag: `product-${productId}` } as any)
-                                        : {})}
-                                />
-                            </Pressable>
-                        </Link>
-                    )}
+                    renderItem={({ item, index }) => {
+                        const ratio = imageSizes[item];
+                        const itemHeight = ratio ? Math.round(SCREEN_WIDTH / ratio) : DEFAULT_HEIGHT;
+
+                        return (
+                            <Link href={viewerHref} asChild>
+                                <Pressable style={{ width: SCREEN_WIDTH, height: itemHeight, alignItems: 'center', justifyContent: 'center' }}>
+                                    {supportsAppleZoomTransition && index === activeIndex ? (
+                                        <Link.AppleZoom>
+                                            <View pointerEvents="none" style={styles.appleZoomSourceProxy}>
+                                                <Image
+                                                    source={{ uri: item }}
+                                                    style={styles.appleZoomSourceImage}
+                                                    contentFit="contain"
+                                                />
+                                            </View>
+                                        </Link.AppleZoom>
+                                    ) : null}
+                                    <AnimatedImage
+                                        source={{ uri: item }}
+                                        style={{ width: SCREEN_WIDTH, height: itemHeight }}
+                                        contentFit="contain"
+                                        onLoad={(e) => handleImageLoad(item, e)}
+                                        {...(productId && index === 0
+                                            ? ({ sharedTransitionTag: `product-${productId}` } as any)
+                                            : {})}
+                                    />
+                                </Pressable>
+                            </Link>
+                        );
+                    }}
                 />
 
                 {images.length > 1 && (
@@ -169,7 +203,7 @@ export function ProductImageGallery({ images, selectedImage, productId }: Produc
                         </View>
                     </View>
                 )}
-            </View>
+            </Animated.View>
 
             {images.length > 1 && (
                 <View style={styles.thumbnailsContainer}>
@@ -221,22 +255,12 @@ const styles = StyleSheet.create({
     },
     mainWrapper: {
         width: SCREEN_WIDTH,
-        height: MAIN_HEIGHT,
         position: 'relative',
         backgroundColor: '#ffffff',
+        overflow: 'hidden',
     },
     mainWrapperDark: {
         backgroundColor: '#0B0B0B',
-    },
-    slide: {
-        width: SCREEN_WIDTH,
-        height: MAIN_HEIGHT,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    image: {
-        width: '100%',
-        height: '100%',
     },
     appleZoomSourceProxy: {
         position: 'absolute',
